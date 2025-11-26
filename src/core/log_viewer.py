@@ -68,8 +68,8 @@ class LogViewer:
             msgs = req_data.get('messages', [])
             system_msg = msgs[0]['content'] if msgs else ""
             agent = "Unknown"
-            if "Orchestrator" in system_msg or "bard" in system_msg.lower():
-                agent = "Orchestrator"
+            if "Director" in system_msg or "Orchestrator" in system_msg:
+                agent = "Director"
             elif "Dungeon Master" in system_msg:
                 agent = "DM"
             elif "You are" in system_msg:
@@ -111,6 +111,16 @@ class LogViewer:
             # Response
             html_content += "<h2>Response</h2>"
             html_content += '<div class="card">'
+            
+            # Reasoning (from thinking models)
+            if resp.get('reasoning'):
+                reasoning = html.escape(resp['reasoning'])
+                html_content += f"""
+                    <div style="background: #fff3e0; border: 1px solid #ffe0b2; padding: 10px; margin-bottom: 10px; border-radius: 4px;">
+                        <div style="font-weight: bold; color: #e65100; margin-bottom: 5px;">🧠 Reasoning</div>
+                        <div class="content" style="background: #fff8f0;">{reasoning}</div>
+                    </div>
+                """
             
             if resp.get('tool_calls'):
                 for tc in resp['tool_calls']:

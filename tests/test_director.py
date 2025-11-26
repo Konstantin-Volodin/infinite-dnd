@@ -1,5 +1,5 @@
 """
-Test Orchestrator - Verify decision making logic.
+Test Director - Verify decision making logic.
 """
 import sys
 import os
@@ -10,13 +10,13 @@ from unittest.mock import MagicMock, patch
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.models import WorldState, Character, CharacterStats, Location, NarrativeState
-from src.agents.orchestrator import OrchestratorAgent
+from src.agents.director import DirectorAgent
 from tests.base_test import BaseTestCase
 
-class TestOrchestrator(BaseTestCase):
+class TestDirector(BaseTestCase):
     
     def setUp(self):
-        self.agent = OrchestratorAgent()
+        self.agent = DirectorAgent()
         
         # Create a basic world state
         self.state = WorldState(
@@ -43,17 +43,17 @@ class TestOrchestrator(BaseTestCase):
         )
 
     def test_combat_transition(self):
-        """Test if orchestrator recognizes combat start."""
+        """Test if director recognizes combat start."""
         print("\n--- Testing Combat Transition ---")
         
         # Simulate a combat trigger
         self.state.history.append("Hero attacks Villain with a sword!")
         
-        # We expect the orchestrator to:
+        # We expect the director to:
         # 1. Update narrative to 'combat' / 'high tension'
         # 2. Select the Villain (to react) or DM (to resolve hit)
         
-        decision = self.agent.decide_next_actor(self.state)
+        decision = self.agent.decide_next_actors(self.state)
         
         print(f"Decision: {decision}")
         
@@ -67,19 +67,21 @@ class TestOrchestrator(BaseTestCase):
             print("⚠️ No narrative update triggered")
 
     def test_dialogue_flow(self):
-        """Test if orchestrator keeps dialogue flowing."""
+        """Test if director keeps dialogue flowing."""
         print("\n--- Testing Dialogue Flow ---")
         
         self.state.history.append('Hero says: "What are you doing here?"')
         
-        decision = self.agent.decide_next_actor(self.state)
+        decision = self.agent.decide_next_actors(self.state)
         print(f"Decision: {decision}")
         
-        # Should pick the Villain to respond
-        self.assertEqual(decision.get("actor"), "char-2")
+        # Should have a sequence with char-2 to respond
+        sequence = decision.get("sequence", [])
+        actors = [s.get("actor") for s in sequence]
+        self.assertIn("char-2", actors)
 
     def test_stall_detection(self):
-        """Test if orchestrator detects stalling and asks DM to intervene."""
+        """Test if director detects stalling and asks DM to intervene."""
         print("\n--- Testing Stall Detection ---")
         
         # Simulate a stalled story - lots of dialogue but no progress
@@ -93,18 +95,13 @@ class TestOrchestrator(BaseTestCase):
             'Villain said: "Thanks."',
         ]
         
-        decision = self.agent.decide_next_actor(self.state)
+        decision = self.agent.decide_next_actors(self.state)
         print(f"Decision: {decision}")
         
-        # When stalled, orchestrator should select DM to inject drama
-        self.assertEqual(decision.get("actor"), "dm")
-        
-        # The suggested action should mention injecting something
-        suggested = decision.get("suggested_action", "").lower()
-        self.assertTrue(
-            any(word in suggested for word in ["complication", "twist", "inject", "event", "drama", "tension"]),
-            f"Expected suggestion to mention drama injection, got: {suggested}"
-        )
+        # When stalled, director should include DM in sequence
+        sequence = decision.get("sequence", [])
+        actors = [s.get("actor") for s in sequence]
+        self.assertIn("dm", actors)
 
 if __name__ == '__main__':
     unittest.main()

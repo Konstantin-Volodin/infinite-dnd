@@ -54,37 +54,32 @@ DM_TOOLS = [
     }),
 ]
 
-ORCHESTRATOR_TOOLS = [
+DIRECTOR_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "update_narrative",
-            "description": "Update the dramatic state of the story. Use this to control pacing and focus.",
+            "name": "plan_sequence",
+            "description": "Plan a sequence of actors to act in order. This creates a mini-arc of actions.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "scene_type": {"type": "string", "enum": ["exploration", "social", "combat", "investigation"], "description": "The current mode of gameplay."},
-                    "tension": {"type": "string", "enum": ["low", "rising", "high", "climax"], "description": "The current dramatic tension level."},
-                    "focus_location_id": {"type": "string", "description": "Which location the camera is focused on (optional)."}
-                },
-                "required": ["scene_type", "tension"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "select_next_actor",
-            "description": "Select who acts next and provide guidance for them.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "actor": {"type": "string", "description": "Actor ID (character_id or 'dm')."},
-                    "reason": {"type": "string", "description": "Why this actor should act now."},
                     "situation_summary": {"type": "string", "description": "Brief summary of what just happened and what's at stake."},
-                    "suggested_action": {"type": "string", "description": "What the actor SHOULD do next. Be specific: 'respond to X's question about Y', 'introduce a mysterious stranger', 'move toward the quest objective'."}
+                    "scene_type": {"type": "string", "enum": ["exploration", "social", "combat", "investigation"], "description": "The current mode of gameplay."},
+                    "tension": {"type": "string", "enum": ["low", "rising", "high"], "description": "The current dramatic tension level."},
+                    "sequence": {
+                        "type": "array",
+                        "description": "List of actors to act in order",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "actor": {"type": "string", "description": "Actor ID (character_id or 'dm')"},
+                                "suggested_action": {"type": "string", "description": "What the actor SHOULD do. Be specific."}
+                            },
+                            "required": ["actor", "suggested_action"]
+                        }
+                    }
                 },
-                "required": ["actor", "reason", "suggested_action"]
+                "required": ["situation_summary", "sequence"]
             }
         }
     }
@@ -97,5 +92,5 @@ def get_character_tools() -> List[Dict[str, Any]]:
 def get_dm_tools() -> List[Dict[str, Any]]:
     return DM_TOOLS
 
-def get_orchestrator_tools() -> List[Dict[str, Any]]:
-    return ORCHESTRATOR_TOOLS
+def get_director_tools() -> List[Dict[str, Any]]:
+    return DIRECTOR_TOOLS

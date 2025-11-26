@@ -23,34 +23,17 @@ class BaseAgent:
         result = self.llm.chat_with_tools(system_prompt, context, tools)
         
         if result["type"] == "tool_calls":
-            # Return the first tool call for backward compatibility
-            # Agents that support multiple calls should handle the raw result
             first_call = result["calls"][0]
             return {
                 "tool": first_call["tool"],
                 **first_call["arguments"],
-                "all_calls": result["calls"] # Pass all calls for advanced agents
-            }
-        elif result["type"] == "tool_call":
-            # Legacy single tool call support
-            return {
-                "tool": result["tool"],
-                **result["arguments"]
+                "all_calls": result["calls"]
             }
         elif result["type"] == "text":
-            # LLM didn't use tools, use fallback
             content = result.get("content", "...")
-            # Map to appropriate argument based on fallback tool
-            if fallback_tool == "say":
-                return {"tool": "say", "dialogue": content}
-            elif fallback_tool == "wait":
-                return {"tool": "wait", "reason": content}
-            else:
-                return {"tool": fallback_tool, "content": content}
+            fallback_arg_map = {"say": "dialogue", "wait": "reason"}
+            arg_name = fallback_arg_map.get(fallback_tool, "content")
+            return {"tool": fallback_tool, arg_name: content}
         else:
-            # Error case
             print(f"Agent error: {result.get('message', 'Unknown error')}")
-            return {
-                "tool": fallback_tool,
-                **(fallback_args or {"reason": "Error"})
-            }
+            return {"tool": fallback_tool, **(fallback_args or {"reason": "Error"})}

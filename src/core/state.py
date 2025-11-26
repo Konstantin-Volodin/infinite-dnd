@@ -42,7 +42,7 @@ class StateManager:
     def load_state(self) -> WorldState:
         """Load saved state, or create fresh from setup if none exists."""
         if not os.path.exists(self.state_file):
-            print("No existing world state. Initializing from setup...")
+            # print("🔄 initializing world state...")
             state = self.load_initial_setup()
             self.save_state(state)
             return state
@@ -52,4 +52,5 @@ class StateManager:
     def save_state(self, state: WorldState):
         """Save current world state to JSON."""
         with open(self.state_file, "w", encoding="utf-8") as f:
+            # print("saving world state...")
             f.write(state.model_dump_json(indent=2))

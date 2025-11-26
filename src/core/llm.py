@@ -44,12 +44,16 @@ class LLMLogger:
             return resp
         try:
             msg = resp["choices"][0]["message"]
-            return {
+            cleaned = {
                 "content": msg.get("content"),
                 "tool_calls": [{"name": t["function"]["name"], "args": t["function"]["arguments"]} 
                                for t in msg.get("tool_calls", [])] if msg.get("tool_calls") else None,
                 "usage": resp.get("usage")
             }
+            # Capture reasoning from thinking models
+            if msg.get("reasoning_content"):
+                cleaned["reasoning"] = msg.get("reasoning_content")
+            return cleaned
         except:
             return {"raw": str(resp)[:200]}
 
@@ -60,9 +64,21 @@ class LLMClient:
     def __init__(self):
         self.base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
         self.model = os.getenv("LLM_MODEL", "qwen/qwen3-4b-2507")
-        self.temperature = float(os.getenv("LLM_TEMPERATURE", "0.7"))
         self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "8192"))
         self.logger = get_logger()
+        
+        # Set parameters based on thinking mode
+        self.is_thinking = "thinking" in self.model.lower()
+        if self.is_thinking:
+            self.temperature = 0.6
+            self.top_p = 0.95
+            self.top_k = 20
+            self.min_p = 0.0
+        else:
+            self.temperature = 0.7
+            self.top_p = 0.8
+            self.top_k = 20
+            self.min_p = 0.0
 
     def _call(self, payload: Dict) -> Dict:
         """Make API call with logging."""
@@ -78,8 +94,16 @@ class LLMClient:
 
     def chat(self, messages: List[Dict], tools: List = None) -> Dict:
         """Raw chat completion."""
-        payload = {"model": self.model, "messages": messages, "temperature": self.temperature, 
-                   "max_tokens": self.max_tokens, "stream": False}
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "min_p": self.min_p,
+            "max_tokens": self.max_tokens,
+            "stream": False
+        }
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"

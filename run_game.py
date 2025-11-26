@@ -3,7 +3,7 @@ import time
 import argparse
 from datetime import datetime
 from src.engine import Engine
-from src.agents import DMAgent, CharacterAgent, OrchestratorAgent
+from src.agents import DMAgent, CharacterAgent, DirectorAgent
 from src.core.llm import setup_logger
 from src.core.log_viewer import generate_log_report
 
@@ -22,7 +22,7 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
     """Execute an action for the given actor. Returns (success, failure_message).
     
     Args:
-        guidance: Optional suggestion from orchestrator about what action to take.
+        guidance: Optional suggestion from director about what action to take.
     """
     # Track by checking the last history item before/after
     history_before = engine.state.history[-1] if engine.state.history else None
@@ -118,7 +118,7 @@ def detect_stuck_state(history: list) -> tuple[bool, str]:
             return True, "repetitive_dialogue"
     
     # Detect no DM activity for too long
-    dm_count = sum(1 for e in recent if e.startswith("DM:"))
+    dm_count = sum(1 for e in recent if e.startswith("dm:"))
     if dm_count == 0 and len(recent) >= 6:
         return True, "no_dm_events"
     
@@ -161,77 +161,104 @@ def update_stall_counter(engine: Engine, actor_id: str, action_taken: bool):
     engine.save_state()
 
 
-def run_game_loop(engine: Engine, dm: DMAgent, orchestrator: OrchestratorAgent, max_actions: int = 30):
-    """Run the game with orchestrator-driven turn order."""
+def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_actions: int = 30):
+    """Run the game with director-driven turn order."""
     
-    print(f"\n{Colors.HEADER}{'='*50}")
+    print(f"\n{Colors.CYAN}{'='*50}")
     print(f"  GAME START")
     print(f"{'='*50}{Colors.ENDC}")
     
     actions_taken = 0
     
+    # Initialize focus on the first character's location
+    current_focus = ""
+    if engine.state.characters:
+        first_char = next(iter(engine.state.characters.values()))
+        current_focus = first_char.location_id
+    
     while actions_taken < max_actions:
-        actions_taken += 1
+        # Ask the director who should act (returns a sequence)
+        decision = director.decide_next_actors(engine.state)
         
-        # Ask the orchestrator who should act next
-        decision = orchestrator.decide_next_actor(engine.state)
-        actor_id = decision.get("actor", "dm")
-        reason = decision.get("reason", "")
-        suggested_action = decision.get("suggested_action", "")
-        situation_summary = decision.get("situation_summary", "")
-        
-        # Extract narrative info
+        # Extract narrative info and apply updates
         narrative_update = decision.get("narrative_update", {})
-        
-        # Apply narrative updates to state
         if narrative_update:
             if "scene_type" in narrative_update:
                 engine.state.narrative.scene_type = narrative_update["scene_type"]
             if "tension" in narrative_update:
                 engine.state.narrative.tension = narrative_update["tension"]
+            if "focus_location_id" in narrative_update:
+                current_focus = narrative_update["focus_location_id"]
             engine.save_state()
+        
+        # Get the sequence of actors
+        sequence = decision.get("sequence", [])
+        if not sequence:
+            sequence = [{"actor": "dm", "reason": "Fallback", "suggested_action": "Advance the story."}]
+        
+        # Print director's plan
+        actor_names = [s.get("actor", "?") for s in sequence]
+        print(f"\n{Colors.CYAN}{'='*50}")
+        print(f"🎬 Director plans sequence: {' → '.join(actor_names)}")
+        print(f"{'='*50}{Colors.ENDC}")
+        
+        # Execute each actor in the sequence
+        for actor_info in sequence:
+            if actions_taken >= max_actions:
+                break
+                
+            actions_taken += 1
             
-        scene_type = engine.state.narrative.scene_type
-        tension = engine.state.narrative.tension
-        
-        print(f"\n{Colors.CYAN}--- Turn {actions_taken} [{scene_type.upper()} | {tension.upper()}] ---{Colors.ENDC}")
-        print(f"{Colors.BLUE}🎭 Orchestrator selects: {Colors.BOLD}{actor_id}{Colors.ENDC}{Colors.BLUE} ({reason}){Colors.ENDC}")
-        if suggested_action:
-            print(f"{Colors.BLUE}   Suggestion: {suggested_action}{Colors.ENDC}")
-        
-        # Get the actor's name for display
-        if actor_id == "dm":
-            actor_name = "Dungeon Master"
-            color = Colors.YELLOW
-        else:
-            char = engine.state.characters.get(actor_id)
-            actor_name = char.name if char else actor_id
-            color = Colors.GREEN
-        
-        print(f"\n{color}{Colors.BOLD}[{actor_name}]{Colors.ENDC}")
-        
-        # Build guidance string from orchestrator
-        guidance_parts = []
-        if situation_summary:
-            guidance_parts.append(f"SITUATION: {situation_summary}")
-        if suggested_action:
-            guidance_parts.append(f"DIRECTOR'S GUIDANCE: {suggested_action}")
-        
-        guidance = "\n".join(guidance_parts)
-        
-        action_taken, failure_msg = run_action(engine, dm, actor_id, guidance=guidance)
-        
-        if not action_taken:
-            print(f"{Colors.RED}  (No action taken: {failure_msg}){Colors.ENDC}")
-        
-        # Update stall counter based on what happened
-        update_stall_counter(engine, actor_id, action_taken)
-        
-        # Advance time periodically (every few actions)
-        if actions_taken % 5 == 0:
-            engine.advance_time()
-        
-        time.sleep(0.3)  # Small delay for readability
+            actor_id = actor_info.get("actor", "dm")
+            reason = actor_info.get("reason", "")
+            suggested_action = actor_info.get("suggested_action", "")
+            situation_summary = actor_info.get("situation_summary", "")
+            
+            scene_type = engine.state.narrative.scene_type
+            tension = engine.state.narrative.tension
+            
+            header_info = f"{scene_type.upper()} | {tension.upper()}"
+            if current_focus:
+                header_info += f" | {current_focus}"
+            
+            print(f"\n{Colors.CYAN}--- Turn {actions_taken} [{header_info}] ---{Colors.ENDC}")
+            print(f"{Colors.BLUE}🎬 Actor: {Colors.BOLD}{actor_id}{Colors.ENDC}{Colors.BLUE} ({reason}){Colors.ENDC}")
+            if suggested_action:
+                print(f"{Colors.BLUE}   Suggestion: {suggested_action}{Colors.ENDC}")
+            
+            # Get the actor's name for display
+            if actor_id == "dm":
+                actor_name = "Dungeon Master"
+                color = Colors.YELLOW
+            else:
+                char = engine.state.characters.get(actor_id)
+                actor_name = char.name if char else actor_id
+                color = Colors.GREEN
+            
+            print(f"\n{color}{Colors.BOLD}[{actor_name}]{Colors.ENDC}")
+            
+            # Build guidance string from director
+            guidance_parts = []
+            if situation_summary:
+                guidance_parts.append(f"SITUATION: {situation_summary}")
+            if suggested_action:
+                guidance_parts.append(f"DIRECTOR'S GUIDANCE: {suggested_action}")
+            
+            guidance = "\n".join(guidance_parts)
+            
+            action_taken, failure_msg = run_action(engine, dm, actor_id, guidance=guidance)
+            
+            if not action_taken:
+                print(f"{Colors.RED}  (No action taken: {failure_msg}){Colors.ENDC}")
+            
+            # Update stall counter based on what happened
+            update_stall_counter(engine, actor_id, action_taken)
+            
+            # Advance time periodically (every few actions)
+            if actions_taken % 5 == 0:
+                engine.advance_time()
+            
+            time.sleep(0.3)  # Small delay for readability
     
     print(f"\n{Colors.HEADER}{'='*50}")
     print(f"  SESSION COMPLETE - {actions_taken} actions taken")
@@ -242,10 +269,18 @@ def main():
     parser = argparse.ArgumentParser(description="Infinite D&D - AI-driven roleplaying game")
     parser.add_argument("--reset", action="store_true", help="Reset world state and start fresh")
     parser.add_argument("--actions", type=int, default=20, help="Number of actions to run (default: 20)")
+    parser.add_argument("--thinking", action="store_true", help="Use thinking model (qwen3-4b-thinking)")
     args = parser.parse_args()
     
-    print("Initializing Infinite D&D (Orchestrated)...")
+    # Set model based on --thinking flag
+    if args.thinking: os.environ["LLM_MODEL"] = "qwen/qwen3-4b-thinking-2507"
     
+    game_intro = f"""=== Infinite DnD ==="""
+    if args.thinking:
+        game_intro = f"""=== ∞ Infinite DnD ∞ ==="""
+
+    print("\n" + Colors.CYAN + Colors.BOLD + game_intro + Colors.ENDC)
+
     # Setup Session Logging
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_dir = os.path.join("logs", f"session_{timestamp}")
@@ -277,11 +312,11 @@ def main():
     
     # Create agents
     dm = DMAgent()
-    orchestrator = OrchestratorAgent()
+    director = DirectorAgent()
     
     # Run the game
     try:
-        run_game_loop(engine, dm, orchestrator, max_actions=args.actions)
+        run_game_loop(engine, dm, director, max_actions=args.actions)
     finally:
         # Generate report
         report_path = os.path.join(session_dir, "report.html")

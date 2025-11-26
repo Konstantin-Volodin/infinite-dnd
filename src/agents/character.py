@@ -19,7 +19,7 @@ class CharacterAgent(BaseAgent):
         """Decide what action this character should take.
         
         Args:
-            guidance: Optional suggestion from the orchestrator about what to do.
+            guidance: Optional suggestion from the director about what to do.
         """
         char = state.characters.get(self.character_id)
         if not char:

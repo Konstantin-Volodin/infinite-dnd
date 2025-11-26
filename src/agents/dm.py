@@ -61,7 +61,7 @@ class DMAgent(BaseAgent):
         """Returns a structured DM response with narration and world updates.
         
         Args:
-            guidance: Optional suggestion from the orchestrator about what to do.
+            guidance: Optional suggestion from the director about what to do.
         """
         context = build_dm_context(state)
         if guidance:
