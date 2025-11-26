@@ -1,0 +1,9 @@
+[
+  {
+    "id": "find-brother",
+    "title": "The Missing Brother",
+    "description": "Find clues about the disappearance of Elara's brother, who vanished while on patrol near the river.",
+    "giver": "elara",
+    "status": "active"
+  }
+]

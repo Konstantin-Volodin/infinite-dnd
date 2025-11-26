@@ -1,0 +1,250 @@
+{
+  "time": 8,
+  "narrative": {
+    "scene_type": "investigation",
+    "tension": "high",
+    "stall_counter": 2
+  },
+  "locations": {
+    "valley-bridge": {
+      "id": "valley-bridge",
+      "name": "Valley Bridge",
+      "description": "An old stone bridge crossing the silver river. Lanterns flicker each evening.",
+      "connections": [
+        "market-square",
+        "forest-trail"
+      ],
+      "items": [],
+      "features": [
+        "stone railing",
+        "flickering lanterns",
+        "river below",
+        "worn path stones"
+      ],
+      "environmental_effects": []
+    },
+    "market-square": {
+      "id": "market-square",
+      "name": "Market Square",
+      "description": "Bustling market with stalls selling spices, trinkets, and rumors.",
+      "connections": [
+        "valley-bridge",
+        "guild-hall"
+      ],
+      "items": [
+        "strange coin",
+        "flyer with glowing symbol",
+        "frayed flyer with hidden symbol",
+        "fragment of glowing symbol",
+        "rusted key",
+        "cracked stone plaque",
+        "rusted lantern",
+        "tattered blue dress",
+        "cracked spice jar",
+        "tattered blue dress fragment",
+        "storm-woven wool thread",
+        "cracked cobblestone fragment",
+        "fragment of storm-woven wool",
+        "cracked-stone-petal"
+      ],
+      "features": [
+        "spice stall",
+        "trinket vendor",
+        "notice board",
+        "fountain",
+        "merchant carts",
+        "cracked fountain basin",
+        "glowing spiral symbol",
+        "fountain-pool of cold blue light",
+        "cracked stone beneath fountain",
+        "cracked stone arch",
+        "fountain mist",
+        "rusted lantern",
+        "cracked stone plaque",
+        "cracked stone wall",
+        "flickering silver mist",
+        "cracked stone panel",
+        "flickering shadow-well",
+        "pulsing rune",
+        "spiral water reflection",
+        "fountain-reflection-rune",
+        "split-shadow-figure",
+        "fountain spiral pattern",
+        "cracked fountain edge",
+        "flickering lantern shadow",
+        "pulsing rune spiral",
+        "glowing spiral etch",
+        "silver droplet"
+      ],
+      "environmental_effects": []
+    },
+    "guild-hall": {
+      "id": "guild-hall",
+      "name": "Guild Hall",
+      "description": "A grand wooden building where merchants and artisans gather. The floorboards creak with secrets.",
+      "connections": [
+        "market-square",
+        "spice-cellar"
+      ],
+      "items": [],
+      "features": [
+        "creaky floorboards",
+        "guild ledger",
+        "meeting table",
+        "fireplace",
+        "stairs to cellar"
+      ],
+      "environmental_effects": []
+    },
+    "spice-cellar": {
+      "id": "spice-cellar",
+      "name": "Old Spice Cellar",
+      "description": "A damp, aromatic cellar beneath the Guild Hall. Crates of rare spices are stacked high, hiding a small meeting table.",
+      "connections": [
+        "guild-hall"
+      ],
+      "items": [
+        "rusted key"
+      ],
+      "features": [
+        "spice crates",
+        "hidden meeting table",
+        "dusty shelves",
+        "strange symbols on wall",
+        "trapdoor"
+      ],
+      "environmental_effects": []
+    },
+    "forest-trail": {
+      "id": "forest-trail",
+      "name": "Forest Trail",
+      "description": "A narrow, winding path leading into the dense woods. Shadows lengthen here, and the air grows cooler.",
+      "connections": [
+        "valley-bridge",
+        "forest-clearing"
+      ],
+      "items": [
+        "torn map"
+      ],
+      "features": [
+        "ancient trees",
+        "animal tracks",
+        "overgrown bushes",
+        "distant sounds"
+      ],
+      "environmental_effects": []
+    },
+    "forest-clearing": {
+      "id": "forest-clearing",
+      "name": "Forest Clearing",
+      "description": "A moonlit clearing deep in the woods. Strange stones form a circle in the center.",
+      "connections": [
+        "forest-trail"
+      ],
+      "items": [],
+      "features": [
+        "stone circle",
+        "charred ground",
+        "ancient altar",
+        "moonlight shaft"
+      ],
+      "environmental_effects": []
+    }
+  },
+  "characters": {
+    "elara": {
+      "id": "elara",
+      "name": "Elara Swift",
+      "type": "pc",
+      "race": "Human",
+      "class_name": "former-guard",
+      "backstory": "A former royal guard who left service after her brother disappeared. Quiet, observant, relentless.",
+      "goal": "Find my brother. He vanished near the river three weeks ago. Someone in this market knows something.",
+      "knowledge": [],
+      "stats": {
+        "hp": 20,
+        "max_hp": 20,
+        "ac": 10,
+        "level": 1,
+        "attributes": {
+          "strength": 10,
+          "dexterity": 10,
+          "constitution": 10,
+          "intelligence": 10,
+          "wisdom": 10,
+          "charisma": 10
+        }
+      },
+      "location_id": "market-square",
+      "inventory": [
+        "guard-pendant",
+        "journal-page-3"
+      ]
+    },
+    "merchant-ronn": {
+      "id": "merchant-ronn",
+      "name": "Ronn the Spice-Merchant",
+      "type": "npc",
+      "race": "Human",
+      "class_name": "merchant",
+      "backstory": "Loud, cheerful, always has a lead on city gossip. Secretly funds a small rescue crew.",
+      "goal": "Keep an ear out for trouble. Help Elara if she asks but don't reveal the rescue crew unless necessary.",
+      "knowledge": [
+        "Elara's brother was last seen heading toward the Old Spice Cellar",
+        "Strange lights have been reported in the cellar at night",
+        "A group called the Marsh Raiders has been kidnapping travelers"
+      ],
+      "stats": {
+        "hp": 20,
+        "max_hp": 20,
+        "ac": 10,
+        "level": 1,
+        "attributes": {
+          "strength": 10,
+          "dexterity": 10,
+          "constitution": 10,
+          "intelligence": 10,
+          "wisdom": 10,
+          "charisma": 10
+        }
+      },
+      "location_id": "market-square",
+      "inventory": [
+        "spice-bag",
+        "coin-purse"
+      ]
+    }
+  },
+  "history": [
+    "Elara Swift: \"Who saw my brother near the river three weeks ago? And did anyone else vanish after stepping into the cellar?\"",
+    "Elara Swift: \"You speak in riddles, but I demand truth. My brother vanished near the river three weeks ago. Did someone see him? Did anyone enter the cellar and come back changed? Name the person who vanished.\"",
+    "Ronn the Spice-Merchant: \"Ah, Elara! You’ve caught me in the middle of a spice-tangled tale! That riddle-spitting figure? Now *that* is a sign—like the old fables say, when the stones remember your name, something *shifts*. I’ve been eyeing the market like a hawk, and I’ve got a few pieces of the puzzle.\"",
+    "DM: The figure’s voice cracks as it speaks, and suddenly, a faint hum echoes through the market, causing spice jars to tremble and spill. A woman in a tattered blue dress stumbles from the back of the crowd, her hands pressed to her chest, her eyes wide—then she begins to whisper in a language no one recognizes. As she does, her shadow splits into two, one walking forward, one retreating into the stone wall.",
+    "Ronn the Spice-Merchant: \"Ah, Elara Swift! You’ve got me hooked with your questions—like a spice jar left too long in the sun. Three weeks ago? A man named Kael vanished near the river—same time your brother was last seen. I was at the market that day, just before dusk, when the river mist rolled in like a thief in the night. A traveler, a tall one with a scarf like storm-woven wool, walked toward the Old Spice Cellar. He didn’t vanish right away—no, he *disappeared* in the cellar’s shadow, and when they found him later, he was… changed. His eyes were the color of storm clouds, and he spoke in riddles. A week later, a woman vanished too—right after she stepped into the cellar. Her shadow split like a coin in the wind. I saw it with my own eyes. The market’s quiet now, but the stones remember. The cellar? That’s not just a place—it’s a *door* to something older than the river.\"",
+    "Elara Swift: \"Ronn, you said a traveler with storm-woven wool vanished in the cellar. What was his name? And did he speak of any warnings or signs before disappearing?\"",
+    "DM: The woman in the tattered blue dress stumbles to her feet, her voice trembling as she turns to Elara, her shadow now split—half of her glides forward, the other half melting into the stone wall like smoke. She whispers in a language that echoes the cellar’s hum, and for a moment, the market’s air thickens, as if the stones themselves are listening. When she finally speaks, her words are not in any known tongue—but they carry the weight of memory, and one phrase, 'the shadow remembers what the light forgets,' resonates like a bell in the valley.",
+    "Elara Swift: \"Woman, I know you heard the echo of the cellar. I’m looking for a man named Kael—tall, storm-woven wool, vanished near the river. Did he warn you of anything before he disappeared? What did he say?\"",
+    "Ronn the Spice-Merchant: \"Ah, Elara! You're asking about Kael—tall, storm-woven wool, vanished near the river. I’ve seen that man, and I’ve seen his shadow too. Right before he stepped into the Old Spice Cellar, he stopped at the river’s edge and looked up at the sky. His eyes were storm clouds, and he said, *'The cellar breathes. It doesn’t just hold secrets—it wakes them up.'* Then he vanished—like smoke in a wind. But here’s the strange part: that same night, the woman in the tattered blue dress stepped into the cellar. Her shadow split—just like Kael’s. And when she whispered that phrase—*'the shadow remembers what the light forgets'*—it wasn’t just magic. It was a warning. Like a riddle from the deep. I’ve heard it echoed in the stones, in the mist, in the silence after a storm. That’s why I know you’re close to the truth. Kael didn’t just vanish—he *spoke* to something older than the river. And now, the cellar… it’s not just a cellar anymore. It’s listening.\"",
+    "Elara Swift: \"Woman, I know you heard the echo of the cellar. I’m looking for a man named Kael—tall, storm-woven wool, vanished near the river. Did he warn you of anything before he disappeared? What did he say?\"",
+    "DM: The cobblestones beneath Elara’s feet begin to hum, a low, resonant vibration that matches the rhythm of the woman’s whisper. A single stone cracks open, revealing a faint, pulsing rune carved into the earth—ancient, glowing faintly blue, like a heartbeat beneath the surface.",
+    "Elara Swift examines cracked stone beneath fountain",
+    "DM: Elara’s fingers trace the crack, and as she presses her palm against the stone, the rune flares briefly, casting a soft blue glow that spreads like ripples across the fountain’s surface. The water shivers, forming a spiral pattern that mirrors the rune’s shape—then, for a moment, the reflection shows a shadowy figure standing at the edge of the river, tall and cloaked in storm-woven wool.",
+    "Elara Swift examines reflection in the fountain",
+    "DM: The reflection in the fountain flickers, showing a tall figure in storm-woven wool standing at the river's edge, his shadow stretching unnaturally long and splitting into two. As Elara watches, the water ripples violently, and the figure turns—just for a second—its face hidden, but its eyes glow like storm clouds.",
+    "Ronn the Spice-Merchant: \"Elara! What in the name of spice did you find under that stone? That rune's pulsing like a heartbeat, and the reflection—it’s showing something *wrong*! That shadowy figure in storm-woven wool, glowing eyes... it’s not just a rumor, is it? I’ve heard whispers about the Old Spice Cellar, and the Marsh Raiders, but this... this feels like a piece of the old market’s dark past.\"",
+    "Elara Swift: \"Ronn, I saw a shadowy figure in storm-woven wool reflected in the fountain. Glowing eyes, a split shadow. The rune beneath the stone is pulsing. Do you know anything about the Old Spice Cellar or the Marsh Raiders? Especially if they were connected to the market square or the fountain?\"",
+    "Elara Swift: \"Ronn, I saw a shadowy figure in storm-woven wool reflected in the fountain. Glowing eyes, a split shadow. The rune beneath the stone is pulsing. Do you know anything about the Old Spice Cellar or the Marsh Raiders? Especially if they were connected to the market square or the fountain?\"",
+    "DM: The fountain erupts in a wave of blue light, the stone cracking further and the spiral pattern in the water now forming a doorway shape. A low growl echoes from beneath the square, and the air thickens with the scent of wet earth and old spice. The reflection suddenly shifts—now showing a child holding a lantern, the flame flickering wildly, before dissolving into the shadowy silhouette with the broken lantern.",
+    "Elara Swift: \"Ronn, I saw a shadowy figure in storm-woven wool reflected in the fountain. Glowing eyes, a split shadow. The rune beneath the stone is pulsing. Do you know anything about the Old Spice Cellar or the Marsh Raiders? Especially if they were connected to the market square or the fountain?\"",
+    "Ronn the Spice-Merchant: \"Ah, Elara! A sight for sore eyes! You’ve seen the fountain’s riddle, and I’ve seen the same thing—flicker, glow, and that child with the lantern, vanishing into shadow. That’s no ordinary reflection, my dear. The fountain’s been talking to me all day, like it’s trying to warn someone. Now, you ask about the Old Spice Cellar and the Marsh Raiders? Let me tell you—both are tied to the square, though not in the way you might think!\"",
+    "Ronn the Spice-Merchant: \"Ah, Elara! A sight for sore eyes! You’ve seen the fountain’s riddle, and I’ve seen the same thing—flicker, glow, and that child with the lantern, vanishing into shadow. That’s no ordinary reflection, my dear. The fountain’s been talking to me all day, like it’s trying to warn someone. Now, you ask about the Old Spice Cellar and the Marsh Raiders? Let me tell you—both are tied to the square, though not in the way you might think!\"",
+    "DM: A gust of wind slams the market square, sending dust swirling as the fountain's surface splits into jagged cracks. From the edge of the water, a shadowy figure emerges—woven in storm-woven wool, eyes glowing like embers, whispering in a guttural dialect of old spice trade. The words form a warning: 'The lantern burns for you, not for the cellar. The child is not dead. It waits.' Then, the figure vanishes, leaving only the scent of burnt spice and cold stone.",
+    "Elara Swift: \"Ronn, do you have any records of children or lanterns in the Old Spice Cellar? Or any connection between the fountain, the marsh, or the Marsh Raiders and missing children?\"",
+    "Ronn the Spice-Merchant examines cracked stone panel",
+    "DM: Ronn’s fingers trace the cracked stone panel, and a faint pulse of green light flares beneath the surface. The runes etch a spiral that pulses like a heartbeat, and when he presses his palm against it, a whisper echoes: 'The lantern burns for you, not for the cellar. The child is not dead. It waits.' A small, rusted key glimmers beneath the crack, half-buried in moss.",
+    "Elara Swift examines rusted key",
+    "DM: Elara’s fingers trace the rusted key, its surface etched with tiny spirals that glow faintly when touched. As she turns it over, a whisper flares from the metal—'The child is not dead. It waits in the cellar's deepest chamber.' The key feels warm, almost alive, and a single drop of liquid silver slides from its edge, pooling on the stone like a tear.",
+    "Elara Swift: \"Ronn, I heard you found something beneath the stone panel. Do you know of any hidden passages or secret storage in the cellar? My brother vanished near the river three weeks ago. I believe he might still be there.\"",
+    "Ronn the Spice-Merchant: \"Ah, Elara! You're right to ask—there's a *very* old secret tucked beneath the stone panel near the fountain. I found it just this morning, right beneath that cracked arch where the spiral pattern pulses like a heartbeat. The runes? They don't just whisper—they *sing*. When I pressed my hand to them, a voice echoed, 'The lantern burns for you, not for the cellar. The child is not dead. It waits.' And there, beneath it all, a rusted key—glowing faintly, with tiny spirals like a storm-woven thread.\""
+  ]
+}

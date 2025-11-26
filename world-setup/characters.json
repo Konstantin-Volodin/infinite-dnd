@@ -1,0 +1,36 @@
+[
+  {
+    "id": "elara",
+    "name": "Elara Swift",
+    "type": "pc",
+    "role": "former-guard",
+    "age": 29,
+    "description": "A former royal guard who left service after her brother disappeared. Quiet, observant, relentless.",
+    "goal": "Find my brother. He vanished near the river three weeks ago. Someone in this market knows something.",
+    "inventory": ["guard-pendant", "journal-page-3"],
+    "relationships": {
+      "ally": ["merchant-ronn"],
+      "enemy": ["marsh-raider"]
+    },
+    "notes": "Prefers problem-solving over fighting. Has a soft spot for stray animals."
+  },
+  {
+    "id": "merchant-ronn",
+    "name": "Ronn the Spice-Merchant",
+    "type": "npc",
+    "role": "merchant",
+    "age": 52,
+    "description": "Loud, cheerful, always has a lead on city gossip. Secretly funds a small rescue crew.",
+    "goal": "Keep an ear out for trouble. Help Elara if she asks but don't reveal the rescue crew unless necessary.",
+    "knowledge": [
+      "Elara's brother was last seen heading toward the Old Spice Cellar",
+      "Strange lights have been reported in the cellar at night",
+      "A group called the Marsh Raiders has been kidnapping travelers"
+    ],
+    "inventory": ["spice-bag", "coin-purse"],
+    "relationships": {
+      "ally": ["elara"],
+      "contacts": ["dockmaster"]
+    }
+  }
+]
