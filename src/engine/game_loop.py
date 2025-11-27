@@ -83,15 +83,15 @@ class Engine:
         elif tool_name == "move":
             return method(args.get("character_id"), args.get("destination") or args.get("location_id", ""))
         elif tool_name == "attack":
-            return method(args.get("character_id"), args.get("target", ""), args.get("weapon", "unarmed"))
+            return method(args.get("character_id"), args.get("target", ""), args.get("weapon", "unarmed"), args.get("style", None))
         elif tool_name == "attempt_skill":
-            return method(args.get("character_id"), args.get("skill", ""), args.get("action_description", ""))
+            return method(args.get("character_id"), args.get("skill", ""), args.get("action_description", ""), args.get("difficulty", None))
         elif tool_name == "examine":
             return method(args.get("character_id"), args.get("target", ""))
         elif tool_name == "pickup":
             return method(args.get("character_id"), args.get("item_name", ""))
         elif tool_name == "use":
-            return method(args.get("character_id"), args.get("item_name", ""), args.get("target", ""))
+            return method(args.get("character_id"), args.get("item_name", ""), args.get("target", ""), args.get("spell_name", None))
         elif tool_name == "wait":
             return method(args.get("character_id"), args.get("reason"))
         elif tool_name == "narrate":

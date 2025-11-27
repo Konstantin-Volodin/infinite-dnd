@@ -14,8 +14,8 @@ DM_RESPONSE_SCHEMA = {
     "properties": {
         "action_type": {
             "type": "string",
-            "enum": ["narrate", "event", "describe"],
-            "description": "Type: 'narrate' for scene-setting, 'event' for something happening, 'describe' for examine responses"
+            "enum": ["narrate", "event", "spawn_npc", "create_location", "create_item"],
+            "description": "Type of action to take. Use 'spawn_npc' for new characters, 'create_location' for new places."
         },
         "narration": {
             "type": "string",
@@ -24,6 +24,26 @@ DM_RESPONSE_SCHEMA = {
         "target_location_id": {
             "type": "string",
             "description": "Location ID where this happens (e.g., 'market-square')"
+        },
+        "spawn_npc": {
+            "type": "object",
+            "properties": {
+                "npc_id": {"type": "string", "description": "Unique ID (lowercase, no spaces)"},
+                "name": {"type": "string"},
+                "role": {"type": "string", "description": "Class/Role (e.g. 'Bandit Leader')"},
+                "description": {"type": "string", "description": "Backstory/Appearance"},
+                "goal": {"type": "string", "description": "Immediate goal (e.g. 'Attack the party')"}
+            },
+            "required": ["npc_id", "name", "role", "description"]
+        },
+        "create_location": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "connected_from": {"type": "string", "description": "ID of location it connects to"}
+            },
+            "required": ["name", "description", "connected_from"]
         },
         "new_features": {
             "type": "array",
@@ -65,7 +85,7 @@ class DMAgent(BaseAgent):
         """
         context = build_dm_context(state)
         if guidance:
-            context = f"{guidance}\n\n{context}"
+            context = f"{guidance}\n(NOTE: This is a suggestion. As DM, you have final say. Prioritize story coherence and fun.)\n\n{context}"
         
         result = self.llm.chat_json(
             system=build_dm_system_prompt(),
@@ -75,9 +95,44 @@ class DMAgent(BaseAgent):
         
         if result["type"] == "json":
             data = result["data"]
+            action_type = data.get("action_type", "narrate")
+            
+            # Handle specific tool calls based on action_type
+            if action_type == "spawn_npc" and "spawn_npc" in data:
+                npc_data = data["spawn_npc"]
+                return {
+                    "tool": "spawn_npc",
+                    "npc_id": npc_data.get("npc_id"),
+                    "name": npc_data.get("name"),
+                    "role": npc_data.get("role"),
+                    "location_id": data.get("target_location_id"),
+                    "description": npc_data.get("description"),
+                    "goal": npc_data.get("goal", "")
+                }
+            
+            elif action_type == "create_location" and "create_location" in data:
+                loc_data = data["create_location"]
+                return {
+                    "tool": "create_location",
+                    "location_id": loc_data.get("name").lower().replace(" ", "-"),
+                    "name": loc_data.get("name"),
+                    "description": loc_data.get("description"),
+                    "connected_to": [loc_data.get("connected_from")]
+                }
+                
+            elif action_type == "create_item" and "new_items" in data and data["new_items"]:
+                # Just take the first item
+                item = data["new_items"][0]
+                return {
+                    "tool": "create_item",
+                    "item_name": item.get("name"),
+                    "location_id": item.get("location_id") or data.get("target_location_id")
+                }
+            
+            # Default to standard DM action (narrate + features/items)
             return {
                 "tool": "dm_action",
-                "action_type": data.get("action_type", "narrate"),
+                "action_type": action_type,
                 "narration": data.get("narration", "..."),
                 "target_location_id": data.get("target_location_id"),
                 "new_features": data.get("new_features", []),
@@ -103,7 +158,7 @@ class DMAgent(BaseAgent):
 Create this location based on its name and the current setting."""
 
         return self._decide(
-            system_prompt=build_dm_system_prompt(),
+            system_prompt=build_dm_system_prompt() + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
             context=prompt,
             tools=get_dm_tools(),
             fallback_tool="create_location",
@@ -123,7 +178,7 @@ Create this location based on its name and the current setting."""
 If it makes sense, create it. Otherwise, narrate why they can't take it."""
         
         return self._decide(
-            system_prompt=build_dm_system_prompt(),
+            system_prompt=build_dm_system_prompt() + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
             context=prompt,
             tools=get_dm_tools(),
             fallback_tool="narrate",

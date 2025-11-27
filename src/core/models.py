@@ -33,6 +33,8 @@ class Location(BaseModel):
     connections: List[str] = []
     items: List[str] = []
     features: List[str] = []
+    # Optional traits map for features to define mechanics without hardcoding
+    feature_traits: Dict[str, Dict] = Field(default_factory=dict)
     environmental_effects: List[str] = []
 
 

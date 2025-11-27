@@ -14,13 +14,25 @@ class DirectorAgent(BaseAgent):
     def decide_next_actors(self, state: WorldState) -> Dict[str, Any]:
         """Returns a sequence of actors to act and why."""
         result = self._decide(
-            system_prompt=build_director_system_prompt(),
+            system_prompt=build_director_system_prompt() + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
             context=build_director_context(state),
             tools=get_director_tools(),
             fallback_tool="plan_sequence",
             fallback_args={"sequence": [{"actor": "dm", "suggested_action": "Advance the story."}]}
         )
         
+        # Handle scene_transition tool
+        if result["tool"] == "scene_transition":
+            return {
+                "sequence": [{"actor": "dm", "suggested_action": f"Describe the arrival at {result.get('target_location_id')}. {result.get('narration_guidance', '')}"}],
+                "narrative_update": {
+                    "scene_transition": {
+                        "target_location_id": result.get("target_location_id"),
+                        "character_ids": result.get("character_ids", [])
+                    }
+                }
+            }
+
         # Handle plan_sequence tool
         if result["tool"] == "plan_sequence":
             sequence = result.get("sequence", [])

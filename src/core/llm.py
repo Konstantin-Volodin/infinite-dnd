@@ -63,7 +63,7 @@ class LLMClient:
     
     def __init__(self):
         self.base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
-        self.model = os.getenv("LLM_MODEL", "qwen/qwen3-4b-2507")
+        self.model = os.getenv("LLM_MODEL", "qwen/qwen3-vl-8b")
         self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "8192"))
         self.logger = get_logger()
         
@@ -84,7 +84,9 @@ class LLMClient:
         """Make API call with logging."""
         start = time.time()
         try:
-            resp = requests.post(f"{self.base_url}/chat/completions", json=payload, timeout=120)
+            # Increased timeout for thinking models
+            timeout = 300 if self.is_thinking else 120
+            resp = requests.post(f"{self.base_url}/chat/completions", json=payload, timeout=timeout)
             resp.raise_for_status()
             result = resp.json()
         except Exception as e:

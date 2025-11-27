@@ -2,7 +2,7 @@
 import random
 from typing import Any, Dict, Optional
 from ..core.models import WorldState, Location, Character, CharacterType, CharacterStats
-from ..core.rules import get_skill_modifier
+from ..core.rules import get_skill_modifier, get_health_status
 
 
 class ActionExecutor:
@@ -129,7 +129,23 @@ class ActionExecutor:
         char = self._get_char(character_id)
         if not char or not dialogue:
             return {"status": "error", "message": "Invalid"}
-        msg = f'{char.name} says to {target}: "{dialogue}"' if target else f'{char.name}: "{dialogue}"'
+        
+        # Check for repetition
+        last_msg = f'{char.name}: "{dialogue}"'
+        if target:
+            last_msg = f'{char.name} says to {target}: "{dialogue}"'
+            
+        if self.state.history and self.state.history[-1] == last_msg:
+             return {"status": "error", "message": "You just said that. Say something else or do something."}
+
+        # Validate target presence if a target is provided
+        if target:
+            # find a character by the target name in same location
+            possible = [c for c in self.state.characters.values() if c.location_id == char.location_id and target.lower() in c.name.lower()]
+            if not possible:
+                allowed = [c.name for c in self.state.characters.values() if c.location_id == char.location_id and c.id != char.id]
+                return {"status": "error", "code": "invalid_target", "message": f"Target not present: {target}", "allowed_targets": allowed}
+        msg = last_msg
         self._emit("💬", msg)
         return {"status": "success"}
 
@@ -163,6 +179,36 @@ class ActionExecutor:
         if not char:
             return {"status": "error", "message": "Character not found"}
         self._emit("🔍", f"{char.name} examines {target}")
+        loc = self._get_loc(char.location_id)
+        # Validate target exists as a feature or item in this location
+        present_features = [f.lower() for f in (loc.features or [])]
+        present_items = [i.lower() for i in (loc.items or [])]
+        inventory_items = [i.lower() for i in (char.inventory or [])]
+        if target.lower() not in present_features and target.lower() not in present_items and target.lower() not in inventory_items:
+            return {"status": "error", "code": "invalid_target", "message": f"Nothing named '{target}' here to examine.", "present_features": loc.features, "present_items": loc.items, "inventory_items": char.inventory}
+        if loc and loc.feature_traits:
+            # Match target against trait keys (case-insensitive)
+            trait = None
+            t_lower = target.lower()
+            for k, v in loc.feature_traits.items():
+                if t_lower == k.lower() or t_lower in k.lower() or k.lower() in t_lower:
+                    trait = v
+                    trait_name = k
+                    break
+            if trait and isinstance(trait, dict) and trait.get("skill"):
+                skill = trait.get("skill")
+                difficulty = trait.get("difficulty", 10)
+                # Offer a skill_required code for run_game to handle
+                return {
+                    "status": "success",
+                    "code": "skill_required",
+                    "skill": skill,
+                    "difficulty": difficulty,
+                    "action_description": trait.get("description", f"Search {target} carefully."),
+                    "location_id": loc.id,
+                    "examine_target": target,
+                    "feature_key": trait_name
+                }
         return {"status": "success", "requires_dm_response": True, "examine_target": target}
 
     def pickup(self, character_id: str, item_name: str) -> Dict:
@@ -177,7 +223,8 @@ class ActionExecutor:
         # Find item (case-insensitive)
         found = next((i for i in loc.items if i.lower() == item_name.lower()), None)
         if not found:
-            return {"status": "error", "code": "item_missing", "item_name": item_name}
+            # Return list of items present to help the agent
+            return {"status": "error", "code": "item_missing", "item_name": item_name, "allowed_items": loc.items}
         
         loc.items.remove(found)
         char.inventory.append(found)
@@ -185,7 +232,7 @@ class ActionExecutor:
         self._emit("✋", f"{char.name} picked up {found}")
         return {"status": "success"}
 
-    def use(self, character_id: str, item_name: str, target: str) -> Dict:
+    def use(self, character_id: str, item_name: str, target: str, spell_name: str = None) -> Dict:
         """Use an item."""
         char = self._get_char(character_id)
         if not char:
@@ -193,39 +240,90 @@ class ActionExecutor:
         found = next((i for i in char.inventory if i.lower() == item_name.lower()), None)
         if not found:
             return {"status": "error", "message": f"Don't have {item_name}"}
-        self._emit("🔧", f"{char.name} used {found} on {target}")
+        # Include spell_name if provided to make the narration clearer
+        if spell_name:
+            self._emit("✨", f"{char.name} uses {found} ({spell_name}) on {target}")
+            # Healing spell recognition (basic): heal if spell_name contains 'heal' or 'cure' or item contains 'potion'
+            if "heal" in spell_name.lower() or "cure" in spell_name.lower() or "potion" in item_name.lower():
+                # Target either self or named target at same location
+                if target:
+                    tchar = self._find_target(char, target)
+                    if not tchar and target.lower() in [c.id for c in self.state.characters.values()]:
+                        tchar = self.state.characters.get(target)
+                else:
+                    tchar = char
+                if tchar:
+                    heal = 6  # Simple flat heal; can be replaced by dice roll
+                    before = tchar.stats.hp
+                    tchar.stats.hp = min(tchar.stats.max_hp, tchar.stats.hp + heal)
+                    self._save()
+                    self._emit("💖", f"{char.name} heals {tchar.name} for {tchar.stats.hp - before} (now {tchar.stats.hp}/{tchar.stats.max_hp})")
+        else:
+            self._emit("🔧", f"{char.name} used {found} on {target}")
+            # Basic item healing for potions
+            if "potion" in item_name.lower() or "healing" in item_name.lower():
+                # heal self or target
+                if target:
+                    tchar = self._find_target(char, target)
+                    if not tchar and target.lower() in [c.id for c in self.state.characters.values()]:
+                        tchar = self.state.characters.get(target)
+                else:
+                    tchar = char
+                if tchar:
+                    heal = 8
+                    before = tchar.stats.hp
+                    tchar.stats.hp = min(tchar.stats.max_hp, tchar.stats.hp + heal)
+                    self._save()
+                    self._emit("💖", f"{char.name} drinks {found} and heals {tchar.name} for {tchar.stats.hp - before} (now {tchar.stats.hp}/{tchar.stats.max_hp})")
         return {"status": "success"}
 
-    def attack(self, character_id: str, target: str, weapon: str = "unarmed") -> Dict:
+    def attack(self, character_id: str, target: str, weapon: str = "unarmed", style: str = None) -> Dict:
         """Attack a target."""
         char = self._get_char(character_id)
         if not char:
             return {"status": "error", "message": "Character not found"}
         target_char = self._find_target(char, target)
         if not target_char:
-            return {"status": "error", "message": f"Can't find {target}"}
+            # Suggest allowed targets present at location
+            allowed = [c.name for c in self.state.characters.values() if c.location_id == char.location_id and c.id != char.id]
+            return {"status": "error", "code": "invalid_target", "message": f"Can't find {target}", "allowed_targets": allowed}
         
-        # Roll attack
+    # Roll attack
         roll = random.randint(1, 20) + char.stats.level
         hit = roll >= target_char.stats.ac
         
         if hit:
             damage = random.randint(1, 6) + char.stats.level
+            before_status = get_health_status(target_char)
             target_char.stats.hp -= damage
             if target_char.stats.hp <= 0:
                 target_char.stats.hp = 0
-                self._emit("⚔️", f"{char.name} defeats {target_char.name}!")
+                if style:
+                    self._emit("⚔️", f"{char.name} delivers a {style} with {weapon}, defeating {target_char.name}!")
+                else:
+                    self._emit("⚔️", f"{char.name} defeats {target_char.name}!")
                 if target_char.type == CharacterType.NPC:
                     del self.state.characters[target_char.id]
             else:
-                self._emit("⚔️", f"{char.name} hits {target_char.name} for {damage} ({target_char.stats.hp} HP)")
+                if style:
+                    self._emit("⚔️", f"{char.name} {style} {target_char.name} for {damage} ({target_char.stats.hp} HP)")
+                else:
+                    self._emit("⚔️", f"{char.name} hits {target_char.name} for {damage} ({target_char.stats.hp} HP)")
+            # Check for status change
+            after_status = get_health_status(target_char)
+            if after_status != before_status:
+                # Emit a status change message
+                self._emit("⚠️", f"{target_char.name} is now {after_status} ({target_char.stats.hp}/{target_char.stats.max_hp})")
         else:
-            self._emit("⚔️", f"{char.name} misses {target_char.name}")
+            if style:
+                self._emit("⚔️", f"{char.name} attempts a {style} but misses {target_char.name}")
+            else:
+                self._emit("⚔️", f"{char.name} misses {target_char.name}")
         
         self._save()
         return {"status": "success", "hit": hit}
 
-    def attempt_skill(self, character_id: str, skill: str, action_description: str) -> Dict:
+    def attempt_skill(self, character_id: str, skill: str, action_description: str, difficulty: int = None) -> Dict:
         """Attempt a skill check."""
         char = self._get_char(character_id)
         if not char:
@@ -237,7 +335,11 @@ class ActionExecutor:
         
         msg = f"🎲 {char.name} {skill.title()}: {total} (d20={roll}, mod={modifier})"
         self._emit("🎲", msg, f"[SYSTEM] {msg}")
-        return {"status": "success", "roll": total, "modifier": modifier}
+        result = {"status": "success", "roll": total, "modifier": modifier}
+        if difficulty is not None:
+            result["difficulty"] = difficulty
+            result["success"] = total >= difficulty
+        return result
 
     def wait(self, character_id: str, reason: str = None) -> Dict:
         """Character waits."""

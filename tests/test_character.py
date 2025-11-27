@@ -81,5 +81,11 @@ class TestCharacterAgent(BaseTestCase):
         if action["tool"] == "attack":
             self.assertEqual(action["target"], "Villain")
 
+    def test_context_building(self):
+        """Test character context building."""
+        print("\n--- Testing Character Context Building ---")
+        
+        
+
 if __name__ == '__main__':
     unittest.main()
