@@ -13,6 +13,22 @@ def build_character_system_prompt(char) -> str:
         prompt += f"\n\n🧠 KNOWLEDGE: {', '.join(char.knowledge)}"
     
     prompt += "\n\nAVAILABLE ACTIONS: say, examine, attempt_skill, move, attack, pickup, use"
+    prompt += "\n\nYOU HAVE AGENCY beyond basic actions:"
+    prompt += "\n\nSELF-REFLECTION:"
+    prompt += "\n- update_knowledge: Save facts you learn during the game"
+    prompt += "\n- reflect: Update your motivation when circumstances change"
+    prompt += "\n- add_memory: Record significant events"
+    prompt += "\n\nWORLD INTERACTION:"
+    prompt += "\n- create_small_item: Make simple objects (notes, crude tools)"
+    prompt += "\n- modify_feature: Alter your environment (barricade doors, extinguish lights)"
+    prompt += "\n- steal: Take items covertly (requires stealth)"
+    prompt += "\n- hide_item: Conceal items from others"
+    prompt += "\n\nITEM MANAGEMENT:"
+    prompt += "\n- destroy_item: Permanently remove items"
+    prompt += "\n- consume_item: Use consumables (food, potions)"
+    prompt += "\n- drop_item: Drop items from inventory"
+    prompt += "\n\nUse these to ACTIVELY pursue your goals, not just react."
+    
     prompt += "\n\nNOTE ON ACTION STYLE: When you 'attack', include a short 'style' (e.g., 'overhead slash', 'riposte', 'feint and strike') and a short physical movement."
     prompt += " When you 'use' a spell or magical item, include 'spell_name' and a brief descriptor (e.g., 'Glimmerbolt - a crackling bolt of light')."
     
@@ -67,7 +83,8 @@ def build_character_context(char, state) -> str:
         lines.append(f"Exits: {', '.join(loc.connections)}")
 
     if examine_targets:
-        lines.append(f"Allowed examine targets: {', '.join(examine_targets)}")
+        lines.append(f"\n[INTERACTABLES] You can 'examine' or 'pickup' these specifically: {', '.join(examine_targets)}")
+        lines.append("Do NOT examine things not in this list, even if mentioned in narration.")
     # Feature vs location guidance
     lines.append("\nNote: Features (stalls, fountains) are part of the location. Use 'examine' to interact with them. Use 'move' to go to an Exit (a different location).")
     
@@ -77,8 +94,13 @@ def build_character_context(char, state) -> str:
         for e in state.history[-4:]:
             lines.append(f"  - {e}")
     
+    
     if char.goal:
         lines.append(f"\n💡 Goal: {char.goal}")
+    
+    # Show current motivation if it exists
+    if getattr(char, 'current_motivation', None):
+        lines.append(f"🎯 Current Motivation: {char.current_motivation}")
 
     # Knowledge the character holds (helps NPCs mention relevant facts)
     if getattr(char, 'knowledge', None):

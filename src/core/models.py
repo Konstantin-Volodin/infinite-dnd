@@ -1,5 +1,5 @@
 """Data Models - Pydantic models for game state."""
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 from enum import Enum
 from pydantic import BaseModel, Field
 
@@ -38,6 +38,12 @@ class Location(BaseModel):
     environmental_effects: List[str] = []
 
 
+class Memory(BaseModel):
+    content: str
+    importance: str = "medium"
+    turn: int = 0
+
+
 class Character(BaseModel):
     id: str
     name: str
@@ -45,8 +51,12 @@ class Character(BaseModel):
     race: str = "Human"
     class_name: str = ""
     backstory: str = ""
-    goal: str = ""
+    goal: str = ""  # Primary/static goal
+    current_motivation: str = ""  # Dynamic motivation that can change
     knowledge: List[str] = []
+    memory: List[Memory] = []  # Structured memories with context
+    examined_items: List[str] = []  # Track what has been examined to prevent loops
+    short_term_goals: List[str] = []  # Temporary objectives
     stats: CharacterStats = Field(default_factory=CharacterStats)
     location_id: str = ""
     inventory: List[str] = []
@@ -56,6 +66,17 @@ class NarrativeState(BaseModel):
     scene_type: str = "exploration"  # exploration, social, combat
     tension: str = "low"             # low, rising, high
     stall_counter: int = 0
+    combat_turn_order: List[str] = [] # List of character IDs in initiative order
+    current_turn_index: int = 0       # Index in combat_turn_order
+
+
+class Quest(BaseModel):
+    id: str
+    title: str
+    description: str
+    status: str = "active"  # active, completed, failed
+    giver_id: str = ""
+    steps: List[str] = []
 
 
 class WorldState(BaseModel):
@@ -63,4 +84,6 @@ class WorldState(BaseModel):
     narrative: NarrativeState = Field(default_factory=NarrativeState)
     locations: Dict[str, Location] = {}
     characters: Dict[str, Character] = {}
+    quests: Dict[str, Quest] = {}
     history: List[str] = []
+    inspected_features: List[str] = [] # Track inspected features globally (location_id:feature_key)

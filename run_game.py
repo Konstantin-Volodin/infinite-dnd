@@ -30,9 +30,16 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
     result = None
     
     if actor_id == "dm":
-        # DM now returns structured JSON response
+        # DM now uses tools (may return multiple tool calls in 'all_calls')
         action = dm.decide_action(engine.state, guidance=guidance)
-        result = engine.execute_tool(action["tool"], **action)
+        # If it returned multiple calls, run them in order
+        if "all_calls" in action:
+            for call in action["all_calls"]:
+                cmd = call["arguments"].copy()
+                cmd["tool"] = call["tool"]
+                result = engine.execute_tool(cmd["tool"], **cmd)
+        else:
+            result = engine.execute_tool(action["tool"], **action)
     else:
         # It's a character
         char = engine.state.characters.get(actor_id)
@@ -75,7 +82,20 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                 
                 dm_guidance = f"DESCRIBE what the character finds when examining '{examine_target}'. Reveal a clue, danger, or interesting detail. Location: {location_id}"
                 dm_action = dm.decide_action(engine.state, guidance=dm_guidance)
-                engine.execute_tool(dm_action["tool"], **dm_action)
+                if "all_calls" in dm_action:
+                    for call in dm_action["all_calls"]:
+                        cmd = call["arguments"].copy()
+                        cmd["tool"] = call["tool"]
+                        engine.execute_tool(cmd["tool"], **cmd)
+                else:
+                    engine.execute_tool(dm_action["tool"], **dm_action)
+                # If the examine response included a feature_key and the DM narrated, mark it inspected
+                feature_key = result.get("feature_key")
+                if feature_key and location_id:
+                    global_feature_id = f"{location_id}:{feature_key}"
+                    if global_feature_id not in engine.state.inspected_features:
+                        engine.state.inspected_features.append(global_feature_id)
+                        engine.save_state()
             
             # Check for dynamic location generation trigger
             if result.get("code") == "location_missing":
@@ -118,7 +138,20 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                     print("  ✅ Skill check SUCCESS")
                     dm_guidance = f"DESCRIBE the success: The character succeeded a {skill} check and discovers something useful at {location_id}. Reveal a clue or path."
                     dm_action = dm.decide_action(engine.state, guidance=dm_guidance)
-                    engine.execute_tool(dm_action["tool"], **dm_action)
+                    if "all_calls" in dm_action:
+                        for call in dm_action["all_calls"]:
+                            cmd = call["arguments"].copy()
+                            cmd["tool"] = call["tool"]
+                            engine.execute_tool(cmd["tool"], **cmd)
+                    else:
+                        engine.execute_tool(dm_action["tool"], **dm_action)
+                    # Mark feature as inspected (if present)
+                    feature_key = result.get("feature_key")
+                    if feature_key and location_id:
+                        global_feature_id = f"{location_id}:{feature_key}"
+                        if global_feature_id not in engine.state.inspected_features:
+                            engine.state.inspected_features.append(global_feature_id)
+                            engine.save_state()
                 else:
                     print("  ❌ Skill check FAILED")
                     # Increase narrative tension and ask DM to narrate a failure (maybe a trap)
@@ -126,7 +159,13 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                     engine.save_state()
                     dm_guidance = f"DESCRIBE the failure: The character fails the {skill} check and something goes wrong at {location_id}. Add tension and consequences."
                     dm_action = dm.decide_action(engine.state, guidance=dm_guidance)
-                    engine.execute_tool(dm_action["tool"], **dm_action)
+                    if "all_calls" in dm_action:
+                        for call in dm_action["all_calls"]:
+                            cmd = call["arguments"].copy()
+                            cmd["tool"] = call["tool"]
+                            engine.execute_tool(cmd["tool"], **cmd)
+                    else:
+                        engine.execute_tool(dm_action["tool"], **dm_action)
                 # after handling skill, continue to next actor
                 continue
             
@@ -171,7 +210,7 @@ def detect_stuck_state(history: list) -> tuple[bool, str]:
     if len(history) < 6:
         return False, ""
     
-    recent = history[-8:]
+    recent = history[-10:]
     
     # Count movement actions
     move_count = sum(1 for e in recent if "moved to" in e.lower())
@@ -193,6 +232,13 @@ def detect_stuck_state(history: list) -> tuple[bool, str]:
     # Detect exact repetition of the last event
     if len(history) >= 2 and history[-1] == history[-2]:
         return True, "exact_repetition"
+
+    # Detect repeated n-gram sequences (simple 3-gram repeat): if last 6 events are two identical 3-event sequences
+    if len(recent) >= 6:
+        last3 = [r.lower() for r in recent[-3:]]
+        prev3 = [r.lower() for r in recent[-6:-3]]
+        if last3 == prev3:
+            return True, "repeated_action_sequence"
     
     return False, ""
 
@@ -249,32 +295,8 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
         current_focus = first_char.location_id
     
     while actions_taken < max_actions:
-        # Check for stuck state or stalling
-        is_stuck, stuck_reason = detect_stuck_state(engine.state.history)
-        stall_count = engine.state.narrative.stall_counter
         
-        force_dm_intervention = False
-        intervention_reason = ""
-        
-        if is_stuck:
-            force_dm_intervention = True
-            intervention_reason = f"The story seems stuck ({stuck_reason}). Introduce a sudden event to break the loop."
-            print(f"{Colors.RED}⚠️ STUCK STATE DETECTED: {stuck_reason}{Colors.ENDC}")
-            
-        elif stall_count >= 4:
-            force_dm_intervention = True
-            intervention_reason = "The story is stalling. Make something happen immediately."
-            print(f"{Colors.RED}⚠️ STALL DETECTED (Count: {stall_count}){Colors.ENDC}")
-
-        if force_dm_intervention:
-            # Override director to force DM intervention
-            decision = {
-                "sequence": [{"actor": "dm", "suggested_action": intervention_reason, "reason": "Intervention"}],
-                "narrative_update": {"tension": "high"}
-            }
-        else:
-            # Ask the director who should act (returns a sequence)
-            decision = director.decide_next_actors(engine.state)
+        decision = director.decide_next_actors(engine.state)
         
         # Extract narrative info and apply updates
         narrative_update = decision.get("narrative_update", {})
@@ -307,31 +329,29 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
             engine.save_state()
 
         # Simple threat injection: if tension is high, spawn an ambush NPC at focus
-        if engine.state.narrative.tension == "high" and current_focus:
-            # Unique ambush id based on focus
-            ambush_id = f"ambush_{current_focus}"
-            if ambush_id not in engine.state.characters:
-                print(f"\n{Colors.RED}⚠️ TENSION HIGH: Spawning an ambush at {current_focus}{Colors.ENDC}")
-                # Create a simple bandit NPC
-                spawn_res = engine.execute_tool(
-                    "spawn_npc",
-                    npc_id=ambush_id,
-                    name="Ambush Bandit",
-                    role="bandit",
-                    location_id=current_focus,
-                    description="A shadowy bandit waiting to strike.",
-                    goal="Attack the first target who draws near"
-                )
-                if spawn_res.get("status") == "success":
-                    # Immediate DM narration about the ambush
-                    engine.execute_tool("narrate", text=f"A shadow detaches from the treeline near {current_focus} — someone doesn't want you here.")
+        # if engine.state.narrative.tension == "high" and current_focus:
+        #     # Unique ambush id based on focus
+        #     ambush_id = f"ambush_{current_focus}"
+        #     if ambush_id not in engine.state.characters:
+        #         print(f"\n{Colors.RED}⚠️ TENSION HIGH: Spawning an ambush at {current_focus}{Colors.ENDC}")
+        #         # Create a simple bandit NPC
+        #         spawn_res = engine.execute_tool(
+        #             "spawn_npc",
+        #             npc_id=ambush_id,
+        #             name="Ambush Bandit",
+        #             role="bandit",
+        #             location_id=current_focus,
+        #             description="A shadowy bandit waiting to strike.",
+        #             goal="Attack the first target who draws near"
+        #         )
+        #         if spawn_res.get("status") == "success":
+        #             # Immediate DM narration about the ambush
+        #             engine.execute_tool("narrate", text=f"A shadow detaches from the treeline near {current_focus} — someone doesn't want you here.")
         
-        # Get the sequence of actors (Director should provide a single actor recommendation)
+        # Get the sequence of actors from director
         sequence = decision.get("sequence", [])
-        if sequence:
-            sequence = [sequence[0]]
         if not sequence:
-            sequence = [{"actor": "dm", "reason": "Fallback", "suggested_action": "Advance the story."}]
+            sequence = [{"actor": "dm", "reason": "Fallback", "character_thinking": "Advance the story."}]
         
         # Print director's plan
         actor_names = [s.get("actor", "?") for s in sequence]
@@ -348,20 +368,49 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
             
             actor_id = actor_info.get("actor", "dm")
             reason = actor_info.get("reason", "")
-            suggested_action = actor_info.get("suggested_action", "")
+            character_thinking = actor_info.get("character_thinking", "")
             situation_summary = actor_info.get("situation_summary", "")
             
             scene_type = engine.state.narrative.scene_type
             tension = engine.state.narrative.tension
             
+            # COMBAT LOGIC: Enforce initiative if in combat
+            if scene_type == "combat":
+                # Initialize initiative if empty
+                if not engine.state.narrative.combat_turn_order:
+                    # Simple initiative: PC first, then NPCs
+                    chars = list(engine.state.characters.values())
+                    # Sort by dexterity (descending)
+                    chars.sort(key=lambda c: c.stats.attributes.dexterity, reverse=True)
+                    engine.state.narrative.combat_turn_order = [c.id for c in chars if c.location_id == current_focus]
+                    engine.state.narrative.current_turn_index = 0
+                    print(f"\n{Colors.RED}⚔️ INITIATIVE ORDER: {', '.join(engine.state.narrative.combat_turn_order)}{Colors.ENDC}")
+                    engine.save_state()
+                
+                # Override director's actor choice with initiative order
+                if engine.state.narrative.combat_turn_order:
+                    idx = engine.state.narrative.current_turn_index % len(engine.state.narrative.combat_turn_order)
+                    actor_id = engine.state.narrative.combat_turn_order[idx]
+                    reason = "Initiative Turn"
+                    
+                    # Advance turn index for next time
+                    engine.state.narrative.current_turn_index += 1
+                    engine.save_state()
+            
+            # Update focus to the active character's location
+            if actor_id != "dm":
+                char = engine.state.characters.get(actor_id)
+                if char:
+                    current_focus = char.location_id
+
             header_info = f"{scene_type.upper()} | {tension.upper()}"
             if current_focus:
                 header_info += f" | {current_focus}"
             
             print(f"\n{Colors.CYAN}--- Turn {actions_taken} [{header_info}] ---{Colors.ENDC}")
             print(f"{Colors.BLUE}🎬 Actor: {Colors.BOLD}{actor_id}{Colors.ENDC}{Colors.BLUE} ({reason}){Colors.ENDC}")
-            if suggested_action:
-                print(f"{Colors.BLUE}   <thinking>{suggested_action}</thinking>{Colors.ENDC}")
+            if character_thinking:
+                print(f"{Colors.BLUE}   {character_thinking}{Colors.ENDC}")
             
             # Get the actor's name for display
             if actor_id == "dm":
@@ -378,8 +427,8 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
             guidance_parts = []
             if situation_summary:
                 guidance_parts.append(f"SITUATION: {situation_summary}")
-            if suggested_action:
-                guidance_parts.append(f"DIRECTOR'S GUIDANCE: {suggested_action}")
+            if character_thinking:
+                guidance_parts.append(character_thinking)
             
             guidance = "\n".join(guidance_parts)
             
@@ -387,6 +436,10 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
             
             if not action_taken:
                 print(f"{Colors.RED}  (No action taken: {failure_msg}){Colors.ENDC}")
+                # Feedback to the agent so they know why it failed
+                if failure_msg:
+                    engine.state.history.append(f"[SYSTEM] Action failed: {failure_msg}")
+                    engine.save_state()
             
             # Update stall counter based on what happened
             update_stall_counter(engine, actor_id, action_taken)

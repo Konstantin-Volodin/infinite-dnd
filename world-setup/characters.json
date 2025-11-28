@@ -7,10 +7,15 @@
     "age": 29,
     "description": "A former royal guard who left service after her brother disappeared. Quiet, observant, relentless.",
     "goal": "Find my brother. He vanished near the river three weeks ago. Someone in this market knows something.",
-    "inventory": ["guard-pendant", "journal-page-3"],
+    "inventory": [
+      "guard-pendant",
+      "journal-page-3"
+    ],
     "relationships": {
-      "ally": ["merchant-ronn"],
-      "enemy": ["marsh-raider"]
+      "ally": [
+        "merchant-ronn",
+        "kaelen-swift"
+      ]
     },
     "notes": "Prefers problem-solving over fighting. Has a soft spot for stray animals."
   },
@@ -27,10 +32,17 @@
       "Strange lights have been reported in the cellar at night",
       "A group called the Marsh Raiders has been kidnapping travelers"
     ],
-    "inventory": ["spice-bag", "coin-purse"],
+    "inventory": [
+      "spice-bag",
+      "coin-purse"
+    ],
     "relationships": {
-      "ally": ["elara"],
-      "contacts": ["dockmaster"]
+      "ally": [
+        "elara"
+      ],
+      "contacts": [
+        "dockmaster"
+      ]
     }
   }
 ]

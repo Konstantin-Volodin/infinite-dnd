@@ -31,14 +31,59 @@ CHARACTER_TOOLS = [
         "action_description": "What you are trying to do (e.g., 'I try to pick the lock', 'I search for hidden traps')."
     }),
     _tool("attack", "Attack a target to start combat. Include a concise 'style' describing the movement (e.g., 'overhead slash', 'riposte', 'cleave').", {"target": "Who to attack.", "weapon": "Weapon to use (or 'unarmed').", "style": "Attack style or movement (optional)."}),
+    
+    # Self-modification tools
+    _tool("update_knowledge", "Save new information you've learned.", {
+        "knowledge_item": "What you learned (one fact)."
+    }),
+    _tool("reflect", "Update your current motivation or emotional state.", {
+        "new_motivation": "What drives you right now.",
+        "reason": "Why this changed (optional)."
+    }, required=["new_motivation"]),
+    _tool("add_memory", "Record a significant event or realization.", {
+        "memory": "What happened or what you realized.",
+        "importance": "high, medium, or low"
+    }),
+    
+    # World modification tools
+    _tool("create_small_item", "Attempt to create a small mundane item.", {
+        "item_name": "Name of item to create (e.g., 'crude map', 'scribbled note').",
+        "description": "Brief description of the item."
+    }),
+    _tool("modify_feature", "Attempt to alter a location feature.", {
+        "feature": "Feature to modify (must exist).",
+        "modification": "How you're changing it (e.g., 'barricade the door', 'extinguish the candle')."
+    }),
+    _tool("steal", "Covertly take an item. Requires stealth.", {
+        "item_name": "Item to steal.",
+        "target": "Who you're stealing from (or 'from the location')."
+    }),
+    _tool("hide_item", "Hide an item from view.", {
+        "item_name": "Item to hide.",
+        "location": "Where to hide it (e.g., 'under the table', 'in my cloak')."
+    }),
+    
+    # Item lifecycle management
+    _tool("destroy_item", "Destroy or discard an item permanently.", {
+        "item_name": "Item to destroy.",
+        "method": "How you destroy it (e.g., 'burn', 'smash', 'throw away')."
+    }),
+    _tool("consume_item", "Use and consume an item (removes it).", {
+        "item_name": "Item to consume (food, potion, scroll).",
+        "effect": "What happens when consumed (optional)."
+    }),
+    _tool("drop_item", "Drop an item from inventory to current location.", {
+        "item_name": "Item to drop."
+    }),
+    
     _tool("wait", "Do nothing. Only use when there's nothing meaningful to do.", {"reason": "Reason."}, required=[]),
 ]
 
 DM_TOOLS = [
     _tool("narrate", "Narrate.", {"content": "Narration."}),
-    _tool("spawn_event", "Create event.", {"location_id": "Location.", "description": "Event."}),
+    _tool("spawn_event", "[DEPRECATED - use narrate + new_features instead] Create ephemeral event.", {"location_id": "Location.", "description": "Event."}),
     _tool("update_quest", "Update quest.", {"quest_id": "Quest.", "status": "Status."}, required=["quest_id", "status"]),
-    _tool("create_location", "Create location.", {"name": "Name.", "description": "Desc.", "connected_from": "From."}),
+    _tool("create_location", "Create location.", {"name": "Name.", "description": "Desc.", "connected_to": "Connections (to be added)."}),
     _tool("create_item", "Create item.", {"item_name": "Item.", "location_id": "Location."}),
     _tool("spawn_npc", "Create a new NPC character.", {
         "npc_id": "Unique ID (lowercase, no spaces, e.g. 'guard-marcus').",
@@ -78,28 +123,31 @@ DIRECTOR_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "plan_sequence",
-            "description": "Plan a sequence of actors to act in order (characters may choose to ignore it). This creates a mini-arc of actions.",
+            "name": "select_next_actor",
+            "description": "Select the next actor to act. Call this multiple times to plan a sequence.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "situation_summary": {"type": "string", "description": "brief summary of the story."},
-                    "scene_type": {"type": "string", "enum": ["exploration", "social", "combat", "investigation"], "description": "current game mode."},
-                    "tension": {"type": "string", "enum": ["low", "high"], "description": "current tension level."},
-                    "sequence": {
-                        "type": "array",
-                        "description": "list of actors to act in order",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "actor": {"type": "string", "description": "character_id or 'dm'"},
-                                "suggested_action": {"type": "string", "description": "What the actor SHOULD do. Be specific."}
-                            },
-                            "required": ["actor", "suggested_action"]
-                        }
-                    }
+                    "actor": {"type": "string", "description": "character_id or 'dm'"},
+                    "character_thinking": {"type": "string", "description": "Thought process of the character - use this to guide the character's action. Frame as internal monologue."},
+                    "reason": {"type": "string", "description": "Why this actor should act now (for logging)."}
                 },
-                "required": ["situation_summary", "sequence"]
+                "required": ["actor", "character_thinking"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_narrative",
+            "description": "Update scene metadata (type and tension).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "scene_type": {"type": "string", "enum": ["exploration", "social", "combat", "investigation"], "description": "Current game mode."},
+                    "tension": {"type": "string", "enum": ["low", "high"], "description": "Current tension level."}
+                },
+                "required": []
             }
         }
     }

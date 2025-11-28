@@ -1,7 +1,7 @@
 """State Manager - Load/save world state from JSON files."""
 import json
 import os
-from .models import WorldState, Character, Location, CharacterType, CharacterStats
+from .models import WorldState, Character, Location, CharacterType, CharacterStats, Quest
 
 
 class StateManager:
@@ -37,7 +37,17 @@ class StateManager:
                     location_id="market-square", inventory=char.get("inventory", [])
                 )
 
-        return WorldState(locations=locations, characters=characters)
+        quests = {}
+        quests_path = os.path.join(self.setup_dir, "quests.json")
+        if os.path.exists(quests_path):
+            with open(quests_path) as f:
+                try:
+                    for q in json.load(f):
+                        quests[q["id"]] = Quest(**q)
+                except Exception as e:
+                    print(f"⚠️ Failed to load quests: {e}")
+
+        return WorldState(locations=locations, characters=characters, quests=quests)
 
     def load_state(self) -> WorldState:
         """Load saved state, or create fresh from setup if none exists."""

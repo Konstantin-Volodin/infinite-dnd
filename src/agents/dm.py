@@ -36,14 +36,14 @@ DM_RESPONSE_SCHEMA = {
             },
             "required": ["npc_id", "name", "role", "description"]
         },
-        "create_location": {
+    "create_location": {
             "type": "object",
             "properties": {
                 "name": {"type": "string"},
                 "description": {"type": "string"},
-                "connected_from": {"type": "string", "description": "ID of location it connects to"}
+                "connected_to": {"type": "array", "items": {"type": "string"}, "description": "IDs of locations it connects to (e.g., origin id)."}
             },
-            "required": ["name", "description", "connected_from"]
+            "required": ["name", "description", "connected_to"]
         },
         "new_features": {
             "type": "array",
@@ -85,69 +85,48 @@ class DMAgent(BaseAgent):
         """
         context = build_dm_context(state)
         if guidance:
-            context = f"{guidance}\n(NOTE: This is a suggestion. As DM, you have final say. Prioritize story coherence and fun.)\n\n{context}"
+            context = f"{guidance}\n\n{context}"
         
-        result = self.llm.chat_json(
-            system=build_dm_system_prompt(),
-            user=context,
-            schema=DM_RESPONSE_SCHEMA
+        # Use the tool-calling interface like other agents (narrate, spawn_npc, create_location, etc.)
+        decision = self._decide(
+            system_prompt=build_dm_system_prompt() + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
+            context=context,
+            tools=get_dm_tools(),
+            fallback_tool="narrate",
+            fallback_args={"content": "The scene continues..."}
         )
-        
-        if result["type"] == "json":
-            data = result["data"]
-            action_type = data.get("action_type", "narrate")
-            
-            # Handle specific tool calls based on action_type
-            if action_type == "spawn_npc" and "spawn_npc" in data:
-                npc_data = data["spawn_npc"]
-                return {
-                    "tool": "spawn_npc",
-                    "npc_id": npc_data.get("npc_id"),
-                    "name": npc_data.get("name"),
-                    "role": npc_data.get("role"),
-                    "location_id": data.get("target_location_id"),
-                    "description": npc_data.get("description"),
-                    "goal": npc_data.get("goal", "")
-                }
-            
-            elif action_type == "create_location" and "create_location" in data:
-                loc_data = data["create_location"]
-                return {
-                    "tool": "create_location",
-                    "location_id": loc_data.get("name").lower().replace(" ", "-"),
-                    "name": loc_data.get("name"),
-                    "description": loc_data.get("description"),
-                    "connected_to": [loc_data.get("connected_from")]
-                }
-                
-            elif action_type == "create_item" and "new_items" in data and data["new_items"]:
-                # Just take the first item
-                item = data["new_items"][0]
-                return {
-                    "tool": "create_item",
-                    "item_name": item.get("name"),
-                    "location_id": item.get("location_id") or data.get("target_location_id")
-                }
-            
-            # Default to standard DM action (narrate + features/items)
-            return {
-                "tool": "dm_action",
-                "action_type": action_type,
-                "narration": data.get("narration", "..."),
-                "target_location_id": data.get("target_location_id"),
-                "new_features": data.get("new_features", []),
-                "new_items": data.get("new_items", [])
-            }
-        else:
-            print(f"DM JSON error: {result.get('message', 'Unknown')}")
-            return {
-                "tool": "dm_action",
-                "action_type": "narrate",
-                "narration": "The scene continues...",
-                "target_location_id": None,
-                "new_features": [],
-                "new_items": []
-            }
+        # _decide returns a dict: {'tool': <tool>, ...} or a fallback
+        # If the DM used the old JSON schema tools (dm_action), try to convert it to a set of tool calls
+        if decision.get("tool") == "dm_action":
+            # Convert old-style dm_action into a narrate + optional create/spawn actions
+            # Accept both 'narration' and 'narrate' content
+            content = decision.get("narration") or decision.get("narration_text") or decision.get("content")
+            target_loc = decision.get("target_location_id")
+            # Emit narrate as first tool
+            calls = [{"tool": "narrate", "content": content}] if content else []
+            # New features/items are expressed in dm_action as 'new_features'/'new_items' arrays; convert to create_item calls
+            for f in decision.get("new_items", []) or []:
+                if isinstance(f, dict):
+                    calls.append({"tool": "create_item", "item_name": f.get("name"), "location_id": f.get("location_id") or target_loc})
+                else:
+                    calls.append({"tool": "create_item", "item_name": f, "location_id": target_loc})
+            # spawn_npc not part of this path; but if dm_action included spawn_npc, convert
+            if decision.get("spawn_npc"):
+                sp = decision.get("spawn_npc")
+                calls.append({"tool": "spawn_npc", "npc_id": sp.get("npc_id"), "name": sp.get("name"), "role": sp.get("role"), "description": sp.get("description"), "location_id": sp.get("location_id") or target_loc, "goal": sp.get("goal", "")})
+            # Return first call along with all_calls for the runner to execute sequentially
+            if calls:
+                first = calls[0].copy()
+                first["all_calls"] = [{"tool": c["tool"], "arguments": {k: v for k, v in c.items() if k != "tool"}} for c in calls]
+                return first
+            else:
+                return {"tool": "narrate", "content": "The scene continues..."}
+        # Normalize some args for compatibility
+        if decision.get("tool") == "create_location":
+            ct = decision.get("connected_to")
+            if isinstance(ct, str):
+                decision["connected_to"] = [ct]
+        return decision
 
     def generate_new_location(self, state: WorldState, target_name: str, origin_id: str) -> Dict[str, Any]:
         """Create a new location when a character tries to move somewhere that doesn't exist."""
@@ -165,7 +144,7 @@ Create this location based on its name and the current setting."""
             fallback_args={
                 "name": target_name, 
                 "description": f"A mysterious place known as {target_name}.", 
-                "connected_from": origin_id
+                "connected_to": [origin_id]
             }
         )
 

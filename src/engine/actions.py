@@ -1,7 +1,7 @@
 """Action execution for the game engine."""
 import random
 from typing import Any, Dict, Optional
-from ..core.models import WorldState, Location, Character, CharacterType, CharacterStats
+from ..core.models import WorldState, Location, Character, CharacterType, CharacterStats, Memory
 from ..core.rules import get_skill_modifier, get_health_status
 
 
@@ -27,10 +27,13 @@ class ActionExecutor:
         return self.state.locations.get(loc_id)
 
     def _find_target(self, char: Character, target_name: str) -> Optional[Character]:
-        """Find a character by name at the same location."""
+        """Find a character by name at the same location (fuzzy match)."""
+        target_lower = target_name.lower()
         for c in self.state.characters.values():
             if c.location_id == char.location_id and c.id != char.id:
-                if target_name.lower() in c.name.lower():
+                c_name_lower = c.name.lower()
+                # Exact match or substring match
+                if target_lower == c_name_lower or target_lower in c_name_lower or c_name_lower in target_lower:
                     return c
         return None
 
@@ -68,8 +71,20 @@ class ActionExecutor:
         self._emit("⚡", f"EVENT at {loc.name}: {description}")
         return {"status": "success"}
 
+    def _sanitize_id(self, id_str: str) -> str:
+        """Sanitize ID to be lowercase, no spaces, no special chars."""
+        import re
+        # Replace spaces/special chars with hyphens, remove non-alphanumeric
+        clean = re.sub(r'[^a-z0-9\-]', '', id_str.lower().replace(' ', '-'))
+        # Remove duplicate hyphens
+        clean = re.sub(r'-+', '-', clean)
+        return clean.strip('-')
+
     def create_location(self, location_id: str, name: str, description: str, connected_to: list = None) -> Dict:
         """Create a new location."""
+        # Sanitize ID
+        location_id = self._sanitize_id(location_id)
+        
         if location_id in self.state.locations:
             return {"status": "error", "message": "Location exists"}
         
@@ -96,6 +111,9 @@ class ActionExecutor:
 
     def spawn_npc(self, npc_id: str, name: str, role: str, location_id: str, description: str = "", goal: str = "") -> Dict:
         """Create a new NPC."""
+        # Sanitize ID
+        npc_id = self._sanitize_id(npc_id)
+        
         if npc_id in self.state.characters:
             return {"status": "error", "message": "NPC exists"}
         loc = self._get_loc(location_id)
@@ -167,7 +185,8 @@ class ActionExecutor:
         if char.location_id == dest_id:
             return {"status": "success", "message": "Already there"}
         
-        old_name = self._get_loc(char.location_id).name if char.location_id else "nowhere"
+        old_loc = self._get_loc(char.location_id)
+        old_name = old_loc.name if old_loc else "unknown location"
         char.location_id = dest_id
         self._save()
         self._emit("🚶", f"{char.name} moved from {old_name} to {self._get_loc(dest_id).name}")
@@ -180,12 +199,41 @@ class ActionExecutor:
             return {"status": "error", "message": "Character not found"}
         self._emit("🔍", f"{char.name} examines {target}")
         loc = self._get_loc(char.location_id)
-        # Validate target exists as a feature or item in this location
-        present_features = [f.lower() for f in (loc.features or [])]
-        present_items = [i.lower() for i in (loc.items or [])]
-        inventory_items = [i.lower() for i in (char.inventory or [])]
-        if target.lower() not in present_features and target.lower() not in present_items and target.lower() not in inventory_items:
+        if not loc:
+             return {"status": "error", "message": "You are in an unknown location."}
+        
+        # Validate target exists as a feature or item in this location (fuzzy match)
+        present_features = [f for f in (loc.features or [])]
+        present_items = [i for i in (loc.items or [])]
+        inventory_items = [i for i in (char.inventory or [])]
+        
+        target_lower = target.lower()
+        
+        # Helper for fuzzy check
+        def is_match(name):
+            n_lower = name.lower()
+            return target_lower == n_lower or target_lower in n_lower or n_lower in target_lower
+
+        matched_feature = next((f for f in present_features if is_match(f)), None)
+        matched_item = next((i for i in present_items if is_match(i)), None)
+        matched_inv = next((i for i in inventory_items if is_match(i)), None)
+        
+        real_target = matched_feature or matched_item or matched_inv
+        
+        if not real_target:
             return {"status": "error", "code": "invalid_target", "message": f"Nothing named '{target}' here to examine.", "present_features": loc.features, "present_items": loc.items, "inventory_items": char.inventory}
+            
+        # Use the real name for history/checks
+        target = real_target
+
+        # Check if already examined
+        if target.lower() in [e.lower() for e in char.examined_items]:
+             return {"status": "success", "message": f"You have already examined {target}. It seems unchanged."}
+        
+        # Mark as examined
+        char.examined_items.append(target)
+        self._save()
+
         if loc and loc.feature_traits:
             # Match target against trait keys (case-insensitive)
             trait = None
@@ -288,7 +336,13 @@ class ActionExecutor:
             allowed = [c.name for c in self.state.characters.values() if c.location_id == char.location_id and c.id != char.id]
             return {"status": "error", "code": "invalid_target", "message": f"Can't find {target}", "allowed_targets": allowed}
         
-    # Roll attack
+        # Trigger combat state if not already in combat
+        if self.state.narrative.scene_type != "combat":
+            self.state.narrative.scene_type = "combat"
+            self.state.narrative.tension = "high"
+            self._emit("⚔️", f"COMBAT STARTED! {char.name} attacks {target_char.name}!")
+        
+        # Roll attack
         roll = random.randint(1, 20) + char.stats.level
         hit = roll >= target_char.stats.ac
         
@@ -302,8 +356,16 @@ class ActionExecutor:
                     self._emit("⚔️", f"{char.name} delivers a {style} with {weapon}, defeating {target_char.name}!")
                 else:
                     self._emit("⚔️", f"{char.name} defeats {target_char.name}!")
+                
+                # Handle defeat
                 if target_char.type == CharacterType.NPC:
+                    # Don't delete immediately, mark as defeated/unconscious? 
+                    # For now, let's just remove them to keep it simple, or maybe leave a body?
+                    # Let's remove them from active characters but maybe leave a "body" item?
                     del self.state.characters[target_char.id]
+                    loc = self._get_loc(char.location_id)
+                    if loc:
+                        loc.items.append(f"body of {target_char.name}")
             else:
                 if style:
                     self._emit("⚔️", f"{char.name} {style} {target_char.name} for {damage} ({target_char.stats.hp} HP)")
@@ -322,6 +384,54 @@ class ActionExecutor:
         
         self._save()
         return {"status": "success", "hit": hit}
+
+    def flee(self, character_id: str, direction: str = None) -> Dict:
+        """Attempt to flee from combat."""
+        char = self._get_char(character_id)
+        if not char:
+            return {"status": "error", "message": "Character not found"}
+        
+        if self.state.narrative.scene_type != "combat":
+            # Just move if not in combat
+            if direction:
+                return self.move(character_id, direction)
+            return {"status": "error", "message": "Not in combat, just move."}
+
+        # Flee check (Athletics/Acrobatics vs DC 12)
+        modifier = max(get_skill_modifier(char, "athletics"), get_skill_modifier(char, "acrobatics"))
+        roll = random.randint(1, 20)
+        total = roll + modifier
+        difficulty = 12
+        
+        self._emit("🏃", f"{char.name} attempts to flee...", f"[SYSTEM] 🎲 Flee Check: {total} (d20={roll}, mod={modifier}) vs DC {difficulty}")
+        
+        if total >= difficulty:
+            self._emit("💨", f"{char.name} escapes the battle!")
+            # If direction provided, move there, else just stay but out of combat? 
+            # Actually, fleeing should probably move you to a random connection or the previous location.
+            # For now, let's ask for a direction or pick the first connection.
+            loc = self._get_loc(char.location_id)
+            target_loc_id = None
+            if direction:
+                 # Try to find matching connection
+                 for conn in loc.connections:
+                     if direction.lower() in conn.lower():
+                         target_loc_id = conn
+                         break
+            
+            if not target_loc_id and loc.connections:
+                target_loc_id = loc.connections[0]
+            
+            if target_loc_id:
+                char.location_id = target_loc_id
+                self._save()
+                self._emit("🚶", f"{char.name} fled to {target_loc_id}")
+                return {"status": "success", "message": "Escaped!"}
+            else:
+                return {"status": "success", "message": "Escaped combat but nowhere to run!"}
+        else:
+            self._emit("🚫", f"{char.name} failed to escape!")
+            return {"status": "failure", "message": "Blocked by enemies"}
 
     def attempt_skill(self, character_id: str, skill: str, action_description: str, difficulty: int = None) -> Dict:
         """Attempt a skill check."""
@@ -347,4 +457,213 @@ class ActionExecutor:
         if not char:
             return {"status": "error", "message": "Character not found"}
         self._emit("⏳", f"{char.name} waits" + (f" ({reason})" if reason else ""))
+        return {"status": "success"}
+
+    # === Self-Modification Actions ===
+    
+    def update_knowledge(self, character_id: str, knowledge_item: str) -> Dict:
+        """Add knowledge to character."""
+        char = self._get_char(character_id)
+        if not char or not knowledge_item:
+            return {"status": "error", "message": "Invalid"}
+        if knowledge_item not in char.knowledge:
+            char.knowledge.append(knowledge_item)
+            self._save()
+            self._emit("🧠", f"{char.name} learned: {knowledge_item}")
+        return {"status": "success"}
+    
+    def reflect(self, character_id: str, new_motivation: str, reason: str = "") -> Dict:
+        """Update character motivation."""
+        char = self._get_char(character_id)
+        if not char:
+            return {"status": "error", "message": "Invalid"}
+        old_motivation = char.current_motivation
+        char.current_motivation = new_motivation
+        self._save()
+        msg = f"{char.name}'s motivation shifts: {new_motivation}"
+        if reason:
+            msg += f" ({reason})"
+        self._emit("💭", msg)
+        return {"status": "success", "old_motivation": old_motivation}
+    
+    def add_memory(self, character_id: str, memory: str, importance: str = "medium") -> Dict:
+        """Record a memory."""
+        char = self._get_char(character_id)
+        if not char:
+            return {"status": "error", "message": "Invalid"}
+        char.memory.append(Memory(
+            content=memory,
+            importance=importance,
+            turn=self.state.time
+        ))
+        self._save()
+        emoji = "⭐" if importance == "high" else "📝"
+        self._emit(emoji, f"{char.name} remembers: {memory}")
+        return {"status": "success"}
+
+    # === World Modification Actions ===
+    
+    def create_small_item(self, character_id: str, item_name: str, description: str = "") -> Dict:
+        """Create a small item (validated)."""
+        char = self._get_char(character_id)
+        loc = self._get_loc(char.location_id)
+        if not char or not loc:
+            return {"status": "error", "message": "Invalid"}
+        
+        # Validate: only small, mundane items
+        forbidden = ["artifact", "magical", "weapon", "sword", "gold", "treasure", "coin"]
+        if any(word in item_name.lower() or word in description.lower() for word in forbidden):
+            return {"status": "error", "message": "Can only create small mundane items like notes, crude tools, etc."}
+        
+        loc.items.append(item_name)
+        self._save()
+        self._emit("🛠️", f"{char.name} creates: {item_name}")
+        return {"status": "success"}
+    
+    def modify_feature(self, character_id: str, feature: str, modification: str) -> Dict:
+        """Modify a location feature."""
+        char = self._get_char(character_id)
+        loc = self._get_loc(char.location_id)
+        if not char or not loc:
+            return {"status": "error", "message": "Invalid"}
+        
+        # Check if feature exists
+        if not loc.features or feature not in loc.features:
+            return {"status": "error", "message": f"Feature '{feature}' doesn't exist here", "available_features": loc.features or []}
+        
+        # Record the modification
+        modified_feature = f"{feature} ({modification})"
+        idx = loc.features.index(feature)
+        loc.features[idx] = modified_feature
+        self._save()
+        self._emit("🔧", f"{char.name} modifies {feature}: {modification}")
+        return {"status": "success"}
+    
+    def steal(self, character_id: str, item_name: str, target: str = "from the location") -> Dict:
+        """Steal an item (requires stealth check)."""
+        char = self._get_char(character_id)
+        loc = self._get_loc(char.location_id)
+        if not char or not loc:
+            return {"status": "error", "message": "Invalid"}
+        
+        # Find the item
+        if target != "from the location":
+            target_char = self._find_target(char, target)
+            if not target_char:
+                return {"status": "error", "message": f"Target not found: {target}"}
+            if item_name not in target_char.inventory:
+                return {"status": "error", "message": f"{target} doesn't have {item_name}"}
+            
+            # Require stealth check to steal from person
+            modifier = get_skill_modifier(char, "stealth")
+            roll = random.randint(1, 20)
+            total = roll + modifier
+            difficulty = 15  # Hard check
+            
+            self._emit("🎲", f"🎲 {char.name} Stealth: {total} (d20={roll}, mod={modifier}) vs DC {difficulty}")
+            
+            if total >= difficulty:
+                target_char.inventory.remove(item_name)
+                char.inventory.append(item_name)
+                self._save()
+                self._emit("🥷", f"{char.name} stealthily steals {item_name} from {target_char.name}!")
+                return {"status": "success", "stolen_from": target_char.name}
+            else:
+                self._emit("⚠️", f"{target_char.name} notices {char.name} trying to steal!")
+                return {"status": "failure", "message": "Caught in the act!"}
+        else:
+            # Stealing from location is easier (just pickup)
+            if item_name not in loc.items:
+                return {"status": "error", "message": f"Item not here: {item_name}"}
+            loc.items.remove(item_name)
+            char.inventory.append(item_name)
+            self._save()
+            self._emit("🥷", f"{char.name} takes {item_name} quietly")
+            return {"status": "success"}
+    
+    def hide_item(self, character_id: str, item_name: str, location: str) -> Dict:
+        """Hide an item."""
+        char = self._get_char(character_id)
+        loc = self._get_loc(char.location_id)
+        if not char or not loc:
+            return {"status": "error", "message": "Invalid"}
+        
+        # Check if character has the item
+        if item_name not in char.inventory:
+            return {"status": "error", "message": f"Don't have {item_name}"}
+        
+        # Hide it (add to location with hidden prefix)
+        char.inventory.remove(item_name)
+        hidden_item = f"hidden: {item_name} ({location})"
+        loc.items.append(hidden_item)
+        self._save()
+        self._emit("🫥", f"{char.name} hides {item_name} {location}")
+        return {"status": "success"}
+
+    # === Item Lifecycle Management ===
+    
+    def destroy_item(self, character_id: str, item_name: str, method: str = "") -> Dict:
+        """Destroy an item permanently."""
+        char = self._get_char(character_id)
+        loc = self._get_loc(char.location_id)
+        if not char:
+            return {"status": "error", "message": "Invalid"}
+        
+        # Check inventory first, then location
+        if item_name in char.inventory:
+            char.inventory.remove(item_name)
+            self._save()
+            self._emit("🔥", f"{char.name} destroys {item_name}" + (f" ({method})" if method else ""))
+            return {"status": "success", "location": "inventory"}
+        elif loc and item_name in loc.items:
+            loc.items.remove(item_name)
+            self._save()
+            self._emit("🔥", f"{char.name} destroys {item_name}" + (f" ({method})" if method else ""))
+            return {"status": "success", "location": "ground"}
+        else:
+            return {"status": "error", "message": f"Don't have {item_name} to destroy"}
+    
+    def consume_item(self, character_id: str, item_name: str, effect: str = "") -> Dict:
+        """Consume an item (removes it from game)."""
+        char = self._get_char(character_id)
+        if not char:
+            return {"status": "error", "message": "Invalid"}
+        
+        found = next((i for i in char.inventory if i.lower() == item_name.lower()), None)
+        if not found:
+            return {"status": "error", "message": f"Don't have {item_name}"}
+        
+        char.inventory.remove(found)
+        self._save()
+        
+        msg = f"{char.name} consumes {found}"
+        if effect:
+            msg += f" - {effect}"
+        self._emit("🍴", msg)
+        
+        # Auto-heal if it's a potion
+        if "potion" in item_name.lower() or "elixir" in item_name.lower():
+            heal = 8
+            before = char.stats.hp
+            char.stats.hp = min(char.stats.max_hp, char.stats.hp + heal)
+            self._save()
+            self._emit("💖", f"{char.name} heals for {char.stats.hp - before} HP")
+        
+        return {"status": "success"}
+    
+    def drop_item(self, character_id: str, item_name: str) -> Dict:
+        """Drop item from inventory to location."""
+        char = self._get_char(character_id)
+        loc = self._get_loc(char.location_id)
+        if not char or not loc:
+            return {"status": "error", "message": "Invalid"}
+        
+        found = next((i for i in char.inventory if i.lower() == item_name.lower()), None)
+        if not found:
+            return {"status": "error", "message": f"Don't have {item_name}"}
+        
+        char.inventory.remove(found)
+        loc.items.append(found)
+        self._save()
+        self._emit("📦", f"{char.name} drops {found}")
         return {"status": "success"}

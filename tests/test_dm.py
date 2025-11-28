@@ -45,11 +45,19 @@ class TestDMAgent(BaseTestCase):
         
         action = self.agent.decide_action(self.state, guidance=guidance)
         print(f"DM Action: {action}")
-        
-        self.assertEqual(action["tool"], "dm_action")
-        self.assertIn("markings", action["narration"].lower())
-        # Should ideally create a new feature or item
-        self.assertTrue(len(action["new_features"]) > 0 or len(action["new_items"]) > 0)
+        # Expect either a direct narration (narrate) OR an all_calls list containing a narrate call
+        tools_seen = []
+        if "all_calls" in action:
+            tools_seen = [c["tool"] for c in action["all_calls"]]
+            narration_texts = [c["arguments"].get("content") or c["arguments"].get("narration") for c in action["all_calls"] if c["tool"] == "narrate"]
+        else:
+            tools_seen = [action.get("tool")]
+            narration_texts = [action.get("content") or action.get("narration") or ""]
+
+        self.assertTrue("narrate" in tools_seen or any(t in ["create_item", "create_location", "spawn_npc"] for t in tools_seen))
+        # Check that narration mentions 'markings' somewhere
+        combined_narration = " ".join([t.lower() for t in (narration_texts or []) if t])
+        self.assertIn("markings", combined_narration)
 
     def test_spawn_event(self):
         """Test if DM can spawn an event when asked."""
@@ -59,18 +67,40 @@ class TestDMAgent(BaseTestCase):
         
         action = self.agent.decide_action(self.state, guidance=guidance)
         print(f"DM Action: {action}")
-        
-        # The DM might use 'dm_action' with narration OR 'spawn_npc' depending on how it interprets it.
-        # But since DMAgent.decide_action returns a structured JSON which maps to 'dm_action',
-        # we expect 'dm_action' with narration describing the skeleton.
-        
-        self.assertEqual(action["tool"], "dm_action")
-        # LLM may say "skeleton" or "skeletal" - both are valid
-        narration_lower = action["narration"].lower()
-        self.assertTrue(
-            "skeleton" in narration_lower or "skeletal" in narration_lower,
-            f"Expected 'skeleton' or 'skeletal' in narration: {action['narration']}"
-        )
+        # The DM could return a spawn_event or narration mentioning skeleton(s)
+        tools_seen = []
+        narration_texts = []
+        if "all_calls" in action:
+            tools_seen = [c["tool"] for c in action["all_calls"]]
+            narration_texts = [c["arguments"].get("content") or c["arguments"].get("narration") for c in action["all_calls"] if c["tool"] == "narrate"]
+        else:
+            tools_seen = [action.get("tool")]
+            narration_texts = [action.get("content") or action.get("narration") or ""]
+
+        # Accept either spawn_event tool or narration mentioning a skeleton
+        if "spawn_event" in tools_seen or "spawn_npc" in tools_seen:
+            ok = True
+        else:
+            narration_lower = " ".join(n.lower() for n in narration_texts if n)
+            ok = ("skeleton" in narration_lower or "skeletal" in narration_lower)
+        self.assertTrue(ok, f"Expected spawn_event or narration mentioning skeleton. Got tools: {tools_seen}, narration: {narration_texts}")
+
+    def test_dm_tool_calls_with_mock(self):
+        """Test that DMAgent returns tool_calls format when chat_with_tools returns calls."""
+        agent = DMAgent()
+        # Mock the llm client's chat_with_tools to return a tool call response
+        agent.llm.chat_with_tools = lambda system, user, tools: {
+            "type": "tool_calls",
+            "calls": [
+                {"tool": "narrate", "arguments": {"content": "A strange set of markings appears."}},
+                {"tool": "create_item", "arguments": {"item_name": "rune", "location_id": "loc-1"}}
+            ]
+        }
+        action = agent.decide_action(self.state, guidance="Describe markings")
+        # Should include 'all_calls' and the first tool should be narrate
+        self.assertEqual(action.get("tool"), "narrate")
+        self.assertIn("all_calls", action)
+        self.assertTrue(any(c["tool"] == "create_item" for c in action["all_calls"]))
 
 if __name__ == '__main__':
     unittest.main()

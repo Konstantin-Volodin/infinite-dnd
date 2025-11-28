@@ -27,7 +27,7 @@ class CharacterAgent(BaseAgent):
         
         context = build_character_context(char, state)
         if guidance:
-            context = f"{guidance}\n(NOTE: This is just a suggestion. Prioritize your GOAL and personality. If the suggestion doesn't fit, ignore it.)\n\n{context}"
+            context = f"{guidance}\n\n{context}"
         
         action = self._decide(
             system_prompt=build_character_system_prompt(char) + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
@@ -51,11 +51,24 @@ class CharacterAgent(BaseAgent):
                 if tgt and tgt not in present_names:
                     return False
             if tool == "examine":
+                # Check if location exists before accessing features
+                if not loc:
+                    return False
                 tgt = a.get("target") or a.get("examine_target")
                 features = [f for f in (loc.features or [])]
                 items = [i for i in (loc.items or [])]
                 inv = [i for i in (char.inventory or [])]
-                if tgt and tgt not in features and tgt not in items and tgt not in inv:
+                
+                # Allow if target is in features/items/inventory
+                if tgt and (tgt in features or tgt in items or tgt in inv):
+                    return True
+                
+                # Strict validation: Only allow if target is in features/items/inventory
+                if tgt and (tgt in features or tgt in items or tgt in inv):
+                    return True
+                
+                # Otherwise invalid
+                if tgt:
                     return False
             if tool == "move":
                 # require destination be a connected location or existing loc name

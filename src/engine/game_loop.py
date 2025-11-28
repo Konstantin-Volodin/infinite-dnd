@@ -95,11 +95,17 @@ class Engine:
         elif tool_name == "wait":
             return method(args.get("character_id"), args.get("reason"))
         elif tool_name == "narrate":
-            return method(args.get("text", ""))
+            return method(args.get("content") or args.get("narration") or args.get("text") or "")
         elif tool_name == "spawn_event":
             return method(args.get("location_id", ""), args.get("description", ""))
         elif tool_name == "create_location":
-            return method(args.get("location_id", ""), args.get("name", ""), args.get("description", ""), args.get("connected_to", []))
+            # If location_id isn't provided, derive from name
+            loc_id = args.get("location_id") or (args.get("name", "").lower().replace(" ", "-") if args.get("name") else "")
+            # Normalize connected_to to a list if provided as a single string
+            conn = args.get("connected_to")
+            if isinstance(conn, str):
+                conn = [conn]
+            return method(loc_id, args.get("name", ""), args.get("description", ""), conn or [])
         elif tool_name == "create_item":
             return method(args.get("item_name", ""), args.get("location_id", ""))
         elif tool_name == "spawn_npc":
@@ -107,4 +113,13 @@ class Engine:
         elif tool_name == "remove_npc":
             return method(args.get("npc_id", ""), args.get("reason", ""))
         
-        return {"status": "error", "message": f"Unhandled tool: {tool_name}"}
+        # Generic fallback for any other tool (like the new character tools)
+        # We pass all kwargs as arguments to the method, but filter out 'tool' keys
+        # This assumes the method signature matches the kwargs provided
+        try:
+            clean_args = {k: v for k, v in args.items() if k not in ["tool", "tool_name"]}
+            return method(**clean_args)
+        except TypeError as e:
+            return {"status": "error", "message": f"Argument mismatch for tool {tool_name}: {e}"}
+        except Exception as e:
+            return {"status": "error", "message": f"Error executing {tool_name}: {e}"}
