@@ -3,58 +3,63 @@
     "id": "valley-bridge",
     "name": "Valley Bridge",
     "description": "An old stone bridge crossing the silver river. Lanterns flicker each evening.",
-    "tags": ["travel", "scenic", "low-threat"],
+    "tags": [
+      "travel",
+      "scenic",
+      "low-threat"
+    ],
     "danger_level": 2,
-    "connections": ["market-square", "forest-trail"],
-    "features": ["stone railing", "flickering lanterns", "river below", "worn path stones"]
+    "connections": [
+      "market-square",
+      "forest-trail"
+    ],
+    "features": [
+      "stone railing",
+      "flickering lanterns",
+      "river below",
+      "worn path stones"
+    ]
   },
   {
     "id": "market-square",
     "name": "Market Square",
     "description": "Bustling market with stalls selling spices, trinkets, and rumors.",
-    "tags": ["social", "trade"],
-    "danger_level": 3,
-    "connections": ["valley-bridge", "guild-hall"],
-    "features": ["spice stall", "trinket vendor", "notice board", "fountain", "merchant carts"],
-    "items": ["strange coin"]
+    "tags": [
+      "social",
+      "trade"
+    ],
+    "danger_level": 2,
+    "connections": [
+      "valley-bridge",
+      "guild-hall"
+    ],
+    "features": [
+      "notice board",
+      "fountain",
+      "merchant carts"
+    ],
+    "items": [
+      "strange coin"
+    ]
   },
   {
     "id": "guild-hall",
     "name": "Guild Hall",
     "description": "A grand wooden building where merchants and artisans gather. The floorboards creak with secrets.",
-    "tags": ["social", "indoor"],
+    "tags": [
+      "social",
+      "indoor"
+    ],
     "danger_level": 1,
-    "connections": ["market-square", "spice-cellar"],
-    "features": ["creaky floorboards", "guild ledger", "meeting table", "fireplace", "stairs to cellar"]
-  },
-  {
-    "id": "spice-cellar",
-    "name": "Old Spice Cellar",
-    "description": "A damp, aromatic cellar beneath the Guild Hall. Crates of rare spices are stacked high, hiding a small meeting table.",
-    "tags": ["secret", "indoor"],
-    "danger_level": 2,
-    "connections": ["guild-hall"],
-    "features": ["spice crates", "hidden meeting table", "dusty shelves", "strange symbols on wall", "trapdoor"],
-    "items": ["rusted key"]
-  },
-  {
-    "id": "forest-trail",
-    "name": "Forest Trail",
-    "description": "A narrow, winding path leading into the dense woods. Shadows lengthen here, and the air grows cooler.",
-    "tags": ["nature", "danger"],
-    "danger_level": 3,
-    "connections": ["valley-bridge", "forest-clearing"],
-    "features": ["ancient trees", "animal tracks", "overgrown bushes", "distant sounds"],
-    "items": ["torn map"]
-  },
-  {
-    "id": "forest-clearing",
-    "name": "Forest Clearing",
-    "description": "A moonlit clearing deep in the woods. Strange stones form a circle in the center.",
-    "tags": ["mystery", "danger"],
-    "danger_level": 4,
-    "connections": ["forest-trail"],
-    "features": ["stone circle", "charred ground", "ancient altar", "moonlight shaft"],
-    "items": []
+    "connections": [
+      "market-square",
+      "spice-cellar"
+    ],
+    "features": [
+      "creaky floorboards",
+      "guild ledger",
+      "meeting table",
+      "fireplace",
+    ]
   }
 ]
