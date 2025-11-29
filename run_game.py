@@ -18,6 +18,22 @@ class Colors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
 
+# Output verbosity levels
+class OutputLevel:
+    QUIET = 0
+    DEFAULT = 1
+    VERBOSE = 2
+    DEBUG = 3
+
+# Global output level (set by CLI args)
+output_level = OutputLevel.DEFAULT
+
+def output(msg: str, level: int = OutputLevel.DEFAULT, end: str = "\n"):
+    """Print message if current output level permits."""
+    if output_level >= level:
+        print(msg, end=end)
+
+
 def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -> tuple[bool, str]:
     """Execute an action for the given actor. Returns (success, failure_message).
     
@@ -44,7 +60,7 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
         # It's a character
         char = engine.state.characters.get(actor_id)
         if not char:
-            print(f"  ⚠️ Unknown actor: {actor_id}")
+            output(f"  ⚠️ Unknown actor: {actor_id}", OutputLevel.VERBOSE)
             return False, "Unknown actor"
         
         char_agent = CharacterAgent(actor_id)
@@ -71,14 +87,14 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
             # Check for errors and return them
             if result.get("status") == "error":
                 failure_msg = result.get("message", "Action failed")
-                print(f"  ⚠️ Action failed: {failure_msg}")
+                output(f"  ⚠️ Action failed: {failure_msg}", OutputLevel.VERBOSE)
                 return False, failure_msg
             
             # Handle examine action - DM should describe what they find
             if result.get("requires_dm_response"):
                 examine_target = result.get("examine_target", "something")
                 location_id = result.get("location_id", "")
-                print(f"  🔍 DM responding to examination...")
+                output(f"  🔍 DM responding to examination...", OutputLevel.VERBOSE)
                 
                 dm_guidance = f"DESCRIBE what the character finds when examining '{examine_target}'. Reveal a clue, danger, or interesting detail. Location: {location_id}"
                 dm_action = dm.decide_action(engine.state, guidance=dm_guidance)
@@ -101,13 +117,13 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
             if result.get("code") == "location_missing":
                 target_name = result.get("target_name")
                 origin_id = result.get("origin_id")
-                print(f"  ✨ Dynamic Generation Triggered: Creating '{target_name}'...")
+                output(f"  ✨ Dynamic Generation Triggered: Creating '{target_name}'...", OutputLevel.VERBOSE)
                 
                 gen_action = dm.generate_new_location(engine.state, target_name, origin_id)
                 gen_result = engine.execute_tool(gen_action["tool"], **gen_action)
                 
                 if gen_result.get("status") == "success":
-                    print(f"  🔄 Retrying move to '{target_name}'...")
+                    output(f"  🔄 Retrying move to '{target_name}'...", OutputLevel.VERBOSE)
                     result = engine.execute_tool(action["tool"], **action)
             
             # Check for dynamic item generation trigger
@@ -117,13 +133,13 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                 char = engine.state.characters.get(char_id)
                 loc_id = char.location_id
                 
-                print(f"  ✨ Dynamic Item Check: Validating '{item_name}'...")
+                output(f"  ✨ Dynamic Item Check: Validating '{item_name}'...", OutputLevel.VERBOSE)
                 
                 gen_action = dm.generate_new_item(engine.state, item_name, loc_id)
                 gen_result = engine.execute_tool(gen_action["tool"], **gen_action)
                 
                 if gen_result.get("status") == "success" and gen_action["tool"] == "create_item":
-                    print(f"  🔄 Retrying pickup of '{item_name}'...")
+                    output(f"  🔄 Retrying pickup of '{item_name}'...", OutputLevel.VERBOSE)
                     result = engine.execute_tool(action["tool"], **action)
 
             # Handle skill_required responses by performing skill check
@@ -131,11 +147,11 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                 skill = result.get("skill")
                 difficulty = result.get("difficulty")
                 location_id = result.get("location_id") or (char.location_id if char else None)
-                print(f"  🎲 Skill check required: {skill} (DC {difficulty})")
+                output(f"  🎲 Skill check required: {skill} (DC {difficulty})", OutputLevel.VERBOSE)
                 skill_res = engine.execute_tool("attempt_skill", character_id=actor_id, skill=skill, action_description=result.get("action_description", ""), difficulty=difficulty)
                 # If check result is success, ask DM to narrate; otherwise, trigger failure and increase tension
                 if skill_res.get("success"):
-                    print("  ✅ Skill check SUCCESS")
+                    output("  ✅ Skill check SUCCESS", OutputLevel.VERBOSE)
                     dm_guidance = f"DESCRIBE the success: The character succeeded a {skill} check and discovers something useful at {location_id}. Reveal a clue or path."
                     dm_action = dm.decide_action(engine.state, guidance=dm_guidance)
                     if "all_calls" in dm_action:
@@ -153,7 +169,7 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                             engine.state.inspected_features.append(global_feature_id)
                             engine.save_state()
                 else:
-                    print("  ❌ Skill check FAILED")
+                    output("  ❌ Skill check FAILED", OutputLevel.VERBOSE)
                     # Increase narrative tension and ask DM to narrate a failure (maybe a trap)
                     engine.state.narrative.tension = "high"
                     engine.save_state()
@@ -173,12 +189,12 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
             if result.get("code") == "invalid_target":
                 msg = result.get("message", "Invalid target")
                 allowed = result.get("allowed_targets") or result.get("present_features") or result.get("allowed_items")
-                print(f"  ⚠️ Invalid target: {msg}")
+                output(f"  ⚠️ Invalid target: {msg}", OutputLevel.VERBOSE)
                 if allowed:
-                    print(f"    Allowed: {allowed}")
+                    output(f"    Allowed: {allowed}", OutputLevel.DEBUG)
                 # Try one automatic retry by re-asking the character with suggestions
                 if actor_id != "dm":
-                    print("  🔁 Re-requesting action with guidance to choose an allowed target...")
+                    output("  🔁 Re-requesting action with guidance to choose an allowed target...", OutputLevel.DEBUG)
                     guidance_extra = ''
                     if isinstance(allowed, list):
                         guidance_extra = f"\nAllowed targets: {', '.join(allowed)}"
@@ -194,7 +210,7 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                     else:
                         # Give up and report failure
                         failure_msg = retry_result.get("message", "Invalid target after retry")
-                        print(f"  ⚠️ Retry failed: {failure_msg}")
+                        output(f"  ⚠️ Retry failed: {failure_msg}", OutputLevel.VERBOSE)
                         return False, failure_msg
                 else:
                     return False, msg
@@ -282,9 +298,9 @@ def update_stall_counter(engine: Engine, actor_id: str, action_taken: bool):
 def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_actions: int = 30):
     """Run the game with director-driven turn order."""
     
-    print(f"\n{Colors.CYAN}{'='*50}")
-    print(f"  GAME START")
-    print(f"{'='*50}{Colors.ENDC}")
+    output(f"\n{Colors.CYAN}{'='*50}")
+    output(f"  GAME START")
+    output(f"{'='*50}{Colors.ENDC}")
     
     actions_taken = 0
     
@@ -314,7 +330,7 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
                 target_loc = trans.get("target_location_id")
                 char_ids = trans.get("character_ids", [])
                 
-                print(f"\n{Colors.CYAN}✨ SCENE TRANSITION: Moving {len(char_ids)} characters to {target_loc}...{Colors.ENDC}")
+                output(f"\n{Colors.CYAN}✨ SCENE TRANSITION: Moving {len(char_ids)} characters to {target_loc}...{Colors.ENDC}", OutputLevel.VERBOSE)
                 
                 # Move characters directly
                 for cid in char_ids:
@@ -355,9 +371,10 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
         
         # Print director's plan
         actor_names = [s.get("actor", "?") for s in sequence]
-        print(f"\n{Colors.CYAN}{'='*50}")
-        print(f"🎬 Director plans sequence: {' → '.join(actor_names)}")
-        print(f"{'='*50}{Colors.ENDC}")
+        # Director plans sequence debug info is noisy. Only show in DEBUG mode for troubleshooting.
+        output(f"\n{Colors.CYAN}{'='*50}", OutputLevel.DEBUG)
+        output(f"🎬 Director plans sequence: {' → '.join(actor_names)}", OutputLevel.DEBUG)
+        output(f"{'='*50}{Colors.ENDC}", OutputLevel.DEBUG)
         
         # Execute each actor in the sequence
         for actor_info in sequence:
@@ -384,7 +401,7 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
                     chars.sort(key=lambda c: c.stats.attributes.dexterity, reverse=True)
                     engine.state.narrative.combat_turn_order = [c.id for c in chars if c.location_id == current_focus]
                     engine.state.narrative.current_turn_index = 0
-                    print(f"\n{Colors.RED}⚔️ INITIATIVE ORDER: {', '.join(engine.state.narrative.combat_turn_order)}{Colors.ENDC}")
+                    output(f"\n{Colors.RED}⚔️ INITIATIVE ORDER: {', '.join(engine.state.narrative.combat_turn_order)}{Colors.ENDC}", OutputLevel.VERBOSE)
                     engine.save_state()
                 
                 # Override director's actor choice with initiative order
@@ -407,12 +424,7 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
             if current_focus:
                 header_info += f" | {current_focus}"
             
-            print(f"\n{Colors.CYAN}--- Turn {actions_taken} [{header_info}] ---{Colors.ENDC}")
-            print(f"{Colors.BLUE}🎬 Actor: {Colors.BOLD}{actor_id}{Colors.ENDC}{Colors.BLUE} ({reason}){Colors.ENDC}")
-            if character_thinking:
-                print(f"{Colors.BLUE}   {character_thinking}{Colors.ENDC}")
-            
-            # Get the actor's name for display
+            # Get the actor's name for display (move above printing so verbose header can reference color/actor)
             if actor_id == "dm":
                 actor_name = "Dungeon Master"
                 color = Colors.YELLOW
@@ -420,8 +432,41 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
                 char = engine.state.characters.get(actor_id)
                 actor_name = char.name if char else actor_id
                 color = Colors.GREEN
+
+            # Quiet mode: Just show turn summary
+            if output_level == OutputLevel.QUIET:
+                actor_name = engine.state.characters.get(actor_id).name if actor_id != "dm" else "DM"
+                # Show only a short turn summary in QUIET mode
+                output(f"Turn {actions_taken}: {actor_name} at {current_focus}", level=OutputLevel.QUIET)
+            else:
+                output(f"\n{Colors.CYAN}--- Turn {actions_taken} [{header_info}] ---{Colors.ENDC}")
+                # Default (story) mode should show a clean actor line with the actor's display name
+                if output_level == OutputLevel.DEFAULT:
+                    # Show actor's display name (not id) in story mode
+                    actor_display = engine.state.characters.get(actor_id).name if actor_id != "dm" else "DM"
+                    output(f"{Colors.BLUE}🎬 {Colors.BOLD}{actor_display}{Colors.ENDC}")
+                    # Blank line after actor heading in story mode for better visual separation
+                    output("", level=OutputLevel.DEFAULT)
+                else:
+                    # VERBOSE mode prints the actor id and reason (technical detail)
+                    # Merge the actor id + reason into one line and replace thinking tags with an emoji
+                    thinking_text = ""
+                    if character_thinking:
+                        # Remove <thinking> tags if present and trim
+                        thinking_text = character_thinking.replace("<thinking>", "").replace("</thinking>", "").strip()
+                    # Display actor line with id and reason
+                    actor_display = engine.state.characters.get(actor_id).name if actor_id != "dm" else "DM"
+                    # Merge bracketed display name into the same line for verbose mode
+                    reason_text = f" ({reason})" if reason else ""
+                    output(f"{Colors.BLUE}🎬 Actor: {Colors.BOLD}{actor_id}{Colors.ENDC}{Colors.BLUE}{reason_text} {color}{Colors.BOLD}[{actor_display}]{Colors.ENDC}")
+                    # Show thinking indicator as emoji + text in verbose mode
+                    if thinking_text and output_level >= OutputLevel.VERBOSE:
+                        output(f"{Colors.BLUE}   🧠 {thinking_text}{Colors.ENDC}", OutputLevel.VERBOSE)
             
-            print(f"\n{color}{Colors.BOLD}[{actor_name}]{Colors.ENDC}")
+            # actor_name and color already set above
+            
+            # Don't print the duplicate bracketed actor block in VERBOSE since it's included inline above
+            # In VERBOSE we've already inlined the actor display into the header; no duplicate bracketed heading
             
             # Build guidance string from director
             guidance_parts = []
@@ -435,7 +480,7 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
             action_taken, failure_msg = run_action(engine, dm, actor_id, guidance=guidance)
             
             if not action_taken:
-                print(f"{Colors.RED}  (No action taken: {failure_msg}){Colors.ENDC}")
+                output(f"{Colors.RED}  (No action taken: {failure_msg}){Colors.ENDC}", OutputLevel.VERBOSE)
                 # Feedback to the agent so they know why it failed
                 if failure_msg:
                     engine.state.history.append(f"[SYSTEM] Action failed: {failure_msg}")
@@ -450,17 +495,32 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
             
             time.sleep(0.3)  # Small delay for readability
     
-    print(f"\n{Colors.HEADER}{'='*50}")
-    print(f"  SESSION COMPLETE - {actions_taken} actions taken")
-    print(f"{'='*50}{Colors.ENDC}")
+    output(f"\n{Colors.HEADER}{'='*50}")
+    output(f"  SESSION COMPLETE - {actions_taken} actions taken")
+    output(f"{'='*50}{Colors.ENDC}")
 
 
 def main():
+    global output_level
+    
     parser = argparse.ArgumentParser(description="Infinite D&D - AI-driven roleplaying game")
     parser.add_argument("--reset", action="store_true", help="Reset world state and start fresh")
     parser.add_argument("--actions", type=int, default=20, help="Number of actions to run (default: 20)")
     parser.add_argument("--thinking", action="store_true", help="Use thinking model (qwen3-4b-thinking)")
+    parser.add_argument("--verbose", action="store_true", help="Show full narrative with thinking and system messages")
+    parser.add_argument("--quiet", action="store_true", help="Minimal output (turn summaries only)")
+    parser.add_argument("--debug", action="store_true", help="Show debug info (tool calls, LLM requests, full errors)")
     args = parser.parse_args()
+    
+    # Set output level based on flags
+    if args.debug:
+        output_level = OutputLevel.DEBUG
+    elif args.verbose:
+        output_level = OutputLevel.VERBOSE
+    elif args.quiet:
+        output_level = OutputLevel.QUIET
+    else:
+        output_level = OutputLevel.DEFAULT
     
     # Set model based on --thinking flag
     if args.thinking:
@@ -472,7 +532,7 @@ def main():
     if args.thinking:
         game_intro = f"""=== ∞ Infinite DnD ∞ ==="""
 
-    print("\n" + Colors.CYAN + Colors.BOLD + game_intro + Colors.ENDC)
+    output("\n" + Colors.CYAN + Colors.BOLD + game_intro + Colors.ENDC)
 
     # Setup Session Logging
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -481,27 +541,31 @@ def main():
     
     llm_log_path = os.path.join(session_dir, "llm_log.jsonl")
     setup_logger(llm_log_path)
-    print(f"📂 Session logs: {session_dir}")
+    output(f"📂 Session logs: {session_dir}")
 
     # Handle reset
     state_file = "world-state/world_state.json"
     if args.reset:
         if os.path.exists(state_file):
             os.remove(state_file)
-            print("🔄 World state reset!")
+            output("🔄 World state reset!")
     
-    engine = Engine(state_file, session_dir=session_dir)
+    try:
+        engine = Engine(state_file, session_dir=session_dir)
+    except Exception as e:
+        output(f"⚠️ Failed to initialize engine: {e}", OutputLevel.DEFAULT)
+        return
     
     # Ensure we have an initial state
     if not engine.state.characters:
-        print("No characters found. Please check world-setup/characters.json")
+        output("No characters found. Please check world-setup/characters.json")
         return
 
     history_count = len(engine.state.history)
     if history_count > 0:
-        print(f"📜 Continuing game from turn {engine.state.time} ({history_count} events in history)")
+        output(f"📜 Continuing game from turn {engine.state.time} ({history_count} events in history)")
     else:
-        print(f"🆕 Starting fresh game")
+        output(f"🆕 Starting fresh game")
     
     # Create agents
     dm = DMAgent()
@@ -514,20 +578,20 @@ def main():
     finally:
         # Generate report
         report_path = os.path.join(session_dir, "report.html")
-        print(f"\n📊 Generating session report...")
+        output(f"\n📊 Generating session report...")
         if generate_log_report(llm_log_path, report_path):
-            print(f"   Report saved to: {report_path}")
+            output(f"   Report saved to: {report_path}")
         else:
-            print("   No logs found to generate report.")
+            output("   No logs found to generate report.")
         # Run session reviewer LLM to summarize the session and suggest improvements
         try:
-            print("\n📝 Generating session review...")
+            output("\n📝 Generating session review...")
             review = reviewer.summarize_session(engine.state)
             review_path = os.path.join(session_dir, "review.json")
             with open(review_path, "w", encoding="utf-8") as f:
                 import json
                 f.write(json.dumps(review, indent=2, ensure_ascii=False))
-            print(f"   Review saved to: {review_path}")
+            output(f"   Review saved to: {review_path}")
             # Also write a short human-readable review
             txt_path = os.path.join(session_dir, "review.txt")
             with open(txt_path, "w", encoding="utf-8") as f:
@@ -545,9 +609,9 @@ def main():
                     f.write("\nRecommendations:\n")
                     for r in review.get("recommendations"):
                         f.write(f" - {r}\n")
-            print(f"   Human-readable review saved to: {txt_path}")
+            output(f"   Human-readable review saved to: {txt_path}")
         except Exception as e:
-            print(f"   Could not generate review: {e}")
+            output(f"   Could not generate review: {e}")
 
 
 if __name__ == "__main__":

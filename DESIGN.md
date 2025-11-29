@@ -23,6 +23,9 @@ A Python application that:
 
 ### The AI Actors (The Drivers)
 Different "System Prompts" define the role the LLM plays.
+- **Director Agent**:
+  - **Goal**: Drive narrative, introduce novelty, manage pacing, adjudicate outcomes.
+  - **Capabilities**: selects an agents and tells it what to do.
 - **DM Agent**:
   - **Goal**: Drive narrative, introduce novelty, manage pacing, adjudicate outcomes.
   - **Capabilities**: Change weather, spawn enemies, update quest logs, narrate scene transitions.
@@ -55,4 +58,4 @@ Different "System Prompts" define the role the LLM plays.
 4. **Decision**: LLM receives context and selects a **Tool** (Action).
 5. **Execution**: Engine validates and runs the tool.
    - *Success*: State is updated, event is logged.
-   - *Failure*: Error returned to LLM to try again.
+   <!-- - *Failure*: Error returned to LLM to try again. -->

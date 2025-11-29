@@ -28,9 +28,8 @@
     "description": "Loud, cheerful, always has a lead on city gossip. Secretly funds a small rescue crew.",
     "goal": "Keep an ear out for trouble. Help Elara if she asks but don't reveal the rescue crew unless necessary.",
     "knowledge": [
-      "Elara's brother was last seen heading toward the Old Spice Cellar",
-      "Strange lights have been reported in the cellar at night",
-      "A group called the Marsh Raiders has been kidnapping travelers"
+      "A group called the Marsh Raiders has been kidnapping travelers",
+      "Kaelen Swift was last seen heading toward the Old Spice Cellar"
     ],
     "inventory": [
       "spice-bag",

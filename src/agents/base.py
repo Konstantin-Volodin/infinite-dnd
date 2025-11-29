@@ -35,5 +35,16 @@ class BaseAgent:
             arg_name = fallback_arg_map.get(fallback_tool, "content")
             return {"tool": fallback_tool, arg_name: content}
         else:
-            print(f"Agent error: {result.get('message', 'Unknown error')}")
+            # Use run_game output() if available so quiet mode respects errors
+            import sys
+            run_game_module = sys.modules.get('__main__')
+            if run_game_module and hasattr(run_game_module, 'output'):
+                try:
+                    OutputLevel = getattr(run_game_module, 'OutputLevel')
+                    run_game_module.output(f"Agent error: {result.get('message', 'Unknown error')}", OutputLevel.DEBUG)
+                except Exception:
+                    # fallback
+                    print(f"Agent error: {result.get('message', 'Unknown error')}")
+            else:
+                print(f"Agent error: {result.get('message', 'Unknown error')}")
             return {"tool": fallback_tool, **(fallback_args or {"reason": "Error"})}

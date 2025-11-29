@@ -16,8 +16,16 @@ class StateManager:
     def load_initial_setup(self) -> WorldState:
         """Load fresh world from setup files."""
         locations = {}
-        with open(os.path.join(self.setup_dir, "locations.json")) as f:
-            for loc in json.load(f):
+        def load_json_file(path: str):
+            try:
+                with open(path, "r", encoding="utf-8") as hf:
+                    return json.load(hf)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Failed to parse JSON file {path}: {e}") from e
+            except Exception as e:
+                raise ValueError(f"Failed to read JSON file {path}: {e}") from e
+
+        for loc in load_json_file(os.path.join(self.setup_dir, "locations.json")):
                 locations[loc["id"]] = Location(
                     id=loc["id"], name=loc["name"], description=loc["description"],
                     connections=loc.get("connections", []),
@@ -25,8 +33,7 @@ class StateManager:
                 )
 
         characters = {}
-        with open(os.path.join(self.setup_dir, "characters.json")) as f:
-            for char in json.load(f):
+        for char in load_json_file(os.path.join(self.setup_dir, "characters.json")):
                 char_type = CharacterType.PC if char.get("type") == "pc" else CharacterType.NPC
                 characters[char["id"]] = Character(
                     id=char["id"], name=char["name"], type=char_type,
@@ -40,11 +47,20 @@ class StateManager:
         quests = {}
         quests_path = os.path.join(self.setup_dir, "quests.json")
         if os.path.exists(quests_path):
-            with open(quests_path) as f:
-                try:
-                    for q in json.load(f):
-                        quests[q["id"]] = Quest(**q)
-                except Exception as e:
+            try:
+                for q in load_json_file(quests_path):
+                    quests[q["id"]] = Quest(**q)
+            except Exception as e:
+                # Use run_game output if available, otherwise print
+                import sys
+                run_game_module = sys.modules.get('__main__')
+                if run_game_module and hasattr(run_game_module, 'output'):
+                    try:
+                        OutputLevel = getattr(run_game_module, 'OutputLevel')
+                        run_game_module.output(f"⚠️ Failed to load quests: {e}", OutputLevel.DEBUG)
+                    except Exception:
+                        print(f"⚠️ Failed to load quests: {e}")
+                else:
                     print(f"⚠️ Failed to load quests: {e}")
 
         return WorldState(locations=locations, characters=characters, quests=quests)
@@ -56,8 +72,13 @@ class StateManager:
             state = self.load_initial_setup()
             self.save_state(state)
             return state
-        with open(self.state_file, "r", encoding="utf-8") as f:
-            return WorldState(**json.load(f))
+        try:
+            with open(self.state_file, "r", encoding="utf-8") as f:
+                return WorldState(**json.load(f))
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Saved state file is invalid JSON: {self.state_file}: {e}") from e
+        except Exception as e:
+            raise ValueError(f"Failed to load saved state from {self.state_file}: {e}") from e
 
     def save_state(self, state: WorldState):
         """Save current world state to JSON."""

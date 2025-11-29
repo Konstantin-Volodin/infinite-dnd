@@ -16,7 +16,57 @@ class ActionExecutor:
 
     def _emit(self, icon: str, msg: str, history_msg: str = None):
         """Log and record an event."""
-        print(f"  {icon} {msg}")
+        # Import sys to check module globals without circular dependency
+        import sys
+        
+        # Get output_level from run_game module if it exists
+        run_game_module = sys.modules.get('__main__')
+        if run_game_module and hasattr(run_game_module, 'OutputLevel'):
+            OutputLevel = run_game_module.OutputLevel
+            current_output_level = getattr(run_game_module, 'output_level', 1)  # Default to DEFAULT
+        else:
+            # Fallback if module not found (e.g., during testing)
+            current_output_level = 1  # DEFAULT
+            class OutputLevel:
+                QUIET = 0
+                DEFAULT = 1
+                VERBOSE = 2
+                DEBUG = 3
+        
+        # Filter thinking and system messages based on output level
+        is_thinking = "<thinking>" in msg or "</thinking>" in msg
+        is_system = msg.startswith("[SYSTEM]")
+        
+        # In QUIET mode, suppress most emissions (they're redundant with turn summaries)
+        # In DEFAULT mode, show normal gameplay but hide thinking/system
+        # In VERBOSE mode, show everything including thinking/system
+        # In DEBUG mode, show absolutely everything
+
+        # Map message types to output levels
+        if is_thinking or is_system:
+            required_level = OutputLevel.VERBOSE
+        else:
+            required_level = OutputLevel.DEFAULT
+
+        # Quiet mode suppresses these messages (turn summaries are handled elsewhere)
+        if current_output_level >= required_level:
+            # Use the run_game output function if present so global output settings are consistent
+            run_game_output = None
+            try:
+                run_game_output = getattr(sys.modules.get('__main__'), 'output')
+            except Exception:
+                run_game_output = None
+            formatted = f"  {icon} {msg}"
+            if run_game_output:
+                try:
+                    # Call output with the appropriate required level
+                    run_game_module = sys.modules.get('__main__')
+                    run_game_module.output(formatted, level=required_level)
+                except Exception:
+                    print(formatted)
+            else:
+                print(formatted)
+        
         self._log(msg)
         self._history(history_msg or msg)
 

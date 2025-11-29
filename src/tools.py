@@ -1,7 +1,7 @@
 """
 Tool Definitions - JSON schemas for LLM function calling.
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 
 def _tool(name: str, desc: str, params: Dict[str, str], required: List[str] = None) -> Dict:
@@ -157,7 +157,16 @@ DIRECTOR_TOOLS = [
 def get_character_tools() -> List[Dict[str, Any]]:
     return CHARACTER_TOOLS
 
-def get_dm_tools() -> List[Dict[str, Any]]:
+def get_dm_tools(scene_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Return a list of tools available to the DM.
+
+    If `scene_type` is provided and equals 'investigation', return a restricted
+    subset that prevents the DM from spawning or removing NPCs (keeps the scene
+    focused on narration and minor world modifications).
+    """
+    if scene_type == "investigation":
+        allowed = {"narrate", "create_item", "create_location", "update_quest"}
+        return [t for t in DM_TOOLS if t["function"]["name"] in allowed]
     return DM_TOOLS
 
 def get_director_tools() -> List[Dict[str, Any]]:

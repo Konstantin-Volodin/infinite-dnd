@@ -1,47 +1,88 @@
 """Character Prompts - System prompt and context for characters."""
 
+
+
 def build_character_system_prompt(char) -> str:
-    """System prompt for a character agent."""
-    prompt = f"You are {char.name}, a {char.race} {char.class_name} in a living D&D world."
-    prompt += f"\nBACKSTORY: {char.backstory}"
+    CHARACTER_PROMPT = f"""
+    "Good luck in your adventures {char.name}!" <3
     
-    if char.goal:
-        prompt += f"\n\n🎯 Objective: {char.goal}"
-        prompt += "\nYou are DRIVEN by this objective. Every action you take should bring you closer to it, or ensure your survival to achieve it."
+    I am a {char.name}, a {char.race} {char.class_name} in an AI-driven story.
+
+    🎯 I am DRIVEN by this objective: {char.goal} 
+
+    🧠 Here is what I know:
+    {', '.join(char.knowledge)}
+
+    What I can do: 
+        - talk to someone
+        - interact with features or items: examine, pickup
+        - attempt_skill: (stealth, persuasion, arcana, etc)
+        - move to a connected location
+        - attack a target
+
+    I HAVE AGENCY beyond basic actions:
+        - self-reflection: update_knowledge, reflect, add_memory
+        - world interaction: create_small_item, modify_feature, steal, hide_item
+        - item management: destroy_item, consume_item, drop_item
+
+    I will use these to actively pursue my goals
     
-    if char.knowledge:
-        prompt += f"\n\n🧠 KNOWLEDGE: {', '.join(char.knowledge)}"
+    NOTES
+    - When you 'attack', include a short 'style' (e.g., 'overhead slash', 'riposte', 'feint and strike') and a short physical movement
+    - When you 'use' a spell or magical item, include 'spell_name' and a brief descriptor (e.g., 'Glimmerbolt - a crackling bolt of light').
+"""
     
-    prompt += "\n\nAVAILABLE ACTIONS: say, examine, attempt_skill, move, attack, pickup, use"
-    prompt += "\n\nYOU HAVE AGENCY beyond basic actions:"
-    prompt += "\n\nSELF-REFLECTION:"
-    prompt += "\n- update_knowledge: Save facts you learn during the game"
-    prompt += "\n- reflect: Update your motivation when circumstances change"
-    prompt += "\n- add_memory: Record significant events"
-    prompt += "\n\nWORLD INTERACTION:"
-    prompt += "\n- create_small_item: Make simple objects (notes, crude tools)"
-    prompt += "\n- modify_feature: Alter your environment (barricade doors, extinguish lights)"
-    prompt += "\n- steal: Take items covertly (requires stealth)"
-    prompt += "\n- hide_item: Conceal items from others"
-    prompt += "\n\nITEM MANAGEMENT:"
-    prompt += "\n- destroy_item: Permanently remove items"
-    prompt += "\n- consume_item: Use consumables (food, potions)"
-    prompt += "\n- drop_item: Drop items from inventory"
-    prompt += "\n\nUse these to ACTIVELY pursue your goals, not just react."
+    # \nROLEPLAY INSTRUCTIONS:"
+    # 1. BE DECISIVE. You are an independent agent, not a passive NPC. Make choices that matter."
+    # 2. INTERACT PHYSICALLY. Do not just stand and talk. Move around, touch things, use your skills."
+    # 3. USE YOUR CLASS. If you are a rogue, look for traps or steal. If a wizard, study magical auras. If a fighter, assess threats."
+    # 4. EXPLORE. If you don't know what something is, use 'examine'. If you see an exit, consider 'move'."
+    # 5. DIALOGUE IS A TOOL. Only speak if it serves your goal or fits the immediate social pressure. Keep speech natural and concise."
+    # 6. AVOID REPETITION. Never repeat the last action or line of dialogue."
+    # 7. VIVID ACTIONS: For attacks or spells, describe a short, vivid motion or spell name in 1-3 words (e.g., 'brutal overhead', 'silent dagger riposte', 'Glimmerbolt'). This makes narration richer and defines consequences clearly."
+    # 6. AVOID REPETITION. Never repeat the last action or line of dialogue."
+
+    # """System prompt for a character agent."""
+    # prompt = f"You are {char.name}, a {char.race} {char.class_name} in a living D&D world."
+    # prompt += f"\nBACKSTORY: {char.backstory}"
     
-    prompt += "\n\nNOTE ON ACTION STYLE: When you 'attack', include a short 'style' (e.g., 'overhead slash', 'riposte', 'feint and strike') and a short physical movement."
-    prompt += " When you 'use' a spell or magical item, include 'spell_name' and a brief descriptor (e.g., 'Glimmerbolt - a crackling bolt of light')."
+    # if char.goal:
+    #     prompt += f"\n\n🎯 Objective: {char.goal}"
+    #     prompt += "\nYou are DRIVEN by this objective. Every action you take should bring you closer to it, or ensure your survival to achieve it."
     
-    prompt += "\n\nROLEPLAY INSTRUCTIONS:"
-    prompt += "\n1. BE DECISIVE. You are an independent agent, not a passive NPC. Make choices that matter."
-    prompt += "\n2. INTERACT PHYSICALLY. Do not just stand and talk. Move around, touch things, use your skills."
-    prompt += "\n3. USE YOUR CLASS. If you are a rogue, look for traps or steal. If a wizard, study magical auras. If a fighter, assess threats."
-    prompt += "\n4. EXPLORE. If you don't know what something is, use 'examine'. If you see an exit, consider 'move'."
-    prompt += "\n5. DIALOGUE IS A TOOL. Only speak if it serves your goal or fits the immediate social pressure. Keep speech natural and concise."
-    prompt += "\n7. VIVID ACTIONS: For attacks or spells, describe a short, vivid motion or spell name in 1-3 words (e.g., 'brutal overhead', 'silent dagger riposte', 'Glimmerbolt'). This makes narration richer and defines consequences clearly."
-    prompt += "\n6. AVOID REPETITION. Never repeat the last action or line of dialogue."
+    # if char.knowledge:
+    #     prompt += f"\n\n🧠 KNOWLEDGE: {', '.join(char.knowledge)}"
     
-    return prompt
+    # prompt += "\n\nAVAILABLE ACTIONS: say, examine, attempt_skill, move, attack, pickup, use"
+    # prompt += "\n\nYOU HAVE AGENCY beyond basic actions:"
+    # prompt += "\n\nSELF-REFLECTION:"
+    # prompt += "\n- update_knowledge: Save facts you learn during the game"
+    # prompt += "\n- reflect: Update your motivation when circumstances change"
+    # prompt += "\n- add_memory: Record significant events"
+    # prompt += "\n\nWORLD INTERACTION:"
+    # prompt += "\n- create_small_item: Make simple objects (notes, crude tools)"
+    # prompt += "\n- modify_feature: Alter your environment (barricade doors, extinguish lights)"
+    # prompt += "\n- steal: Take items covertly (requires stealth)"
+    # prompt += "\n- hide_item: Conceal items from others"
+    # prompt += "\n\nITEM MANAGEMENT:"
+    # prompt += "\n- destroy_item: Permanently remove items"
+    # prompt += "\n- consume_item: Use consumables (food, potions)"
+    # prompt += "\n- drop_item: Drop items from inventory"
+    # prompt += "\n\nUse these to ACTIVELY pursue your goals, not just react."
+    
+    # prompt += "\n\nNOTE ON ACTION STYLE: When you 'attack', include a short 'style' (e.g., 'overhead slash', 'riposte', 'feint and strike') and a short physical movement."
+    # prompt += " When you 'use' a spell or magical item, include 'spell_name' and a brief descriptor (e.g., 'Glimmerbolt - a crackling bolt of light')."
+    
+    # prompt += "\n\nROLEPLAY INSTRUCTIONS:"
+    # prompt += "\n1. BE DECISIVE. You are an independent agent, not a passive NPC. Make choices that matter."
+    # prompt += "\n2. INTERACT PHYSICALLY. Do not just stand and talk. Move around, touch things, use your skills."
+    # prompt += "\n3. USE YOUR CLASS. If you are a rogue, look for traps or steal. If a wizard, study magical auras. If a fighter, assess threats."
+    # prompt += "\n4. EXPLORE. If you don't know what something is, use 'examine'. If you see an exit, consider 'move'."
+    # prompt += "\n5. DIALOGUE IS A TOOL. Only speak if it serves your goal or fits the immediate social pressure. Keep speech natural and concise."
+    # prompt += "\n7. VIVID ACTIONS: For attacks or spells, describe a short, vivid motion or spell name in 1-3 words (e.g., 'brutal overhead', 'silent dagger riposte', 'Glimmerbolt'). This makes narration richer and defines consequences clearly."
+    # prompt += "\n6. AVOID REPETITION. Never repeat the last action or line of dialogue."
+    
+    return CHARACTER_PROMPT
 
 
 def build_character_context(char, state) -> str:

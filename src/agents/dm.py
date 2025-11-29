@@ -88,10 +88,12 @@ class DMAgent(BaseAgent):
             context = f"{guidance}\n\n{context}"
         
         # Use the tool-calling interface like other agents (narrate, spawn_npc, create_location, etc.)
+        # Determine allowed DM tools for current scene type
+        scene_type = getattr(state.narrative, 'scene_type', None)
         decision = self._decide(
             system_prompt=build_dm_system_prompt() + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
             context=context,
-            tools=get_dm_tools(),
+            tools=get_dm_tools(scene_type),
             fallback_tool="narrate",
             fallback_args={"content": "The scene continues..."}
         )
@@ -126,6 +128,22 @@ class DMAgent(BaseAgent):
             ct = decision.get("connected_to")
             if isinstance(ct, str):
                 decision["connected_to"] = [ct]
+        # Enforce allowed tools for the current scene type (safety check):
+        allowed_tools = {t["function"]["name"] for t in get_dm_tools(scene_type)}
+        # If the DM returned multiple calls, filter them; otherwise, enforce single tool
+        if "all_calls" in decision:
+            filtered_calls = [c for c in decision["all_calls"] if c["tool"] in allowed_tools]
+            if not filtered_calls:
+                # Nothing allowed - fallback to narrator
+                return {"tool": "narrate", "content": "The scene continues..."}
+            # Keep first call as primary, and update all_calls
+            first = filtered_calls[0].copy()
+            first["all_calls"] = [{"tool": c["tool"], "arguments": c.get("arguments", {})} for c in filtered_calls]
+            return first
+        else:
+            if decision.get("tool") not in allowed_tools:
+                # Not allowed - convert to narrate for safety
+                return {"tool": "narrate", "content": decision.get("content") or "The scene continues..."}
         return decision
 
     def generate_new_location(self, state: WorldState, target_name: str, origin_id: str) -> Dict[str, Any]:
@@ -139,7 +157,7 @@ Create this location based on its name and the current setting."""
         return self._decide(
             system_prompt=build_dm_system_prompt() + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
             context=prompt,
-            tools=get_dm_tools(),
+            tools=get_dm_tools(state.narrative.scene_type),
             fallback_tool="create_location",
             fallback_args={
                 "name": target_name, 
@@ -159,7 +177,7 @@ If it makes sense, create it. Otherwise, narrate why they can't take it."""
         return self._decide(
             system_prompt=build_dm_system_prompt() + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
             context=prompt,
-            tools=get_dm_tools(),
+            tools=get_dm_tools(state.narrative.scene_type),
             fallback_tool="narrate",
             fallback_args={"content": f"You cannot pick up the {item_name}."}
         )
