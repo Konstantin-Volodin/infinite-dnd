@@ -20,60 +20,37 @@ def _tool(name: str, desc: str, params: Dict[str, str], required: List[str] = No
     }
 
 
+
+
 CHARACTER_TOOLS = [
-    _tool("say", "Speak in character.", {"content": "What to say."}),
-    _tool("examine", "Examine something closely - a feature, person, item, or your surroundings. Use this to investigate mysteries and discover clues.", {"target": "What to examine (e.g., 'hidden passage', 'strange symbol', 'the merchant')."}),
-    _tool("move", "Move to a different location. Only use this when you have a clear reason to leave.", {"location_id": "Must be a location ID from the list."}),
-    _tool("pickup", "Pick up an item from the ground.", {"item_name": "Item name."}),
-    _tool("use", "Use an item on something. If using a spell or magical item, include 'spell_name' and a short effect description.", {"item_name": "Item to use.", "target": "What to use it on.", "spell_name": "Optional spell/item name if this is a magical use."}),
-    _tool("attempt_skill", "Attempt a difficult action using a skill. Use this when the outcome is uncertain.", {
-        "skill": "The skill to use (e.g., 'stealth', 'investigation', 'persuasion', 'athletics').",
-        "action_description": "What you are trying to do (e.g., 'I try to pick the lock', 'I search for hidden traps')."
+    # game
+    _tool("skill_check", "Describe what you will do next to advance the story. This can be an action (eg, pick a lock, climb a wall, attempt a persuasion, knowledge check, etc.). Use this when the outcome is uncertain.", {
+        "skill": "the appropriate skill (e.g., 'stealth', 'investigation', 'persuasion', 'athletics').",
+        "description": "What you are trying to do (e.g., 'I try to pick the lock', 'I attempt to scale this wall, there is no other way to past the city guards.').",
+        "item_name": "Item to use (optional). Using items may impact the outcome of the skill check. you can decide how. THIS IS THE ONLY WAY TO USE ITEMS.",
     }),
-    _tool("attack", "Attack a target to start combat. Include a concise 'style' describing the movement (e.g., 'overhead slash', 'riposte', 'cleave').", {"target": "Who to attack.", "weapon": "Weapon to use (or 'unarmed').", "style": "Attack style or movement (optional)."}),
-    
+    _tool("dialogue", "write a message to express thoughts, feelings, or observations. This can be spoken, narrated, or shouted. It can be a dialogue or a reaction to context. ", {
+        "character_id": "your character id.",
+        "message": "The content of the expression (e.g., 'Hello!', 'I see a strange light.', 'A chill ran down my spine.')."
+    }),
+    _tool("combat", "Start combat or help a character in combat. Describe the action and its impact.", {
+        "target": "character-id.",
+        "description": "Describe the action and its impact (e.g., 'As i chased after the thief, I threw one of my daggers, grazing his shoulder.').",
+        "dmg?": "The damage dealt (e.g., '1d6 + 2').",
+        "heal?": "The healing dealt (e.g., '1d6 + 2')."
+    }),
+    _tool("move", "Move to a different location. ONLY ALLOWED TO USE WHEN NO OTHER TOOLS ARE USED", {"location_id": "location ID chosen from options provided by the context."}),
+
     # Self-modification tools
-    _tool("update_knowledge", "Save new information you've learned.", {
-        "knowledge_item": "What you learned (one fact)."
-    }),
-    _tool("reflect", "Update your current motivation or emotional state.", {
-        "new_motivation": "What drives you right now.",
-        "reason": "Why this changed (optional)."
-    }, required=["new_motivation"]),
-    _tool("add_memory", "Record a significant event or realization.", {
-        "memory": "What happened or what you realized.",
-        "importance": "high, medium, or low"
+    _tool("update", "update your state.", {
+        "goals": "your current goals (optional for npcs)",
+        "emotions": "your current emotional state (optional for npcs)",
+        "knowledge": "your scratchpad, you can update it here with new information or memories triggered by recent events or observations.",
     }),
     
-    # World modification tools
-    _tool("create_small_item", "Attempt to create a small mundane item.", {
-        "item_name": "Name of item to create (e.g., 'crude map', 'scribbled note').",
-        "description": "Brief description of the item."
-    }),
-    _tool("modify_feature", "Attempt to alter a location feature.", {
-        "feature": "Feature to modify (must exist).",
-        "modification": "How you're changing it (e.g., 'barricade the door', 'extinguish the candle')."
-    }),
-    _tool("steal", "Covertly take an item. Requires stealth.", {
-        "item_name": "Item to steal.",
-        "target": "Who you're stealing from (or 'from the location')."
-    }),
-    _tool("hide_item", "Hide an item from view.", {
-        "item_name": "Item to hide.",
-        "location": "Where to hide it (e.g., 'under the table', 'in my cloak')."
-    }),
-    
-    # Item lifecycle management
-    _tool("destroy_item", "Destroy or discard an item permanently.", {
-        "item_name": "Item to destroy.",
-        "method": "How you destroy it (e.g., 'burn', 'smash', 'throw away')."
-    }),
-    _tool("consume_item", "Use and consume an item (removes it).", {
-        "item_name": "Item to consume (food, potion, scroll).",
-        "effect": "What happens when consumed (optional)."
-    }),
-    _tool("drop_item", "Drop an item from inventory to current location.", {
-        "item_name": "Item to drop."
+    # meta tools
+    _tool("request", "request something from the DM.", {
+        "request": "If there is nothing to do, if you are confused about something, or if you need help, you can use this tool to ask the DM for help. Maybe you want more money, or you want to know more about something. describe what you want.",
     }),
     
     _tool("wait", "Do nothing. Only use when there's nothing meaningful to do.", {"reason": "Reason."}, required=[]),

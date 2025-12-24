@@ -56,6 +56,12 @@ RULES:
 - Dialogue: conversations must ADVANCE the plot - reveal info, change relationships, or create decisions
 - Stalled: select DM to inject drama that MOVES THE STORY FORWARD
 
+QUEST RESOLUTION - CRITICAL:
+- When a character reaches a quest-relevant location, SELECT THE DM to spawn quest NPCs/items
+- Example: Character searching for brother reaches cellar → select DM with thinking "Spawn the rescue crew or brother here"
+- Don't let characters wander aimlessly - if they're at the right place, advance the quest!
+- After failed skill checks, select DM to create COMPLICATIONS (not dead-ends)
+
 DM INJECTION IDEAS (when stalled):
 - create a threat that advances a story (spawn enemies, alter environment, etc) 
     - bandit ambush, sudden storm, cave-in, city guard patrol
@@ -95,7 +101,40 @@ def build_director_context(state) -> str:
         lines.append("\nRecent:")
         for event in state.history[-5:]:
             lines.append(f"  - {event}")
-            
+
+    if state.quests:
+        lines.append("\nCurrent Quests:")
+        for quest_id, quest in state.quests.items():
+            # Quest model uses 'title' and 'status' (a string), not 'name' or 'status.value'
+            q_title = getattr(quest, 'title', quest.id if hasattr(quest, 'id') else str(quest))
+            q_status = getattr(quest, 'status', 'unknown')
+            lines.append(f"  - {q_title} (Status: {q_status})")
+        
+        # Quest progress tracking
+        lines.append("\n🎯 Quest Progress Check:")
+        for char in state.characters.values():
+            for quest_id, quest in state.quests.items():
+                if quest.status == "active":
+                    char_loc = state.locations.get(char.location_id)
+                    loc_name = char_loc.name.lower() if char_loc else ""
+                    quest_keywords = quest.title.lower().split() + quest.description.lower().split()
+                    
+                    # Check if character is at quest-relevant location
+                    if any(keyword in loc_name for keyword in quest_keywords if len(keyword) > 4):
+                        lines.append(f"  ⚡ {char.name} at {char_loc.name} - QUEST LOCATION for '{quest.title}'!")
+                        lines.append(f"     → Consider selecting DM to spawn quest NPCs/items here")
+    
+    
+    # Character descriptions
+    lines.append("\nCharacters:")
+    for char in state.characters.values():
+        # Character model does not have a 'description' field; use 'backstory' instead
+        description = getattr(char, 'description', getattr(char, 'backstory', ''))
+        lines.append(f"  - {char.name}: {description}")
+        lines.append(f"    Current Motivation: {char.current_motivation}")
+        lines.append(f"    Current Goal: {char.goal}")
+        lines.append(f"    Knowledge: {', '.join(char.knowledge)}")
+    
     # Check for dialogue fatigue
     # recent_history = state.history[-5:] if state.history else []
     # dialogue_count = sum(1 for e in recent_history if '"' in e or "says" in e.lower())

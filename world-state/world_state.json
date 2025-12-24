@@ -1,9 +1,9 @@
 {
-  "time": 5,
+  "time": 0,
   "narrative": {
-    "scene_type": "investigation",
-    "tension": "high",
-    "stall_counter": 1,
+    "scene_type": "exploration",
+    "tension": "low",
+    "stall_counter": 0,
     "combat_turn_order": [],
     "current_turn_index": 0
   },
@@ -35,13 +35,9 @@
         "guild-hall"
       ],
       "items": [
-        "strange coin",
-        "glowing rune",
-        "Torn Note"
+        "strange coin"
       ],
       "features": [
-        "spice stall",
-        "trinket vendor",
         "notice board",
         "fountain",
         "merchant carts"
@@ -62,98 +58,8 @@
         "creaky floorboards",
         "guild ledger",
         "meeting table",
-        "fireplace",
-        "stairs to cellar"
+        "fireplace"
       ],
-      "feature_traits": {},
-      "environmental_effects": []
-    },
-    "spice-cellar": {
-      "id": "spice-cellar",
-      "name": "Old Spice Cellar",
-      "description": "A damp, aromatic cellar beneath the Guild Hall. Crates of rare spices are stacked high, hiding a small meeting table.",
-      "connections": [
-        "guild-hall"
-      ],
-      "items": [
-        "rusted key"
-      ],
-      "features": [
-        "spice crates",
-        "hidden meeting table",
-        "dusty shelves",
-        "strange symbols on wall",
-        "trapdoor"
-      ],
-      "feature_traits": {},
-      "environmental_effects": []
-    },
-    "forest-trail": {
-      "id": "forest-trail",
-      "name": "Forest Trail",
-      "description": "A narrow, winding path leading into the dense woods. Shadows lengthen here, and the air grows cooler.",
-      "connections": [
-        "valley-bridge",
-        "forest-clearing"
-      ],
-      "items": [
-        "torn map"
-      ],
-      "features": [
-        "ancient trees",
-        "animal tracks",
-        "overgrown bushes",
-        "distant sounds"
-      ],
-      "feature_traits": {},
-      "environmental_effects": []
-    },
-    "forest-clearing": {
-      "id": "forest-clearing",
-      "name": "Forest Clearing",
-      "description": "A moonlit clearing deep in the woods. Strange stones form a circle in the center.",
-      "connections": [
-        "forest-trail",
-        "stone-circle"
-      ],
-      "items": [
-        "Blood-Red Scroll",
-        "Rusted Key"
-      ],
-      "features": [
-        "stone circle (barricade the entrance with fallen branches)",
-        "charred ground",
-        "ancient altar",
-        "moonlight shaft"
-      ],
-      "feature_traits": {},
-      "environmental_effects": []
-    },
-    "stone-circle": {
-      "id": "stone-circle",
-      "name": "Stone Circle",
-      "description": "A moss-covered stone ring in the forest clearing, with a cracked altar and strange glowing symbols etched into the ground. Moonlight filters through the trees, casting long, shifting shadows.",
-      "connections": [
-        "forest-clearing",
-        "rune-chamber"
-      ],
-      "items": [
-        "Glowing Rune",
-        "Corrupted Rune Key"
-      ],
-      "features": [],
-      "feature_traits": {},
-      "environmental_effects": []
-    },
-    "rune-chamber": {
-      "id": "rune-chamber",
-      "name": "Rune Chamber",
-      "description": "A hidden chamber beneath the Stone Circle, carved from obsidian. Walls are covered in glowing runes, and the air smells of ozone and decay. A single altar stands at the center — pulsing with the same corrupted energy as the Stone Circle.",
-      "connections": [
-        "stone-circle"
-      ],
-      "items": [],
-      "features": [],
       "feature_traits": {},
       "environmental_effects": []
     }
@@ -167,36 +73,10 @@
       "class_name": "former-guard",
       "backstory": "A former royal guard who left service after her brother disappeared. Quiet, observant, relentless.",
       "goal": "Find my brother. He vanished near the river three weeks ago. Someone in this market knows something.",
-      "current_motivation": "I must use the Corrupted Rune Key to unlock the truth — even if it means confronting Mara the Keeper.",
-      "knowledge": [
-        "Mara the Keeper is near the Stone Circle and may know about the Marsh Raiders.",
-        "The glowing runes are a magical lock tied to the Marsh Raiders’ corruption. The Corrupted Rune Key may be the key to unlocking it.",
-        "The Corrupted Rune Key is a trigger tied to the Marsh Raiders’ corruption and can unlock memories or magical locks.",
-        "The Corrupted Rune Key reacts to touch and rearranges runes into the Marsh Raiders’ sigil, indicating its connection to their corruption."
-      ],
-      "memory": [
-        {
-          "content": "Spoke with Mara the Keeper at the Stone Circle. She hinted at the Marsh Raiders' connection to the river.",
-          "importance": "high",
-          "turn": 1
-        },
-        {
-          "content": "The key reacted to my touch, rearranging runes into the Marsh Raiders’ sigil. The ground shook, and a scent of rotting reeds filled the air — a sign of corruption.",
-          "importance": "high",
-          "turn": 1
-        },
-        {
-          "content": "The Corrupted Rune Key activated the glowing runes, revealing the Marsh Raiders’ sigil. The chamber’s corruption is tied to their presence.",
-          "importance": "high",
-          "turn": 3
-        }
-      ],
-      "examined_items": [
-        "notice board",
-        "Glowing Rune",
-        "Corrupted Rune Key",
-        "ancient altar"
-      ],
+      "current_motivation": "",
+      "knowledge": [],
+      "memory": [],
+      "examined_items": [],
       "short_term_goals": [],
       "stats": {
         "hp": 20,
@@ -212,11 +92,10 @@
           "charisma": 10
         }
       },
-      "location_id": "forest-clearing",
+      "location_id": "market-square",
       "inventory": [
         "guard-pendant",
-        "journal-page-3",
-        "Corrupted Rune Key"
+        "journal-page-3"
       ]
     },
     "merchant-ronn": {
@@ -229,15 +108,11 @@
       "goal": "Keep an ear out for trouble. Help Elara if she asks but don't reveal the rescue crew unless necessary.",
       "current_motivation": "",
       "knowledge": [
-        "Elara's brother was last seen heading toward the Old Spice Cellar",
-        "Strange lights have been reported in the cellar at night",
         "A group called the Marsh Raiders has been kidnapping travelers",
-        "Recent postings mention ‘Marsh Raiders’ operating near the river and Old Spice Cellar."
+        "Kaelen Swift was last seen heading toward the Old Spice Cellar"
       ],
       "memory": [],
-      "examined_items": [
-        "notice board"
-      ],
+      "examined_items": [],
       "short_term_goals": [],
       "stats": {
         "hp": 20,
@@ -253,211 +128,23 @@
           "charisma": 10
         }
       },
-      "location_id": "stone_circle",
+      "location_id": "market-square",
       "inventory": [
         "spice-bag",
         "coin-purse"
       ]
-    },
-    "altar-keeper": {
-      "id": "altar-keeper",
-      "name": "Mara the Keeper",
-      "type": "npc",
-      "race": "Human",
-      "class_name": "mystic",
-      "backstory": "An elderly woman with silver hair and glowing eyes, she guards the Stone Circle. She speaks in riddles and watches the forest with ancient wisdom.",
-      "goal": "Protect the circle’s secrets from those who seek to misuse its power.",
-      "current_motivation": "",
-      "knowledge": [],
-      "memory": [],
-      "examined_items": [],
-      "short_term_goals": [],
-      "stats": {
-        "hp": 15,
-        "max_hp": 15,
-        "ac": 10,
-        "level": 1,
-        "attributes": {
-          "strength": 10,
-          "dexterity": 10,
-          "constitution": 10,
-          "intelligence": 10,
-          "wisdom": 10,
-          "charisma": 10
-        }
-      },
-      "location_id": "forest-clearing",
-      "inventory": []
-    },
-    "mara-the-keeper": {
-      "id": "mara-the-keeper",
-      "name": "Mara the Keeper",
-      "type": "npc",
-      "race": "Human",
-      "class_name": "mystic",
-      "backstory": "A reclusive guardian of the Stone Circle, Mara knows its secrets—and its dangers. She watches over the circle with ancient eyes, wary of those who seek to misuse its power.",
-      "goal": "Protect the circle’s magic from those who would exploit it.",
-      "current_motivation": "",
-      "knowledge": [],
-      "memory": [],
-      "examined_items": [
-        "stone circle",
-        "ancient altar"
-      ],
-      "short_term_goals": [],
-      "stats": {
-        "hp": 15,
-        "max_hp": 15,
-        "ac": 10,
-        "level": 1,
-        "attributes": {
-          "strength": 10,
-          "dexterity": 10,
-          "constitution": 10,
-          "intelligence": 10,
-          "wisdom": 10,
-          "charisma": 10
-        }
-      },
-      "location_id": "forest-clearing",
-      "inventory": []
-    },
-    "shadow-watcher": {
-      "id": "shadow-watcher",
-      "name": "The Shadow-Watcher",
-      "type": "npc",
-      "race": "Human",
-      "class_name": "mysterious stranger",
-      "backstory": "A hooded figure with eyes that glow faintly green. They seem to be watching Elara — and the Stone Circle — from the shadows. Their goal is to prevent the key from falling into the wrong hands — or to ensure it does, depending on who they serve.",
-      "goal": "",
-      "current_motivation": "",
-      "knowledge": [],
-      "memory": [],
-      "examined_items": [],
-      "short_term_goals": [],
-      "stats": {
-        "hp": 15,
-        "max_hp": 15,
-        "ac": 10,
-        "level": 1,
-        "attributes": {
-          "strength": 10,
-          "dexterity": 10,
-          "constitution": 10,
-          "intelligence": 10,
-          "wisdom": 10,
-          "charisma": 10
-        }
-      },
-      "location_id": "rune_chamber",
-      "inventory": []
-    },
-    "shadow-warden": {
-      "id": "shadow-warden",
-      "name": "The Shadow-Watcher",
-      "type": "npc",
-      "race": "Human",
-      "class_name": "shadow-watcher",
-      "backstory": "A spectral figure clad in tattered robes, their eyes glowing with ancient malice. They speak only in warnings — and they know the cost of meddling with the Stone Circle.",
-      "goal": "Prevent Elara from using the Corrupted Rune Key — or guide her to the truth, if she proves worthy.",
-      "current_motivation": "",
-      "knowledge": [],
-      "memory": [],
-      "examined_items": [],
-      "short_term_goals": [],
-      "stats": {
-        "hp": 15,
-        "max_hp": 15,
-        "ac": 10,
-        "level": 1,
-        "attributes": {
-          "strength": 10,
-          "dexterity": 10,
-          "constitution": 10,
-          "intelligence": 10,
-          "wisdom": 10,
-          "charisma": 10
-        }
-      },
-      "location_id": "rune_chamber",
-      "inventory": []
-    },
-    "shadow-watcher-1": {
-      "id": "shadow-watcher-1",
-      "name": "The Shadow-Watcher",
-      "type": "npc",
-      "race": "Human",
-      "class_name": "shadow-watcher",
-      "backstory": "A silent, cloaked figure with glowing eyes, watching Elara from the trees. Motivated by preventing her from using the Corrupted Rune Key — or guiding her to the truth if she proves worthy.",
-      "goal": "",
-      "current_motivation": "",
-      "knowledge": [],
-      "memory": [],
-      "examined_items": [],
-      "short_term_goals": [],
-      "stats": {
-        "hp": 15,
-        "max_hp": 15,
-        "ac": 10,
-        "level": 1,
-        "attributes": {
-          "strength": 10,
-          "dexterity": 10,
-          "constitution": 10,
-          "intelligence": 10,
-          "wisdom": 10,
-          "charisma": 10
-        }
-      },
-      "location_id": "forest-clearing",
-      "inventory": []
     }
   },
   "quests": {
     "find-brother": {
       "id": "find-brother",
       "title": "The Missing Brother",
-      "description": "Find clues about the disappearance of Elara's brother, who vanished while on patrol near the river.",
+      "description": "Find clues about the disappearance of Kaelen Swift, who vanished while on patrol near the river.",
       "status": "active",
       "giver_id": "",
       "steps": []
     }
   },
-  "history": [
-    "Elara Swift: \"You stand too close, stranger. This key is not for you.\"",
-    "Elara Swift picked up Corrupted Rune Key",
-    "Elara Swift moved from Stone Circle to Forest Clearing",
-    "Elara Swift learned: The Corrupted Rune Key reacts to touch and rearranges runes into the Marsh Raiders’ sigil, indicating its connection to their corruption.",
-    "Elara Swift's motivation shifts: I must use the Corrupted Rune Key to unlock the truth — even if it means confronting Mara the Keeper. (The key is the only lead to my brother’s fate, and I cannot let anyone else get it.)",
-    "Elara Swift moved from Forest Clearing to Stone Circle",
-    "Elara Swift examines Glowing Rune",
-    "Elara Swift: \"You stand in the Stone Circle. The air hums with ancient magic. The glowing runes pulse faintly, as if whispering secrets. I must unlock this — for my brother. The Corrupted Rune Key is the only way. I’ll touch it — and see what it reveals.\"",
-    "Elara Swift uses Corrupted Rune Key (Rune Activation - a flicker of corrupted light) on Glowing Rune",
-    "DM: The moment Elara’s fingers brush the Glowing Rune, the Stone Circle shudders. The air thickens with crackling energy, and the runes above her glow brighter — then twist, rearranging themselves into a jagged sigil: the Marsh Raiders’ mark. A low, guttural hum fills the space, and the ground beneath her feet trembles. The Shadow-Watcher’s eyes narrow — they’ve seen this before. A voice, not Elara’s, echoes in her mind: *‘You dare awaken what you cannot control.’*",
-    "The Shadow-Watcher (shadow-watcher) appears at Stone Circle",
-    "New location: Rune Chamber",
-    "DM: The ground beneath Elara’s feet fractures with a deep, resonant groan, splitting open to reveal a vast, vaulted chamber carved from obsidian. Jagged pillars rise like tombstones, each etched with glowing runes that pulse with unstable energy — some flickering, others screaming with corrupted light. The air is thick with the scent of ozone and rotting earth, as if the chamber itself is breathing decay. Above, the ceiling arches into darkness, broken only by a single shaft of moonlight piercing through a fissure in the stone. The Shadow-Watcher steps forward, its form shifting between shadow and silhouette, eyes fixed on Elara with unnerving focus. The Shadow-Warden remains motionless in the gloom, watching like a statue carved from smoke. The runes on the walls flicker violently, rearranging into jagged sigils — the Marsh Raiders’ mark — as if the chamber itself is warning them of what they’ve unleashed.",
-    "Elara Swift moved from unknown location to Stone Circle",
-    "Elara Swift examines Glowing Rune",
-    "Elara Swift uses Corrupted Rune Key (Rune Activation - Corrupted Sigil Reveal) on Glowing Rune",
-    "Elara Swift remembers: The Corrupted Rune Key activated the glowing runes, revealing the Marsh Raiders’ sigil. The chamber’s corruption is tied to their presence.",
-    "Elara Swift moved from Stone Circle to Forest Clearing",
-    "Elara Swift: \"Mara. I know you’ve been watching the Stone Circle. What are you hiding? My brother vanished near the river — and the Marsh Raiders are involved. Tell me what you know.\"",
-    "[SYSTEM] Action failed: Feature 'stone circle' doesn't exist here",
-    "[SYSTEM] Action failed: Feature 'stone circle' doesn't exist here",
-    "Mara the Keeper: \"Elara, the Stone Circle’s magic is not for the unworthy. Your brother’s fate is not mine to explain. The Marsh Raiders are a distraction — the true threat lies in the shadows.\"",
-    "[SYSTEM] Action failed: Feature 'forest-trail' doesn't exist here",
-    "Elara Swift examines ancient altar",
-    "DM: Elara’s fingers brush the cold stone of the ancient altar. Carved runes glow faintly beneath her touch, pulsing like a heartbeat. A whisper echoes in her mind — not words, but memories: her brother’s last words, ‘The key… it’s not just a key… it’s a warning.’ Suddenly, the ground trembles. A hidden compartment in the altar slides open, revealing a rusted key and a blood-red scroll. The scroll’s text glows: ‘To unlock the truth, you must first face the Keeper — or the Shadow-Watcher.’ A low growl echoes from the shadows, and a pair of glowing eyes flicker behind the trees. The Shadow-Watcher is watching. The altar’s magic is unstable — touching it risks awakening something worse than the Marsh Raiders.",
-    "The Shadow-Watcher (shadow-watcher) appears at Forest Clearing",
-    "Elara Swift uses Corrupted Rune Key (Rune Activation - glows faintly as it touches the altar) on ancient altar",
-    "Elara Swift: \"Mara. I don’t care about distractions. My brother vanished near the river. If you know anything — now. Or I’ll force it out of you.\"",
-    "Mara the Keeper: \"Elara, the key isn’t just a key — it’s a vessel. And the Shadow-Watcher is not just watching — it’s hunting. You’re not just awakening magic… you’re inviting destruction.\"",
-    "[SYSTEM] Action failed: Feature 'stone circle' doesn't exist here",
-    "Elara Swift: \"Mara. I don’t care about distractions. My brother vanished near the river. If you know anything — now. Or I’ll force it out of you.\"",
-    "Elara Swift examines ancient altar",
-    "Elara Swift uses Corrupted Rune Key (Rune Activation - glows faintly as it touches the altar) on ancient altar",
-    "Mara the Keeper examines ancient altar"
-  ],
+  "history": [],
   "inspected_features": []
 }

@@ -10,15 +10,15 @@ from .actions import ActionExecutor
 class Engine:
     """Core game engine that executes tools/actions and manages game state."""
     
-    def __init__(self, state_path: str = "world-state/world_state.json", session_dir: str = None):
+    def __init__(self, state_path: str = "world-state/world-state.json", session_dir: str = None):
         self.state_manager = StateManager()
         self.state: WorldState = self.state_manager.load_state()
         
         # Setup logging
         log_dir = session_dir or "logs"
         os.makedirs(log_dir, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.log_file = os.path.join(log_dir, f"story_{ts}.md")
+        ts = datetime.now().strftime("%Y%m%d-%H%M")
+        self.log_file = os.path.join(log_dir, f"story-{ts}.md")
         
         # Initialize action executor
         self._actions = ActionExecutor(
@@ -35,7 +35,7 @@ class Engine:
         """Write to narrative log file."""
         try:
             with open(self.log_file, "a", encoding="utf-8") as f:
-                ts = datetime.now().strftime("%H:%M:%S")
+                ts = datetime.now().strftime("%H:%M")
                 f.write(f"**{ts}** {text}\n\n")
         except Exception:
             pass
@@ -56,6 +56,13 @@ class Engine:
     
     def execute_tool(self, tool_name: str, **kwargs) -> Dict[str, Any]:
         """Execute a tool by name, routing to the appropriate handler."""
+        # Backwards compat: accept old tool names and map them to current method names
+        TOOL_ALIASES = {
+            "attack": "combat",
+            "say": "dialogue",
+            "attempt_skill": "skill_check",
+        }
+        tool_name = TOOL_ALIASES.get(tool_name, tool_name)
         # Map tool names to methods (remove 'tool_' prefix pattern)
         method = getattr(self._actions, tool_name, None)
         if not method:
@@ -78,22 +85,6 @@ class Engine:
                     "new_items": [i.get("name", i) if isinstance(i, dict) else i for i in args.get("new_items", [])]
                 }
             )
-        elif tool_name == "say":
-            return method(args.get("character_id"), args.get("dialogue") or args.get("content", ""), args.get("target"))
-        elif tool_name == "move":
-            return method(args.get("character_id"), args.get("destination") or args.get("location_id", ""))
-        elif tool_name == "attack":
-            return method(args.get("character_id"), args.get("target", ""), args.get("weapon", "unarmed"), args.get("style", None))
-        elif tool_name == "attempt_skill":
-            return method(args.get("character_id"), args.get("skill", ""), args.get("action_description", ""), args.get("difficulty", None))
-        elif tool_name == "examine":
-            return method(args.get("character_id"), args.get("target", ""))
-        elif tool_name == "pickup":
-            return method(args.get("character_id"), args.get("item_name", ""))
-        elif tool_name == "use":
-            return method(args.get("character_id"), args.get("item_name", ""), args.get("target", ""), args.get("spell_name", None))
-        elif tool_name == "wait":
-            return method(args.get("character_id"), args.get("reason"))
         elif tool_name == "narrate":
             return method(args.get("content") or args.get("narration") or args.get("text") or "")
         elif tool_name == "spawn_event":

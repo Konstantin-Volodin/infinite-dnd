@@ -60,6 +60,12 @@ class Character(BaseModel):
     stats: CharacterStats = Field(default_factory=CharacterStats)
     location_id: str = ""
     inventory: List[str] = []
+    
+    # Backwards compatibility alias for description
+    @property
+    def description(self) -> str:
+        """Alias for 'backstory' to support existing prompts that use 'description'."""
+        return self.backstory
 
 
 class NarrativeState(BaseModel):
@@ -77,6 +83,12 @@ class Quest(BaseModel):
     status: str = "active"  # active, completed, failed
     giver_id: str = ""
     steps: List[str] = []
+    
+    # Backwards compatibility aliases
+    @property
+    def name(self) -> str:
+        """Alias for 'title' for backwards compatibility."""
+        return self.title
 
 
 class WorldState(BaseModel):

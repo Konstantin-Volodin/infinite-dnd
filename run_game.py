@@ -40,8 +40,8 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
     Args:
         guidance: Optional suggestion from director about what action to take.
     """
-    # Track by checking the last history item before/after
-    history_before = engine.state.history[-1] if engine.state.history else None
+    # Track by checking the history length before/after
+    history_len_before = len(engine.state.history)
     
     result = None
     
@@ -90,13 +90,18 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                 output(f"  ⚠️ Action failed: {failure_msg}", OutputLevel.VERBOSE)
                 return False, failure_msg
             
-            # Handle examine action - DM should describe what they find
+            # Handle actions requiring DM response (examine, skill_check, etc.)
             if result.get("requires_dm_response"):
-                examine_target = result.get("examine_target", "something")
-                location_id = result.get("location_id", "")
-                output(f"  🔍 DM responding to examination...", OutputLevel.VERBOSE)
+                output(f"  🎲 DM responding to action...", OutputLevel.VERBOSE)
                 
-                dm_guidance = f"DESCRIBE what the character finds when examining '{examine_target}'. Reveal a clue, danger, or interesting detail. Location: {location_id}"
+                if result.get("dm_guidance"):
+                    dm_guidance = result.get("dm_guidance")
+                else:
+                    # Fallback for examine
+                    examine_target = result.get("examine_target", "something")
+                    location_id = result.get("location_id", "")
+                    dm_guidance = f"DESCRIBE what the character finds when examining '{examine_target}'. Reveal a clue, danger, or interesting detail. Location: {location_id}"
+                
                 dm_action = dm.decide_action(engine.state, guidance=dm_guidance)
                 if "all_calls" in dm_action:
                     for call in dm_action["all_calls"]:
@@ -152,7 +157,11 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                 # If check result is success, ask DM to narrate; otherwise, trigger failure and increase tension
                 if skill_res.get("success"):
                     output("  ✅ Skill check SUCCESS", OutputLevel.VERBOSE)
+                    # Add quest context to success guidance
+                    char_goal = char.goal if char else ""
                     dm_guidance = f"DESCRIBE the success: The character succeeded a {skill} check and discovers something useful at {location_id}. Reveal a clue or path."
+                    if char_goal:
+                        dm_guidance += f"\n\nCharacter's Goal: {char_goal}\nConsider spawning quest-relevant NPCs or items if this location is related to their goal."
                     dm_action = dm.decide_action(engine.state, guidance=dm_guidance)
                     if "all_calls" in dm_action:
                         for call in dm_action["all_calls"]:
@@ -173,7 +182,11 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                     # Increase narrative tension and ask DM to narrate a failure (maybe a trap)
                     engine.state.narrative.tension = "high"
                     engine.save_state()
+                    # Add quest context to failure guidance
+                    char_goal = char.goal if char else ""
                     dm_guidance = f"DESCRIBE the failure: The character fails the {skill} check and something goes wrong at {location_id}. Add tension and consequences."
+                    if char_goal:
+                        dm_guidance += f"\n\nCharacter's Goal: {char_goal}\nIMPORTANT: Create a COMPLICATION, not a dead-end. Example: caught by a guard who might know something, or failure reveals an alternative path."
                     dm_action = dm.decide_action(engine.state, guidance=dm_guidance)
                     if "all_calls" in dm_action:
                         for call in dm_action["all_calls"]:
@@ -216,8 +229,9 @@ def run_action(engine: Engine, dm: DMAgent, actor_id: str, guidance: str = "") -
                     return False, msg
     
     # Check if a new event was added (last item changed)
-    history_after = engine.state.history[-1] if engine.state.history else None
-    success = history_before != history_after
+    # Check if a new event was added (history length changed)
+    history_len_after = len(engine.state.history)
+    success = history_len_after > history_len_before
     return success, "" if success else "No action effect"
 
 
@@ -500,6 +514,32 @@ def run_game_loop(engine: Engine, dm: DMAgent, director: DirectorAgent, max_acti
     output(f"{'='*50}{Colors.ENDC}")
 
 
+def finalize_session(session_dir: str, llm_log_path: str, engine: Engine, reviewer: ReviewerAgent):
+    """Generate reports and reviews for the session."""
+    # Generate HTML report
+    report_path = os.path.join(session_dir, "report.html")
+    output(f"\n📊 Generating session report...")
+    if generate_log_report(llm_log_path, report_path):
+        output(f"   Report saved to: {report_path}")
+    else:
+        output("   No logs found to generate report.")
+
+    # Run session reviewer LLM
+    try:
+        output("\n📝 Generating session review...")
+        review = reviewer.summarize_session(engine.state)
+        
+        # Save JSON
+        review_path = os.path.join(session_dir, "review.json")
+        with open(review_path, "w", encoding="utf-8") as f:
+            import json
+            f.write(json.dumps(review, indent=2, ensure_ascii=False))
+        output(f"   Review saved to: {review_path}")
+
+    except Exception as e:
+        output(f"   Could not generate review: {e}")
+
+
 def main():
     global output_level
     
@@ -576,42 +616,7 @@ def main():
     try:
         run_game_loop(engine, dm, director, max_actions=args.actions)
     finally:
-        # Generate report
-        report_path = os.path.join(session_dir, "report.html")
-        output(f"\n📊 Generating session report...")
-        if generate_log_report(llm_log_path, report_path):
-            output(f"   Report saved to: {report_path}")
-        else:
-            output("   No logs found to generate report.")
-        # Run session reviewer LLM to summarize the session and suggest improvements
-        try:
-            output("\n📝 Generating session review...")
-            review = reviewer.summarize_session(engine.state)
-            review_path = os.path.join(session_dir, "review.json")
-            with open(review_path, "w", encoding="utf-8") as f:
-                import json
-                f.write(json.dumps(review, indent=2, ensure_ascii=False))
-            output(f"   Review saved to: {review_path}")
-            # Also write a short human-readable review
-            txt_path = os.path.join(session_dir, "review.txt")
-            with open(txt_path, "w", encoding="utf-8") as f:
-                f.write("Session Summary:\n\n")
-                f.write(review.get("summary", "No summary") + "\n\n")
-                if review.get("bugs"):
-                    f.write("Bugs/Issues:\n")
-                    for b in review.get("bugs"):
-                        f.write(f" - {b}\n")
-                if review.get("inconsistencies"):
-                    f.write("\nInconsistencies:\n")
-                    for i in review.get("inconsistencies"):
-                        f.write(f" - {i}\n")
-                if review.get("recommendations"):
-                    f.write("\nRecommendations:\n")
-                    for r in review.get("recommendations"):
-                        f.write(f" - {r}\n")
-            output(f"   Human-readable review saved to: {txt_path}")
-        except Exception as e:
-            output(f"   Could not generate review: {e}")
+        finalize_session(session_dir, llm_log_path, engine, reviewer)
 
 
 if __name__ == "__main__":
