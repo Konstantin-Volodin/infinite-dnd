@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📖 Story Log</title>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #eaeaea;
+            --text-dim: #a0a0a0;
+            --accent: #e94560;
+            --accent2: #0f3460;
+            --gold: #f4d03f;
+        }
+        
+        body {
+            font-family: 'Georgia', serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.8;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: var(--gold);
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            margin-bottom: 40px;
+        }
+        
+        .scene-header {
+            background: linear-gradient(135deg, var(--accent2), var(--card-bg));
+            padding: 20px 30px;
+            margin: 40px -20px;
+            border-left: 4px solid var(--accent);
+        }
+        
+        .scene-header h2 {
+            margin: 0;
+            color: var(--gold);
+            font-size: 1.5em;
+        }
+        
+        .event {
+            margin: 20px 0;
+            padding: 15px 20px;
+            border-radius: 8px;
+        }
+        
+        .dialogue {
+            background: var(--card-bg);
+            border-left: 3px solid var(--accent);
+        }
+        
+        .dialogue .speaker {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .dialogue .message {
+            font-size: 1.1em;
+            margin-top: 8px;
+            font-style: italic;
+        }
+        
+        .dialogue .message::before { content: '"'; color: var(--gold); }
+        .dialogue .message::after { content: '"'; color: var(--gold); }
+        
+        .narration {
+            background: transparent;
+            color: var(--text-dim);
+            font-style: italic;
+            padding: 10px 30px;
+            border-left: 2px solid var(--accent2);
+        }
+        
+        .action {
+            background: var(--accent2);
+            border-left: 3px solid var(--gold);
+        }
+        
+        .action .actor {
+            color: var(--gold);
+            font-weight: bold;
+        }
+        
+        .thought {
+            background: rgba(244, 208, 63, 0.1);
+            border: 1px dashed var(--gold);
+            font-size: 0.95em;
+        }
+        
+        .thought-label {
+            color: var(--gold);
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .thought-content {
+            color: var(--text-dim);
+            font-style: italic;
+        }
+        
+        .world-change {
+            text-align: center;
+            color: var(--gold);
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        .world-change::before { content: '✨ '; }
+        .world-change::after { content: ' ✨'; }
+        
+        .movement {
+            text-align: center;
+            color: var(--text-dim);
+            font-style: italic;
+            padding: 10px;
+        }
+        
+        .timestamp {
+            font-size: 0.7em;
+            color: var(--text-dim);
+            float: right;
+            opacity: 0.5;
+        }
+        
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        
+        .controls label {
+            cursor: pointer;
+        }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <label>
+            <input type="checkbox" id="showThoughts" checked onchange="toggleThoughts()">
+            Show character thoughts
+        </label>
+    </div>
+    
+    <div class="container">
+        <h1>📖 Story Log</h1>
+        <p class="subtitle">Generated: 2026-01-27 00:46</p>
+        
+        <div class="story">
+
+            <div class="event narration"><span class="timestamp">00:44</span>The lantern Elara carried cast a trembling glow across the spice stall, illuminating jars of saffron, cinnamon, and crushed lavender in hues that seemed to breathe with the dim light. Ronn’s fingers, calloused from years of handling trade, twitched as he set aside a bundle of dried rosemary — a gesture that spoke more than words ever could. He smiled, a flicker of something dangerous beneath his practiced charm, and leaned forward, eyes twinkling with mischief. &#x27;Miss Elara,&#x27; he murmured, &#x27;I&#x27;ve been expecting you.&#x27; He pulled from his vest a small, crinkled map, its edges frayed, ink smudged by time. &#x27;That’s where the rescue crew went… but they didn’t come back. And they didn’t leave a trail.&#x27; His voice dropped to a whisper, as if the map held secrets too heavy to share aloud. Elara’s gaze narrowed, the lantern’s flicker casting jagged shadows across her face. &#x27;You’re hiding something,&#x27; she said, voice low but edged with steel. Ronn’s smile faltered. He glanced at the map, then back to her — eyes wide, betraying the fear he’d long buried beneath his merchant’s grin. The air thickened, the scent of spice mingling with something older, something darker. What did the map lead to? And what had the rescue crew truly been searching for?</div>
+
+            <div class="event narration"><span class="timestamp">00:44</span>The market square buzzed with the clatter of spice carts and the murmur of merchants haggling over rare herbs. Elara’s boots clicked on the worn cobblestones as she approached Ronn’s stall, her gaze sweeping the cluttered shelves—saffron threads, crushed cardamom pods, and a single, cracked jar labeled ‘Sorrow’s Balm’—all under the dim glow of a flickering lantern. She held out a coin, its edge worn smooth by time and trade. &quot;Where is my brother?&quot; she demanded, voice low but edged with urgency. Ronn’s eyes widened—not in fear, but in amusement. He leaned in, his breath warm against the spice-scented air, whispering secrets like a man who’d been waiting for this moment: &quot;He’s not gone. He’s just… hiding. And if you’re looking for a man who knows the river’s secrets, you’ve come to the right place.&quot; He glanced toward the dockmaster’s alley, then back at her, his expression unreadable, the coins in his pocket suddenly heavy with consequence. The market’s laughter faded as if the world held its breath. Elara’s hand trembled slightly—she’d found the man who could help, but she didn’t know if he’d lead her to the truth—or to the edge of the river.</div>
+
+            <div class="event narration"><span class="timestamp">00:44</span>The scent of cinnamon and burnt sugar hung thick in the air as Elara stepped into Ronn’s Sundries, her boots clicking softly on the worn stone floor. Her gaze swept the spice jars—each labeled with cryptic symbols, their contents whispering tales of old trade routes and forgotten curses. A rumor pinned to the wall with a rusty nail read: *‘The dockmaster’s new coin’s been seen near the river’s bend.’* She didn’t look at it. She looked at Ronn. His grin was too wide, too practiced, and the peppermint stick he offered—tightly wrapped in a stained paper—felt like a lie in her hand. &#x27;Tastes like secrets, girl,&#x27; he said, voice low and smooth, as if he’d known her since the first moonrise. But Elara didn’t laugh. She didn’t blink. She asked, &#x27;Do you know where Kaelen was last seen?&#x27; The grin vanished. His hands, once steady, trembled slightly as he shifted the peppermint stick to the counter. &#x27;He met the dockmaster,&#x27; he whispered, &#x27;but Alan’s been hiding something. You want to hear what he’s been selling to the moon?&#x27; The word *moon* hung in the air like a promise—or a warning. The market square had its secrets, but Elara wasn’t here to hear them. She was here to find her brother. And if Ronn’s eyes betrayed a flicker of fear… well, then the game had just begun.</div>
+
+            <div class="event narration"><span class="timestamp">00:44</span>The lanterns above the market square flickered in unison, casting dancing shadows across the cobblestones as Elara stepped forward, her boots crunching softly on the worn stones. She paused near Ronn’s stall, her gaze sweeping the stalls—each one a story in itself, each one a potential clue. The air smelled of spices, sweat, and something older, like forgotten secrets. Ronn, his fingers still wrapped around a steaming cup of tea, leaned back in his chair, eyes twinkling with the usual merchant’s mischief. He didn’t look up. Instead, he gestured with a slow, languid hand toward the stall next door, where a vendor in a patched apron was whispering urgently to a passing figure whose cloak billowed like a flag in the breeze. Elara’s eyes narrowed. She knew that whisper. Knew the way the vendor’s fingers twitched when he spoke of the river. She leaned closer, voice low, like a blade cutting through the market’s hum: &#x27;Where is my brother?&#x27; The stallholder’s smile didn’t falter. But his tea cup trembled slightly, the steam curling upward in a silent, urgent question. What was he hiding? And who was he whispering to? The air grew heavier, the lanterns dimming just enough to make the market feel like a stage set for something darker than the river.</div>
+
+            <div class="event narration"><span class="timestamp">00:44</span>The lanterns above Ronn’s stall flickered like restless spirits, casting long, dancing shadows that seemed to lean in, watching. Elara’s eyes swept the spice jars—cinnamon bark, crushed mint, saffron threads—each a secret in its own right, but none more so than the silence between them. She stopped, fingers hovering over a jar labeled ‘River Mist,’ her breath shallow, eyes fixed on Ronn. He shifted, a practiced smile tugging at his lips, but it didn’t reach his eyes. He’d been waiting for this moment, the moment she’d come bearing the weight of her brother’s disappearance. The air smelled of cloves and damp earth, the kind that clung to memory. He leaned forward, voice low, conspiratorial, as if sharing a secret with a friend who’d been lost in the fog. &#x27;Alan the Dockmaster, miss. He’s been seen near the river’s edge, whispering to someone who doesn’t belong. I don’t know who, but I think... he knows more than he lets on. But don’t press too hard. The river’s got a mind of its own, and it’s got eyes. You’ll thank me later, I promise.&#x27; He didn’t meet her gaze. Instead, he glanced toward the door, as if expecting the wind to carry the truth away before it reached her ears. Elara’s hand twitched, her eyes narrowing. &#x27;And if I don’t thank you?&#x27; she asked, her voice low, sharp. The lanterns flickered again, casting shadows that seemed to follow her, as if the market itself was watching. The air grew heavier. The silence between them stretched. The river’s whisper was louder than it had ever been.</div>
+
+            <div class="event narration"><span class="timestamp">00:45</span>The lantern Elara carried flickered softly, casting a warm, amber glow across the rows of spice jars and dried herbs that lined Ronn’s stall. Dust motes danced in the light as she stepped inside, her boots clicking against the worn stone floor. She didn’t look at the goods — her gaze was fixed on him, her voice low and urgent, like a thread pulled taut by unseen weight.
+
+Ronn’s smile, practiced and polite, faltered just enough to betray his unease. He leaned forward, offering a curious, almost conspiratorial grin, and pinched a pinch of cinnamon between his fingers — a gesture meant to be inviting, but his eyes darted toward the dockmaster’s direction, where the river’s edge seemed to whisper secrets. He offered her a glance, then a wink, and then dropped the hint — not a confession, but a whisper of something larger: &#x27;Alan’s been… odd. Not just a little off. Something’s been stirring where the river bends.&#x27;
+
+Elara’s breath hitched, her hand tightening around the lantern. She didn’t ask again — she simply waited, her eyes narrowing, as if the air itself was holding its breath, waiting for the next move.</div>
+
+            <div class="event narration"><span class="timestamp">00:45</span>The market square buzzed with the rhythm of clanging spices, clinking coins, and the occasional burst of laughter from street performers. Elara’s boots clicked against the worn cobblestones as she slipped between stalls, her eyes darting to every corner — the notice board, the fountain’s flickering lanterns, the cart parked near the docks. She paused beside Ronn’s spice stall, where the scent of cinnamon and clove clung thick to the air like a promise of secrets. He leaned forward, one hand holding a peppermint candy aloft, the other gripping a sack of turmeric with a practiced flick of his wrist. His grin was easy, familiar — the kind that said, ‘You’re in my world now.’ But his eyes, sharp and tired, darted toward the docks where Alan’s cart stood, empty and silent. He took a breath, then let it out slowly, his voice low and warm, as if trying to keep the truth buried beneath the spice dust. &#x27;You’re not here for the peppermint, are you?&#x27; he asked, his tone light, but his hand trembling slightly as he offered the candy. &#x27;You’re here for Kaelen. I’ve seen him. I’ve seen him disappear. I’ve seen him vanish. But I don’t know if I can help you. Not without a price. Not without a risk. Not without a cost.&#x27; Elara’s gaze narrowed. She didn’t flinch. She didn’t blink. She just stared — and waited. The market hummed around them, indifferent, oblivious. But the silence between them — that was the storm.</div>
+
+            <div class="event narration"><span class="timestamp">00:45</span>The scent of cinnamon and burnt sugar hung thick in the air as Elara stepped into Ronn’s Sundries, her boots clicking against the worn stone floor. She didn’t pause — her gaze swept the cluttered stall, landing on the brass bells above the door, which chimed once as she passed. Ronn’s grin widened like a trapdoor opening, and he leaned forward, offering her a peppermint stick with a flourish. &#x27;Test of patience, Miss Swift,&#x27; he said, voice low and sweet, &#x27;or do you prefer a peppermint that’s a little more… spicy?&#x27; His eyes flickered toward the notice board, then back to her, as if he knew what she’d come for. Elara’s fingers curled around the stick, but her gaze never left his face. &#x27;Where is my brother?&#x27; she demanded, voice sharp as a river stone. Ronn’s grin faltered. He took a slow breath, then shifted the peppermint into her hand — not a gesture of kindness, but of bait. &#x27;You’re asking the right questions, Miss Swift,&#x27; he murmured, &#x27;but the answer might not be as sweet as it looks.&#x27;</div>
+
+            <div class="event narration"><span class="timestamp">00:45</span>The market square buzzed with the low thrum of merchants and the clatter of coin on stone. Above, the brass bells of Ronn’s Sundries chimed once, twice — a sound that echoed through the crowd like a warning. Elara’s boots clicked against the worn cobblestones as she stepped closer, her eyes darting across the stall, past the jars of glowing amber spice and the tattered maps pinned to the notice board. She didn’t speak to the street performers, nor to the merchant’s wife who’d just dropped her basket of saffron. Her gaze locked onto Ronn’s, who grinned like a man who’d just won a gamble — but his eyes flickered, darting to the edge of the stall, as if something behind him had shifted.
+
+Ronn held out a jar of amber spice, its surface shimmering with faint embers. &quot;He was headed to meet the dockmaster Alan,&quot; he said, voice low, almost a whisper. &quot;But Alan’s been acting... off-late. And the rescue crew? They’re not coming back unless it’s a fire in the sky.&quot;
+
+Elara’s hand tightened around the jar. &quot;Fire in the sky?&quot; she asked, voice sharp as a blade. &quot;What does that mean?&quot;
+
+Ronn’s grin faltered. He looked away, then back at her — eyes flickering with something unreadable. &quot;It means,&quot; he said, &quot;the world’s changed. And you’re the only one who can find him.&quot;
+
+She didn’t ask again. She knew. The world had shifted — and she was the only one who could find her brother. But the world was watching, and the silence between them was thick with something darker than fear. Something older.
+
+The jar of amber spice glowed brighter as she turned to leave, the weight of her quest heavy on her shoulders. The market square buzzed, but she heard nothing. She heard only the whisper of the world — and the faint hum of something ancient, waiting to be found.</div>
+
+            <div class="event narration"><span class="timestamp">00:45</span>The lantern’s glow pooled over the spice stall like a warm, amber lantern, casting long shadows across jars of saffron, crushed coriander, and dried lavender. Ronn’s fingers twitched beneath the counter as Elara leaned in, her breath sharp with urgency — not anger, but desperation. The market’s clamor faded into a low hum around them, as if the world had paused to listen. He smiled, slow and knowing, and gestured to the hidden compartment behind the spice rack — a latch of brass, worn smooth by time and secrecy. As she reached for it, he leaned close, his voice a whisper against her ear, just loud enough to be heard: ‘Alan.’ Then, the warning: ‘Don’t ask about the river.’ He didn’t say it again — not because he feared her, but because the truth was too heavy to carry. The market buzzed on, but here, in the quiet between the bells and the chatter, the river’s murmur was all that mattered. And Elara, eyes narrowed, fingers trembling, knew — this was the beginning of the hunt.</div>
+
+            <div class="event narration"><span class="timestamp">00:45</span>The scent of cinnamon and clove hung thick in the air as Elara stepped into the market square, her boots crunching on the worn cobblestones. Her eyes darted to the spice stall where Ronn leaned against the counter, arms crossed like a man who’d seen too much. She didn’t wait for him to speak — her gaze locked onto him, sharp as a blade. The silence stretched, heavy with unspoken tension. Then, she asked, voice low but urgent: &quot;Where is my brother?&quot; Ronn’s smile faltered, and his fingers twitched nervously against the spice jar. He leaned in, conspiratorially, as if sharing a secret that could unravel the world — &quot;Alan’s been seen arguing with the river guard... and he’s been buying more supplies than usual.&quot; Elara’s eyes narrowed. She knew that rumor was a thread, not a lie — but whether it led to her brother or just deeper danger, she wouldn’t know until she followed it. The market buzzed around them, but the world had narrowed to this stall, this whisper, this promise of a lead — and the price of finding it.</div>
+
+            <div class="event narration"><span class="timestamp">00:46</span>The lantern Elara carried cast a golden circle on the spice jars lining Ronn’s stall, each one a different hue — crimson saffron, amber turmeric, deep indigo cardamom. The market’s murmur faded as if the world itself held its breath. Ronn, ever the gossip, leaned forward, swirling a jar of saffron with a practiced flick of his wrist. He didn’t look up, but his fingers danced like they knew the rhythm of secrets better than anyone. Elara’s voice, low and urgent, cut through the haze of spice and chatter: &quot;Where is my brother?&quot; Her eyes, sharp as a blade, scanned the stall as if searching for a clue buried beneath the cinnamon dust. Ronn’s smile faltered, but he didn’t flinch. Instead, he tapped the jar with a fingertip, as if measuring the silence between words. &quot;You know the river’s bend, don’t you?&quot; he murmured, not looking at her. &quot;It’s not the water that’s dangerous — it’s the people who walk there.&quot; The market buzzed again, but Elara’s gaze never left him. The lantern flickered — a tiny, nervous signal. The world had paused, and now it was waiting to see if the merchant would speak, or if the silence would speak for them both.</div>
+
+            <div class="event narration"><span class="timestamp">00:46</span>Elara’s boots clicked softly on the worn cobblestones as she stepped into the bustling market square, her gaze darting toward the spice stall where Ronn waited. The air smelled of cinnamon, cloves, and something darker — like wet earth and old secrets. He smiled, a practiced curve of his lips, but his eyes flickered with something else — cautious, calculating. He leaned forward, offering her a small jar, its weight unnaturally heavy for its size. The glass was etched with a faint, looping symbol — the emblem of the Marsh Raiders. As she reached for it, he murmured, &#x27;The river’s not the only thing that flows...&#x27; — and the words hung in the air like a warning, not a promise. She didn’t flinch. She simply took the jar, her fingers brushing the cool glass, and met his gaze with a quiet, unyielding resolve. The market’s laughter faded around them. The only sound was the faint chime of the bell above the door, echoing through the stillness.</div>
+
+            <div class="event narration"><span class="timestamp">00:46</span>The market square buzzed with the low hum of vendors and the clatter of coin purses, but Elara’s steps were silent, her gaze fixed on the spice stall where Ronn leaned, one elbow propped on the counter. The brass lanterns above flickered, casting long, wavering shadows across the stone tiles, as if the market itself held its breath. Ronn grinned, a practiced smile that never quite reached his eyes. He poured steaming spiced tea into a chipped ceramic cup, his fingers brushing the rim with a practiced motion. Elara sipped, her eyes never leaving him — sharp, searching, like a hawk scanning for prey. Ronn, ever the gossip merchant, leaned in, the scent of cinnamon and cloves thick in the air. &#x27;Tea for the seeker of secrets, miss,&#x27; he murmured, voice low and smooth. &#x27;Or the seeker of… trouble?&#x27;</div>
+
+            <div class="event narration"><span class="timestamp">00:46</span>The market square buzzed with the clatter of carts, the murmur of traders, and the occasional burst of laughter from street performers. Above, the sun hung low, casting long shadows across the worn cobblestones. Elara stood just beyond the spice stall, her boots crunching lightly on the grit. She didn’t flinch at the scent of cinnamon and clove that wafted from Ronn’s stall — it was familiar, comforting, even. But her gaze was sharp, scanning the stall’s shelves, the notice board, the fountain’s basin — anything that might hold a clue.
+
+Ronn, ever the opportunist, turned to her with a practiced smile. His eyes flickered toward the market’s edge, where the crowd thinned — a silent warning, perhaps, to keep his secrets safe. He gestured to a small jar nestled among the spices, its label faded but legible: *River’s Whisper*. He offered it with a wink. &quot;A little something for the curious, Miss Swift. A drink of it, and you’ll hear what the river whispers — if it’s willing to speak at all.&quot; 
+
+Elara’s eyes narrowed. &quot;What’s in it?&quot; she asked, voice low, but edged with urgency.
+
+Ronn’s smile faltered. He glanced at the jar, then at her, then back at the crowd — a flicker of fear, of hope, of calculation. He didn’t say a word. He just handed her the jar, his fingers brushing hers as he did. The crowd around them didn’t notice — they were too busy enjoying the spectacle of a merchant’s trick, or a woman’s curiosity. But Elara? She felt it — the weight of the jar, the unspoken promise, the tremor beneath Ronn’s smile. The market was oblivious. But the river? It was listening. And Elara? She was ready to listen.</div>
+
+        </div>
+    </div>
+    
+    <script>
+        function toggleThoughts() {
+            const show = document.getElementById('showThoughts').checked;
+            document.querySelectorAll('[data-thought]').forEach(el => {
+                el.classList.toggle('hidden', !show);
+            });
+        }
+    </script>
+</body>
+</html>

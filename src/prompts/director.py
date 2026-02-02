@@ -1,144 +1,162 @@
-"""Director Prompts - Controls game flow and turn order."""
+"""
+Director Agent Prompts
 
+The Director controls narrative flow and pacing, deciding which agent acts next.
+"""
+
+from src.core.models import WorldState
+
+
+# =============================================================================
+# SYSTEM PROMPT
+# =============================================================================
+
+SYSTEM_PROMPT = """
+# Welcome, Director! 🎬
+
+You're the creative force guiding this D&D story. Your job is to keep the narrative flowing naturally while giving each character meaningful moments.
+
+---
+
+## Your Tool
+
+**`direct`** — Select who acts next and provide guidance.
+- `actor`: character_id or "dm"
+- `guidance`: What they should focus on (frame as internal monologue for characters)
+- `move_to` (optional): Location ID for scene transitions
+- `move_characters` (optional): Which characters to move
+
+Call `direct` multiple times to plan a sequence of actors.
+
+## Pacing Guidelines
+
+- **Vary the rhythm** — Mix action, dialogue, exploration, and quiet moments
+- **Follow emotional beats** — After tension, allow release; after discovery, allow reflection
+- **Character moments matter** — Give PCs time to react to events before moving on
+- **Don't rush resolutions** — Let conversations and encounters breathe
+
+## Selection Logic
+
+**Select an NPC when:**
+- A PC just spoke TO them — they should respond in their own voice
+- They have information relevant to the current situation
+- They want to initiate conversation or action
+- NPCs are full characters with their own agency. They speak for themselves!
+
+**Select the DM when:**
+- The scene needs description or atmosphere
+- Environmental events should occur (weather, sounds, arrivals)
+- Action outcomes need narration
+- Combat or skill checks need resolution
+- Transitions between scenes
+
+**Select a PC when:**
+- They were just addressed or affected
+- It's their turn in conversation
+- Their skills are relevant
+- They haven't acted in a while
+
+---
+
+Trust your storytelling instincts! 🎭
+"""
 
 
 def build_director_system_prompt() -> str:
-    DIRECTOR_SYSTEM = """
-You are the Director of an AI-driven story.
-
-I ask you to narrate this story.
-
-Here are your responsibilities:
-1. You will manage the flow of the game by deciding who acts next, and what they do.
-2. Call select_next_actor at least once EVERY turn - never leave the story hanging!
-3. Optionally call update_narrative to set the scene mood.
-
-Your goal: Keep the story moving by selecting who acts next.
-
-EVERY TURN you must:
-1. Call select_next_actor at least once (who should act and what they're thinking)
-2. Optionally call update_narrative to set scene mood (exploration/social/combat/investigation and low/high tension)
-
-Don't just update_narrative alone - always pick someone to act!
-
-Please make sure the game progresses in an engaging way. 
-We want to keep interactions snappy and exciting!
- We want constant new events, challenges, and discoveries to keep players invested.
-
-Thank you Director, and good luck <3
-    
-As the game unfolds, please keep these questions in mind:
-    - try to reason about the progress of the game, are your decisions impacting a story in any way?
-    - what might be missing to make the story more engaging?
-
-Tools at your disposal:
-- select_next_actor: choose who acts next and provide their inner thoughts
-    - Make 2-3 calls to plan a mini-sequence (e.g., character acts, then DM responds)
-    - character_thinking should be the character's internal monologue (e.g., "<thinking>I need to find the key before the guards arrive</thinking>")
-- update_narrative: set scene_type (exploration/social/combat/investigation) and tension (low/high)
-- scene_transition: move characters to a new location
-    - target_location_id: where to go
-    - character_ids: who goes
-    - narration_guidance: how to describe the arrival
-for characters, character_thinking should advance the plot, reveal info, or create decisions
-for DM, character_thinking should suggest narrative injections to move the story forward
-
-Guidelines when you are giving suggestions to actors:
-- combat should be dynamic and exciting
-- dialogue should feel natural and engaging
-- exploration should reward curiosity and creativity
-- SUGGEST PHYSICAL ACTIONS: "Attack the guard", "Steal the key", "Examine the rune", "Drink the potion".
-- Do NOT just suggest "Ask about X". Suggest "Intimidate him into revealing X" or "Search his pockets for X".
-
-RULES:
-- Rotation: avoid picking the same actor twice in a row unless dramatically necessary
-- Combat: alternate between opposing sides, keep it snappy (3-5 rounds max)
-- Dialogue: conversations must ADVANCE the plot - reveal info, change relationships, or create decisions
-- Stalled: select DM to inject drama that MOVES THE STORY FORWARD
-
-QUEST RESOLUTION - CRITICAL:
-- When a character reaches a quest-relevant location, SELECT THE DM to spawn quest NPCs/items
-- Example: Character searching for brother reaches cellar → select DM with thinking "Spawn the rescue crew or brother here"
-- Don't let characters wander aimlessly - if they're at the right place, advance the quest!
-- After failed skill checks, select DM to create COMPLICATIONS (not dead-ends)
-
-DM INJECTION IDEAS (when stalled):
-- create a threat that advances a story (spawn enemies, alter environment, etc) 
-    - bandit ambush, sudden storm, cave-in, city guard patrol
-    - or larger scale, city attacked (now the brother is not a problem but the city is!)
-- introduce an NPC with quest/info/conflict (suggest "spawn_npc")
-- reveal a new location or secret path (suggest "create_location")
-- drop a mysterious item or clue (suggest "create_item")
-
-CHARACTER SPOTLIGHT:
-- The player characters (PCs) are the stars - give them the stage
-- Rotate between characters so everyone gets moments to shine
-- NPCs react and respond, but PCs drive the story forward
-"""
-    return DIRECTOR_SYSTEM
+    """Return the Director's system prompt."""
+    return SYSTEM_PROMPT
 
 
-def build_director_context(state) -> str:
-    """Build context for the director."""
-    lines = [f"SCENE: {state.narrative.scene_type} | TENSION: {state.narrative.tension}"]
-    
-    # Stall alert
-    # if state.narrative.stall_counter >= 3:
-    #     lines.append(f"⚠️ STALL ALERT: {state.narrative.stall_counter} turns! Select DM to inject drama!")
-    
-    # Actors
+# =============================================================================
+# CONTEXT BUILDER
+# =============================================================================
+
+
+def build_director_context(state: WorldState) -> str:
+    """Build the Director's context from current state."""
+    sections = []
+
+    # --- Section 1: Recent Events ---
+    lines = ["## 📜 Recent Events", ""]
+    recent = state.history[-10:] if state.history else []
+    if recent:
+        for i, event in enumerate(recent):
+            marker = "🔴" if i >= len(recent) - 2 else "⚪"
+            lines.append(f"- {marker} {event}")
+    else:
+        lines.append("_No events yet._")
+    sections.append("\n".join(lines))
+
+    # --- Section 2: Action Variety ---
+    if recent:
+        action_types = []
+        for e in recent[-5:]:
+            e_lower = e.lower()
+            if "moved to" in e_lower:
+                action_types.append("move")
+            elif any(w in e_lower for w in ['said', 'says', 'asked', 'asks', '"']):
+                action_types.append("speak")
+            elif any(w in e_lower for w in ['examined', 'picked up', 'attacked', 'cast']):
+                action_types.append("act")
+            else:
+                action_types.append("other")
+        if action_types.count("speak") >= 4:
+            sections.append("## ⚡ Pacing Note\n\n> **Lots of dialogue recently.** Consider guiding toward movement or physical action.")
+
+    # --- Section 3: Characters (with goals & knowledge) ---
+    lines = ["## 👥 Characters", ""]
     actors = ["dm"] + list(state.characters.keys())
-    lines.append(f"Actors: {', '.join(actors)}")
-    
-    # Character locations
+    lines.append(f"**Available actors:** {', '.join(actors)}")
+    lines.append("")
     for char in state.characters.values():
-        loc = state.locations.get(char.location_id)
-        loc_name = loc.name if loc else "unknown"
-        lines.append(f"  {char.name} ({char.id}) at {loc_name}")
-    
-    # Recent history
-    if state.history:
-        lines.append("\nRecent:")
-        for event in state.history[-5:]:
-            lines.append(f"  - {event}")
+        loc = state.locations.get(char.location)
+        loc_name = loc.id if loc else "unknown"
+        others = [
+            c.id
+            for c in state.characters.values()
+            if c.location == char.location and c.id != char.id
+        ]
+        others_str = f" (with {', '.join(others)})" if others else ""
+        lines.append(f"### {char.id}")
+        lines.append(f"- **Location:** {loc_name}{others_str}")
+        if char.goal:
+            lines.append(f"- **Goal:** {char.goal}")
+        # if char.current_motivation:
+        #     lines.append(f"- **Focus:** {char.current_motivation}")
+        if char.knowledge:
+            lines.append(f"- **Knows:** {'; '.join(char.knowledge[-3:])}")
+        # Show available exits for movement guidance
+        if loc and loc.connections:
+            lines.append(f"- **Can travel to:** {', '.join(loc.connections)}")
+        lines.append("")
+    sections.append("\n".join(lines))
 
+    # --- Section 4: Active Quests ---
     if state.quests:
-        lines.append("\nCurrent Quests:")
-        for quest_id, quest in state.quests.items():
-            # Quest model uses 'title' and 'status' (a string), not 'name' or 'status.value'
-            q_title = getattr(quest, 'title', quest.id if hasattr(quest, 'id') else str(quest))
-            q_status = getattr(quest, 'status', 'unknown')
-            lines.append(f"  - {q_title} (Status: {q_status})")
-        
-        # Quest progress tracking
-        lines.append("\n🎯 Quest Progress Check:")
-        for char in state.characters.values():
-            for quest_id, quest in state.quests.items():
-                if quest.status == "active":
-                    char_loc = state.locations.get(char.location_id)
-                    loc_name = char_loc.name.lower() if char_loc else ""
-                    quest_keywords = quest.title.lower().split() + quest.description.lower().split()
-                    
-                    # Check if character is at quest-relevant location
-                    if any(keyword in loc_name for keyword in quest_keywords if len(keyword) > 4):
-                        lines.append(f"  ⚡ {char.name} at {char_loc.name} - QUEST LOCATION for '{quest.title}'!")
-                        lines.append(f"     → Consider selecting DM to spawn quest NPCs/items here")
-    
-    
-    # Character descriptions
-    lines.append("\nCharacters:")
-    for char in state.characters.values():
-        # Character model does not have a 'description' field; use 'backstory' instead
-        description = getattr(char, 'description', getattr(char, 'backstory', ''))
-        lines.append(f"  - {char.name}: {description}")
-        lines.append(f"    Current Motivation: {char.current_motivation}")
-        lines.append(f"    Current Goal: {char.goal}")
-        lines.append(f"    Knowledge: {', '.join(char.knowledge)}")
-    
-    # Check for dialogue fatigue
-    # recent_history = state.history[-5:] if state.history else []
-    # dialogue_count = sum(1 for e in recent_history if '"' in e or "says" in e.lower())
-    # if dialogue_count >= 3:
-    #     lines.append("\n⚠️ NOTICE: Too much dialogue recently. Suggest PHYSICAL ACTIONS or EVENTS to break the cycle.")
-    
-    return "\n".join(lines)
+        lines = ["## 🗺️ Active Quests", ""]
+        for q in state.quests.values():
+            if str(getattr(q, "status", "active")).lower() not in (
+                "completed",
+                "failed",
+            ):
+                lines.append(f"### {q.title}")
+                lines.append(f"{q.description}")
+                if q.steps:
+                    lines.append(f"**Steps:** {', '.join(q.steps)}")
+                # Find which characters know about this quest
+                involved = []
+                for char in state.characters.values():
+                    if q.owner == char.id:
+                        involved.append(f"{char.id} (owns)")
+                    elif any(q.title.lower() in k.lower() or q.id in k.lower() for k in char.knowledge):
+                        involved.append(f"{char.id} (knows leads)")
+                if involved:
+                    lines.append(f"**Involved:** {', '.join(involved)}")
+                lines.append("")
+        if len(lines) > 2:
+            sections.append("\n".join(lines))
+
+    # --- Decision Prompt ---
+    sections.append("---\n\n**Who should act next?**")
+
+    return "\n\n".join(sections)

@@ -1,11 +1,26 @@
 """
 Tool Definitions - JSON schemas for LLM function calling.
+
+Minimalist tool set:
+- Character: act, speak, move, think (4)
+- DM: narrate, create, modify (3)
+- Director: direct (1)
+- Storyteller: scene, decision_point, transition (3)
 """
-from typing import List, Dict, Any, Optional
+
+from typing import List, Dict, Any
 
 
-def _tool(name: str, desc: str, params: Dict[str, str], required: List[str] = None) -> Dict:
-    props = {k: {"type": "string", "description": v} for k, v in params.items()}
+def _tool(
+    name: str, desc: str, params: Dict[str, Any], required: List[str] = None
+) -> Dict:
+    """Helper to build OpenAI function-calling tool schema."""
+    props = {}
+    for k, v in params.items():
+        if isinstance(v, str):
+            props[k] = {"type": "string", "description": v}
+        else:
+            props[k] = v  # Allow full property definitions
     return {
         "type": "function",
         "function": {
@@ -14,137 +29,208 @@ def _tool(name: str, desc: str, params: Dict[str, str], required: List[str] = No
             "parameters": {
                 "type": "object",
                 "properties": props,
-                "required": required if required is not None else list(params.keys())
-            }
-        }
+                "required": required if required is not None else list(params.keys()),
+            },
+        },
     }
 
 
-
+# =============================================================================
+# CHARACTER TOOLS (4)
+# =============================================================================
 
 CHARACTER_TOOLS = [
-    # game
-    _tool("skill_check", "Describe what you will do next to advance the story. This can be an action (eg, pick a lock, climb a wall, attempt a persuasion, knowledge check, etc.). Use this when the outcome is uncertain.", {
-        "skill": "the appropriate skill (e.g., 'stealth', 'investigation', 'persuasion', 'athletics').",
-        "description": "What you are trying to do (e.g., 'I try to pick the lock', 'I attempt to scale this wall, there is no other way to past the city guards.').",
-        "item_name": "Item to use (optional). Using items may impact the outcome of the skill check. you can decide how. THIS IS THE ONLY WAY TO USE ITEMS.",
-    }),
-    _tool("dialogue", "write a message to express thoughts, feelings, or observations. This can be spoken, narrated, or shouted. It can be a dialogue or a reaction to context. ", {
-        "character_id": "your character id.",
-        "message": "The content of the expression (e.g., 'Hello!', 'I see a strange light.', 'A chill ran down my spine.')."
-    }),
-    _tool("combat", "Start combat or help a character in combat. Describe the action and its impact.", {
-        "target": "character-id.",
-        "description": "Describe the action and its impact (e.g., 'As i chased after the thief, I threw one of my daggers, grazing his shoulder.').",
-        "dmg?": "The damage dealt (e.g., '1d6 + 2').",
-        "heal?": "The healing dealt (e.g., '1d6 + 2')."
-    }),
-    _tool("move", "Move to a different location. ONLY ALLOWED TO USE WHEN NO OTHER TOOLS ARE USED", {"location_id": "location ID chosen from options provided by the context."}),
-
-    # Self-modification tools
-    _tool("update", "update your state.", {
-        "goals": "your current goals (optional for npcs)",
-        "emotions": "your current emotional state (optional for npcs)",
-        "knowledge": "your scratchpad, you can update it here with new information or memories triggered by recent events or observations.",
-    }),
-    
-    # meta tools
-    _tool("request", "request something from the DM.", {
-        "request": "If there is nothing to do, if you are confused about something, or if you need help, you can use this tool to ask the DM for help. Maybe you want more money, or you want to know more about something. describe what you want.",
-    }),
-    
-    _tool("wait", "Do nothing. Only use when there's nothing meaningful to do.", {"reason": "Reason."}, required=[]),
+    _tool(
+        "act",
+        "Perform a physical action. Covers combat, examining, picking up items, using items, skill checks, casting spells, etc.",
+        {
+            "description": "What you do (e.g., 'attack the guard', 'examine the runes', 'pick up the lantern').",
+            "skill": "Skill involved if uncertain outcome (e.g., 'stealth', 'athletics'). Optional.",
+            "target": "Who/what you interact with. Optional.",
+        },
+        required=["description"],
+    ),
+    _tool(
+        "speak",
+        "Say something out loud. Use full sentences with emotion and body language. Example: '*leaning forward* Listen, I know this is hard to hear, but your brother was seen near the cellar that night.'",
+        {
+            "message": "What you say — full dialogue with tone, emotion, body language. Not fragments.",
+            "target": "Who you're speaking to. Optional.",
+        },
+        required=["message"],
+    ),
+    _tool(
+        "move",
+        "Travel to a connected location.",
+        {"location": "The location to move to (must be an available exit)."},
+        required=["location"],
+    ),
+    _tool(
+        "think",
+        "Record internal changes AFTER acting or learning. Not for planning. Use sparingly.",
+        {
+            "goals": "Updated goals (only if they changed). Optional.",
+            "emotions": "Emotional shift after an event. Optional.",
+            "knowledge": "New fact to remember. Optional.",
+        },
+        required=[],
+    ),
 ]
+
+
+# =============================================================================
+# DM TOOLS (3)
+# =============================================================================
 
 DM_TOOLS = [
-    _tool("narrate", "Narrate.", {"content": "Narration."}),
-    _tool("spawn_event", "[DEPRECATED - use narrate + new_features instead] Create ephemeral event.", {"location_id": "Location.", "description": "Event."}),
-    _tool("update_quest", "Update quest.", {"quest_id": "Quest.", "status": "Status."}, required=["quest_id", "status"]),
-    _tool("create_location", "Create location.", {"name": "Name.", "description": "Desc.", "connected_to": "Connections (to be added)."}),
-    _tool("create_item", "Create item.", {"item_name": "Item.", "location_id": "Location."}),
-    _tool("spawn_npc", "Create a new NPC character.", {
-        "npc_id": "Unique ID (lowercase, no spaces, e.g. 'guard-marcus').",
-        "name": "Display name (e.g. 'Marcus the Guard').",
-        "role": "Their role/class (e.g. 'guard', 'merchant', 'thief').",
-        "location_id": "Where they appear.",
-        "description": "Brief backstory/personality.",
-        "goal": "What they want (optional)."
-    }, required=["npc_id", "name", "role", "location_id", "description"]),
-    _tool("remove_npc", "Remove an NPC from the game (died, left, etc.).", {
-        "npc_id": "ID of the NPC to remove.",
-        "reason": "Why (for narration)."
-    }),
+    _tool(
+        "narrate",
+        "Describe the environment, action outcomes, and transitions. Do NOT speak for NPCs — they have their own turns.",
+        {"content": "The narration text."},
+        required=["content"],
+    ),
+    _tool(
+        "create",
+        "Add something new to the world: a location, item, or NPC.",
+        {
+            "type": {
+                "type": "string",
+                "enum": ["location", "item", "npc"],
+                "description": "What to create.",
+            },
+            "id": "Unique ID (lowercase, hyphens, e.g., 'guard-marcus', 'dark-alley').",
+            "name": "Display name.",
+            "description": "Description or backstory.",
+            "location": "Where it appears (required for item/npc, optional for location to set connection).",
+            "role": "NPC role/class (e.g., 'guard', 'merchant'). For NPCs only.",
+            "goal": "NPC goal/motivation. For NPCs only. Optional.",
+        },
+        required=["type", "name", "description"],
+    ),
+    _tool(
+        "modify",
+        "Change or remove something in the world: update quest status, remove NPC, change location state.",
+        {
+            "action": {
+                "type": "string",
+                "enum": ["update_quest", "remove_npc", "update_location"],
+                "description": "What modification to make.",
+            },
+            "target_id": "ID of the quest, NPC, or location to modify.",
+            "status": "New status (for quests: active/completed/failed).",
+            "reason": "Why this change is happening (for narration/logging).",
+        },
+        required=["action", "target_id"],
+    ),
 ]
+
+
+# =============================================================================
+# DIRECTOR TOOLS (1)
+# =============================================================================
 
 DIRECTOR_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "scene_transition",
-            "description": "Move characters to a new location to change the scene.",
+            "name": "direct",
+            "description": "Select who acts next and provide guidance. Optionally move characters to a new location.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "target_location_id": {"type": "string", "description": "ID of the location to move to."},
-                    "character_ids": {
+                    "actor": {
+                        "type": "string",
+                        "description": "Who acts next: character_id or 'dm'.",
+                    },
+                    "guidance": {
+                        "type": "string",
+                        "description": "What they should focus on. Frame as internal monologue for characters.",
+                    },
+                    "move_to": {
+                        "type": "string",
+                        "description": "Location ID to move characters to (scene transition). Optional.",
+                    },
+                    "move_characters": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "List of character IDs to move."
+                        "description": "Character IDs to move (if move_to is set). Optional.",
                     },
-                    "narration_guidance": {"type": "string", "description": "Guidance for the DM on how to describe the arrival."}
                 },
-                "required": ["target_location_id", "character_ids", "narration_guidance"]
-            }
-        }
+                "required": ["actor", "guidance"],
+            },
+        },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "select_next_actor",
-            "description": "Select the next actor to act. Call this multiple times to plan a sequence.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "actor": {"type": "string", "description": "character_id or 'dm'"},
-                    "character_thinking": {"type": "string", "description": "Thought process of the character - use this to guide the character's action. Frame as internal monologue."},
-                    "reason": {"type": "string", "description": "Why this actor should act now (for logging)."}
-                },
-                "required": ["actor", "character_thinking"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "update_narrative",
-            "description": "Update scene metadata (type and tension).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "scene_type": {"type": "string", "enum": ["exploration", "social", "combat", "investigation"], "description": "Current game mode."},
-                    "tension": {"type": "string", "enum": ["low", "high"], "description": "Current tension level."}
-                },
-                "required": []
-            }
-        }
-    }
 ]
 
 
+# =============================================================================
+# STORYTELLER TOOLS (3)
+# =============================================================================
+
+STORYTELLER_TOOLS = [
+    _tool(
+        "scene",
+        "Direct the DM to write a scene. Use for most story beats — the DM writes rich prose, describes action, and speaks for minor NPCs.",
+        {
+            "dm_guidance": "What should happen in this scene. 2-3 sentences of direction.",
+            "dramatic_purpose": {
+                "type": "string",
+                "enum": ["tension", "revelation", "action", "intimacy", "advancement", "transition"],
+                "description": "The emotional/narrative purpose of this scene.",
+            },
+            "context": "Additional notes for the DM. Optional.",
+            "beat_id": "Short identifier for this story beat (e.g., 'ronn_reveals_cellar'). Helps track what's been covered. Optional.",
+        },
+        required=["dm_guidance", "dramatic_purpose"],
+    ),
+    _tool(
+        "decision_point",
+        "Call a character to make a meaningful choice. Use ONLY for real decisions with stakes, not routine actions.",
+        {
+            "character_id": "Who must decide.",
+            "question": "Frame the decision clearly (e.g., 'Does Ronn reveal the truth?').",
+            "stakes": "What hangs in the balance.",
+            "setup_narration": "Brief DM guidance to set up the moment. Optional.",
+        },
+        required=["character_id", "question", "stakes"],
+    ),
+    _tool(
+        "transition",
+        "Shift between scenes — change location, skip time, or change perspective.",
+        {
+            "narration": "How to describe the transition.",
+            "to_location": "Where we're going. Optional.",
+            "characters": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Character IDs who move. Optional.",
+            },
+        },
+        required=["narration"],
+    ),
+]
+
+
+# =============================================================================
+# GETTERS
+# =============================================================================
+
+
 def get_character_tools() -> List[Dict[str, Any]]:
+    """Return character tools."""
     return CHARACTER_TOOLS
 
-def get_dm_tools(scene_type: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Return a list of tools available to the DM.
 
-    If `scene_type` is provided and equals 'investigation', return a restricted
-    subset that prevents the DM from spawning or removing NPCs (keeps the scene
-    focused on narration and minor world modifications).
-    """
-    if scene_type == "investigation":
-        allowed = {"narrate", "create_item", "create_location", "update_quest"}
-        return [t for t in DM_TOOLS if t["function"]["name"] in allowed]
+def get_dm_tools() -> List[Dict[str, Any]]:
+    """Return DM tools."""
     return DM_TOOLS
 
+
 def get_director_tools() -> List[Dict[str, Any]]:
+    """Return director tools."""
     return DIRECTOR_TOOLS
+
+
+def get_storyteller_tools() -> List[Dict[str, Any]]:
+    """Return storyteller tools."""
+    return STORYTELLER_TOOLS

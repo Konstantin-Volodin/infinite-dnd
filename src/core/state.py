@@ -1,87 +1,110 @@
 """State Manager - Load/save world state from JSON files."""
+
 import json
 import os
-from .models import WorldState, Character, Location, CharacterType, CharacterStats, Quest
+from .models import (
+    WorldState,
+    Character,
+    Location,
+    CharacterType,
+    CharacterStats,
+    Quest,
+)
+from ..config import game_config
 
 
 class StateManager:
-    """Handles loading initial setup and persisting world state."""
-    
+    """Handles the world state."""
+
     def __init__(self, setup_dir: str = "world-setup", state_dir: str = "world-state"):
+        """Initialize the state manager."""
         self.setup_dir = setup_dir
         self.state_dir = state_dir
         self.state_file = os.path.join(state_dir, "world_state.json")
         os.makedirs(self.state_dir, exist_ok=True)
 
-    def load_initial_setup(self) -> WorldState:
+    def read_json(self, path: str):
+        """Load a JSON file."""
+        try:
+            with open(path, "r", encoding="utf-8") as json_file:
+                return json.load(json_file)
+        except Exception as e:
+            raise ValueError(f"Failed to read JSON file {path}: {e}") from e
+
+    def generate_initial_setup(self) -> WorldState:
         """Load fresh world from setup files."""
+
+        # Load locations
         locations = {}
-        def load_json_file(path: str):
-            try:
-                with open(path, "r", encoding="utf-8") as hf:
-                    return json.load(hf)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Failed to parse JSON file {path}: {e}") from e
-            except Exception as e:
-                raise ValueError(f"Failed to read JSON file {path}: {e}") from e
+        locations_json = self.read_json(os.path.join(self.setup_dir, "locations.json"))
+        for loc in locations_json:
+            locations[loc["id"]] = Location(
+                id=loc["id"],
+                description=loc["description"],
+                connections=loc.get("connections", []),
+                features=loc.get("features", []),
+                items=loc.get("items", []),
+            )
 
-        for loc in load_json_file(os.path.join(self.setup_dir, "locations.json")):
-                locations[loc["id"]] = Location(
-                    id=loc["id"], name=loc["name"], description=loc["description"],
-                    connections=loc.get("connections", []),
-                    features=loc.get("features", []), items=loc.get("items", [])
-                )
-
+        # Load characters
         characters = {}
-        for char in load_json_file(os.path.join(self.setup_dir, "characters.json")):
-                char_type = CharacterType.PC if char.get("type") == "pc" else CharacterType.NPC
-                characters[char["id"]] = Character(
-                    id=char["id"], name=char["name"], type=char_type,
-                    class_name=char.get("role", "Commoner"),
-                    backstory=char.get("description", ""), goal=char.get("goal", ""),
-                    knowledge=char.get("knowledge", []),
-                    stats=CharacterStats(hp=20, max_hp=20, ac=10),
-                    location_id="market-square", inventory=char.get("inventory", [])
-                )
+        characters_json = self.read_json(os.path.join(self.setup_dir, "characters.json"))
+        for char in characters_json:
+            # Simple heuristic: elara-swift is PC, others are NPC unless specified
+            c_type = CharacterType.PC if "elara" in char["id"].lower() else CharacterType.NPC
+            # Simple heuristic for name: convert slug to Title Case
+            c_name = char.get("name") or char["id"].replace("-", " ").title()
 
+            characters[char["id"]] = Character(
+                id=char["id"],
+                name=c_name,
+                type=char.get("type", c_type),
+                location=char.get("location", "market-square"),
+                role=char.get("role", ""),
+                stats=CharacterStats(**char.get("stats", {})),
+                backstory=char.get("backstory", ""),
+                personality=char.get("personality", ""),
+                goal=char.get("goal", ""),
+                inventory=char.get("inventory", []),
+                knowledge=char.get("knowledge", []),
+                relationships=char.get("relationships", {}),
+            )
+
+        # Load Quests
         quests = {}
-        quests_path = os.path.join(self.setup_dir, "quests.json")
-        if os.path.exists(quests_path):
-            try:
-                for q in load_json_file(quests_path):
-                    quests[q["id"]] = Quest(**q)
-            except Exception as e:
-                # Use run_game output if available, otherwise print
-                import sys
-                run_game_module = sys.modules.get('__main__')
-                if run_game_module and hasattr(run_game_module, 'output'):
-                    try:
-                        OutputLevel = getattr(run_game_module, 'OutputLevel')
-                        run_game_module.output(f"⚠️ Failed to load quests: {e}", OutputLevel.DEBUG)
-                    except Exception:
-                        print(f"⚠️ Failed to load quests: {e}")
-                else:
-                    print(f"⚠️ Failed to load quests: {e}")
+        quests_json = self.read_json(os.path.join(self.setup_dir, "quests.json"))
+        for quest in quests_json:
+            quests[quest["id"]] = Quest(
+                id=quest["id"],
+                title=quest["title"],
+                description=quest["description"],
+                status=quest.get("status", "active"),
+                owner=quest.get("owner", ""),
+                steps=quest.get("steps", []),
+            )
 
-        return WorldState(locations=locations, characters=characters, quests=quests)
+        # Initial world state
+        world_state = WorldState(locations=locations, characters=characters, quests=quests)
+        return world_state
 
-    def load_state(self) -> WorldState:
+    def generate_state(self) -> WorldState:
         """Load saved state, or create fresh from setup if none exists."""
+        
+        # initial state
         if not os.path.exists(self.state_file):
-            # print("🔄 initializing world state...")
-            state = self.load_initial_setup()
+            print("🔄 initializing world state...")
+            state = self.generate_initial_setup()
             self.save_state(state)
             return state
-        try:
-            with open(self.state_file, "r", encoding="utf-8") as f:
-                return WorldState(**json.load(f))
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Saved state file is invalid JSON: {self.state_file}: {e}") from e
-        except Exception as e:
-            raise ValueError(f"Failed to load saved state from {self.state_file}: {e}") from e
+
+        # load saved state
+        world_state_json = self.read_json(self.state_file)
+
+
+
+        return WorldState(**world_state_json)
 
     def save_state(self, state: WorldState):
         """Save current world state to JSON."""
         with open(self.state_file, "w", encoding="utf-8") as f:
-            # print("saving world state...")
             f.write(state.model_dump_json(indent=2))

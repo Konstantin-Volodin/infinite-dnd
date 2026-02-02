@@ -1,0 +1,15 @@
+# 📖 Story Log
+
+*Generated: 2026-01-27 00:43*
+
+---
+
+*The market square thrummed with life — a symphony of clashing coins, bargaining cries, and the low hum of laughter from street performers. Cinnamon and smoke curled through the air, thick as memory, clinging to the backs of necks and the soles of boots. Above, the clock tower’s brass face ticked steadily, each chime a heartbeat in the pulse of the crowd. Lanterns glowed softly atop carts, casting amber pools of light that danced with the flicker of passing shadows. Elara moved through the throng, her steps light but purposeful, eyes darting — searching for a face, a scent, a whisper of urgency. Ronn stood near the spice stall, arms crossed like a shield, his gaze scanning the square with the wary eyes of one who’d seen too much. The air felt charged — not with fear, but with expectation. Something was about to shift, and the world was waiting to see what it would become.*
+
+*The market square thrummed with the chaotic energy of a thousand lives — the clatter of spices in wooden bins, the sharp tang of saffron and cinnamon, the low murmur of bargaining and gossip. Elara stood near the spice stalls, her gaze darting from face to face, her fingers brushing the edge of her cloak as if searching for a pulse beneath the noise. Around her, merchants hawked wares with practiced smiles, but their eyes flickered with something else — suspicion, curiosity, or just the usual market chatter. Ronn, the spice merchant, leaned against his stall with a knowing smirk, his eyes never leaving the crowd. He’d heard the whispers — the ones that said the dockmaster was the one who’d taken Kaelen. But he didn’t say it. Not yet. The silence between the chatter felt heavier than the spice dust, thick with unspoken dread.*
+
+*The market square pulsed with life — a symphony of clanging bells, bargaining voices, and the rhythmic clack of boots on cobblestones. Elara’s boots echoed as she moved through the crowd, her gaze sharp, scanning faces, stalls, and shadows. Above, the sky was bruised with the promise of rain, and the air hung thick with the scent of cinnamon, burnt sugar, and something deeper — the metallic tang of old blood or distant magic. A cart nearby, piled high with glowing, pulsing herbs, caught her eye — their luminescence shifting like veins beneath the skin. A merchant’s laughter rang out, distracted by a child’s toy, but Elara’s fingers tightened around her satchel. She didn’t know what to look for, but she knew she had to find it. Behind her, the dockmaster’s name was whispered in alleys — a name that slipped through the gaps between stalls, a name that made her blood run cold. She didn’t know why, but she had to find him. She had to find her brother.*
+
+*elara-swift travels to Market Square.*
+
+**elara-swift** to ronn: "*approaching the spice merchant with a firm stride, arms crossed, eyes sharp* Ronn, I need to know what happened. My brother, Kaelen, vanished near the river three weeks ago. Did you see anything? Did anyone near the dockmaster Alan know what he was doing that night?"

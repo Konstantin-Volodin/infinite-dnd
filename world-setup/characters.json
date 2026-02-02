@@ -1,47 +1,30 @@
 [
   {
-    "id": "elara",
-    "name": "Elara Swift",
-    "type": "pc",
+    "id": "elara-swift",
+    "location": "valley-bridge",
+
     "role": "former-guard",
-    "age": 29,
-    "description": "A former royal guard who left service after her brother disappeared. Quiet, observant, relentless.",
+    "stats": {"hp": 20, "max_hp": 20},
+    "backstory": "I was a royal guard once. I left when my brother disappeared - finding him matters more than any oath.",
+    "personality": "When I decide to act, I don't stop until it's done. I'd rather solve a problem than fight my way through it. Stray animals trust me - maybe because I know what it's like to be lost.",
     "goal": "Find my brother. He vanished near the river three weeks ago. Someone in this market knows something.",
-    "inventory": [
-      "guard-pendant",
-      "journal-page-3"
-    ],
-    "relationships": {
-      "ally": [
-        "merchant-ronn",
-        "kaelen-swift"
-      ]
-    },
-    "notes": "Prefers problem-solving over fighting. Has a soft spot for stray animals."
+    "inventory": ["guard-pendant"],
+    "knowledge": [],
+    "relationships": {"kaelen-swift": "brother" }
   },
   {
-    "id": "merchant-ronn",
-    "name": "Ronn the Spice-Merchant",
-    "type": "npc",
+    "id": "ronn-spice-merchant",
+    "stats": {"hp": 5, "max_hp": 5},
     "role": "merchant",
-    "age": 52,
-    "description": "Loud, cheerful, always has a lead on city gossip. Secretly funds a small rescue crew.",
-    "goal": "Keep an ear out for trouble. Help Elara if she asks but don't reveal the rescue crew unless necessary.",
+    "location": "market-square",
+    "backstory": "I've been selling spices in this market for thirty years. I know everyone, and everyone knows me. What they don't know is that I fund a small crew that rescues people from the Raiders.",
+    "personality": "I'm loud, I'm friendly, and I remember every face. Gossip flows through me like water - but the secrets that matter? Those I keep locked tight. My friends are family, and I protect family.",
+    "goal": "Keep my ears open for trouble. Help Elara find her brother if she asks - but the rescue crew stays secret unless there's no other choice.",
     "knowledge": [
-      "A group called the Marsh Raiders has been kidnapping travelers",
-      "Kaelen Swift was last seen heading toward the Old Spice Cellar"
+      "Kaelen Swift was last seen heading toward to meet the dockmaster Alan.",
+      "The dockmaster Alan has been acting suspiciously lately."
     ],
-    "inventory": [
-      "spice-bag",
-      "coin-purse"
-    ],
-    "relationships": {
-      "ally": [
-        "elara"
-      ],
-      "contacts": [
-        "dockmaster"
-      ]
-    }
+    "inventory": ["spice-bag","coin-purse"],
+    "relationships": {"alan-dockmaster": "contact" }
   }
 ]

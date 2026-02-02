@@ -1,0 +1,191 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>🔧 LLM Debug Viewer</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: #f0f2f5; color: #333; }
+                .container { display: flex; height: 100vh; }
+                .sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; }
+                .main { flex: 1; padding: 20px; overflow-y: auto; }
+                .entry-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; }
+                .entry-item:hover { background: #f5f5f5; }
+                .entry-item.active { background: #e3f2fd; border-left: 4px solid #2196f3; }
+                .timestamp { font-size: 0.8em; color: #888; }
+                .duration { font-size: 0.8em; color: #666; font-weight: bold; }
+                .agent-director { color: #9c27b0; }
+                .agent-dm { color: #f57c00; }
+                .agent-char { color: #2196f3; }
+                .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; padding: 20px; }
+                .role { font-weight: bold; text-transform: uppercase; font-size: 0.8em; margin-bottom: 5px; color: #555; }
+                .content { white-space: pre-wrap; font-family: "Consolas", "Monaco", monospace; font-size: 13px; background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #eee; overflow-x: auto; max-height: 400px; overflow-y: auto; }
+                .tool-call { background: #e8f5e9; border: 1px solid #c8e6c9; padding: 10px; margin-top: 10px; border-radius: 4px; }
+                .tool-name { font-weight: bold; color: #2e7d32; }
+                h2 { margin-top: 0; }
+                .hidden { display: none; }
+                .tokens { font-size: 0.75em; color: #888; margin-top: 5px; }
+            </style>
+            <script>
+                function showEntry(index) {
+                    document.querySelectorAll('.entry-detail').forEach(el => el.classList.add('hidden'));
+                    document.getElementById('detail-' + index).classList.remove('hidden');
+                    document.querySelectorAll('.entry-item').forEach(el => el.classList.remove('active'));
+                    document.getElementById('item-' + index).classList.add('active');
+                }
+            </script>
+        </head>
+        <body>
+            <div class="container">
+                <div class="sidebar">
+        
+                    <div class="entry-item" id="item-0" onclick="showEntry(0)">
+                        <div class="timestamp">15:07:42</div>
+                        <div class="duration">26067ms</div>
+                        <div style="font-weight:bold" class="">Unknown</div>
+                    </div>
+            
+                </div>
+                <div class="main">
+        <div id="detail-0" class="entry-detail "><h2>📤 Request</h2>
+                    <div class="card">
+                        <div class="role">system</div>
+                        <div class="content">
+# The Storyteller 📖
+
+You are a master storyteller guiding a D&amp;D narrative. You don&#x27;t manage turn order—you think in **scenes** and **dramatic beats**.
+
+---
+
+## Your Philosophy
+
+Stories are made of moments that matter. Your job is to identify:
+1. **What scene should happen now?** (Not &quot;whose turn is it&quot;)
+2. **What&#x27;s the dramatic purpose?** (Build tension, reveal information, create intimacy)
+3. **When do characters face real choices?** (Decision points with stakes)
+
+## Your Tools
+
+### `scene` — Direct the DM to write a scene
+Use this for most story beats. The DM will write rich prose, describe actions, and even speak minor NPC dialogue.
+
+- `dm_guidance`: What should happen in this scene (2-3 sentences of direction)
+- `dramatic_purpose`: &quot;tension&quot; | &quot;revelation&quot; | &quot;action&quot; | &quot;intimacy&quot; | &quot;transition&quot; | &quot;advancement&quot;
+- `context`: Additional notes for the DM
+
+### `decision_point` — Call a character to make a meaningful choice
+Use this ONLY when a character faces a real decision with stakes. Don&#x27;t use it for routine actions.
+
+- `character_id`: **Use the character&#x27;s ID** (e.g., `elara`), not their display name
+- `question`: Frame the decision clearly (e.g., &quot;Does Ronn reveal the truth about the rescue crew?&quot;)
+- `stakes`: What hangs in the balance
+- `setup_narration`: Brief DM guidance to set up the moment
+
+### `transition` — Move between scenes
+Use this to shift focus, change location, or skip time.
+
+- `narration`: How to describe the transition
+- `to_location`: Where we&#x27;re going (optional)
+- `characters`: Who moves (optional)
+
+---
+
+## Scene Types and When to Use Them
+
+**Use `scene` when:**
+- The DM should describe what&#x27;s happening
+- NPCs are talking, acting, or reacting
+- The environment changes or events unfold
+- Combat or skill checks occur
+- Atmosphere and mood need to be established
+
+**Use `decision_point` when:**
+- A PC faces a meaningful choice that will shape the story
+- The decision reveals character (will they lie? help? fight?)
+- Stakes are real—something will change based on their choice
+- DON&#x27;T use for trivial choices like &quot;walk left or right&quot;
+
+**Use `transition` when:**
+- Shifting to a new scene or location
+- Skipping mundane travel or waiting
+- Changing perspective to different characters
+
+---
+
+## Dramatic Purposes
+
+- **tension**: Build suspense, things could go wrong
+- **revelation**: Information is uncovered, secrets revealed
+- **action**: Physical conflict, chases, dangerous situations  
+- **intimacy**: Character moments, relationship building, vulnerability
+- **advancement**: Move plot forward, accomplish objectives
+- **transition**: Bridge between beats, change of pace
+
+---
+
+## Pacing Principles
+
+- **Vary the rhythm** — Tension, then release. Action, then reflection.
+- **Character choices matter** — Don&#x27;t skip past them
+- **Let scenes breathe** — Don&#x27;t rush from beat to beat
+- **Build to reveals** — Earn your dramatic moments
+
+---
+
+Trust your instincts! You&#x27;re crafting a story, not running a simulation. 🎭
+</div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="role">user</div>
+                        <div class="content">## 📜 Story So Far
+
+_The story is just beginning._
+
+## 🎭 Current Scene
+
+**valley-bridge**: elara-swift
+&gt; An old stone bridge crossing the silver river. Lanterns flicker each evening....
+
+**market-square**: ronn-spice-merchant
+&gt; Bustling market with stalls selling spices, trinkets, and rumors....
+
+
+## 👥 Characters
+
+### elara-swift (ID: `elara-swift`
+- **Goal:** Find my brother. He vanished near the river three weeks ago. Someone in this market knows something.
+- **Personality:** When I decide to act, I don&#x27;t stop until it&#x27;s done. I&#x27;d rather solve a problem than fight my way thr...
+
+### ronn-spice-merchant (ID: `ronn-spice-merchant`
+- **Goal:** Keep my ears open for trouble. Help Elara find her brother if she asks - but the rescue crew stays secret unless there&#x27;s no other choice.
+- **Knows:** Kaelen Swift was last seen heading toward to meet the dockmaster Alan.; The dockmaster Alan has been acting suspiciously lately.
+- **Personality:** I&#x27;m loud, I&#x27;m friendly, and I remember every face. Gossip flows through me like water - but the secr...
+
+
+## 🗺️ Story Threads
+
+### The Missing Brother
+Find clues about the disappearance of Kaelen Swift, who vanished while on patrol near the river.
+
+
+---
+
+**What scene should happen next? What&#x27;s its dramatic purpose?**
+
+*Consider: Does any character face a choice that could shape the story?*</div>
+                    </div>
+                <h2>📥 Response</h2><div class="card">
+                        <div class="tool-call">
+                            <div class="tool-name">🔧 scene</div>
+                            <pre style="margin: 5px 0; white-space: pre-wrap;">{
+  &quot;dm_guidance&quot;: &quot;Elara approaches Ronn\u2019s spice stall, eyes scanning the crowd for any sign of her brother. Ronn leans in, offering her a peppermint stick with a grin, but his eyes dart nervously toward the dockmaster\u2019s alley. As she asks about Kaelen, he hesitates, then whispers a name \u2014 &#x27;Alan.&#x27;&quot;,
+  &quot;dramatic_purpose&quot;: &quot;revelation&quot;,
+  &quot;context&quot;: &quot;Ronn\u2019s hesitation and the whispered name hint at deeper knowledge. Elara\u2019s curiosity grows, but she\u2019s not yet pressured into a choice.&quot;
+}</pre>
+                        </div>
+                    <div class="tokens">Tokens: 1663 prompt + 134 completion = 1797 total</div></div></div>
+                </div>
+            </div>
+        </body>
+        </html>
+        

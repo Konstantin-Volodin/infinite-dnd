@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📖 Story Log</title>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #eaeaea;
+            --text-dim: #a0a0a0;
+            --accent: #e94560;
+            --accent2: #0f3460;
+            --gold: #f4d03f;
+        }
+        
+        body {
+            font-family: 'Georgia', serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.8;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: var(--gold);
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            margin-bottom: 40px;
+        }
+        
+        .scene-header {
+            background: linear-gradient(135deg, var(--accent2), var(--card-bg));
+            padding: 20px 30px;
+            margin: 40px -20px;
+            border-left: 4px solid var(--accent);
+        }
+        
+        .scene-header h2 {
+            margin: 0;
+            color: var(--gold);
+            font-size: 1.5em;
+        }
+        
+        .event {
+            margin: 20px 0;
+            padding: 15px 20px;
+            border-radius: 8px;
+        }
+        
+        .dialogue {
+            background: var(--card-bg);
+            border-left: 3px solid var(--accent);
+        }
+        
+        .dialogue .speaker {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .dialogue .message {
+            font-size: 1.1em;
+            margin-top: 8px;
+            font-style: italic;
+        }
+        
+        .dialogue .message::before { content: '"'; color: var(--gold); }
+        .dialogue .message::after { content: '"'; color: var(--gold); }
+        
+        .narration {
+            background: transparent;
+            color: var(--text-dim);
+            font-style: italic;
+            padding: 10px 30px;
+            border-left: 2px solid var(--accent2);
+        }
+        
+        .action {
+            background: var(--accent2);
+            border-left: 3px solid var(--gold);
+        }
+        
+        .action .actor {
+            color: var(--gold);
+            font-weight: bold;
+        }
+        
+        .thought {
+            background: rgba(244, 208, 63, 0.1);
+            border: 1px dashed var(--gold);
+            font-size: 0.95em;
+        }
+        
+        .thought-label {
+            color: var(--gold);
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .thought-content {
+            color: var(--text-dim);
+            font-style: italic;
+        }
+        
+        .world-change {
+            text-align: center;
+            color: var(--gold);
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        .world-change::before { content: '✨ '; }
+        .world-change::after { content: ' ✨'; }
+        
+        .movement {
+            text-align: center;
+            color: var(--text-dim);
+            font-style: italic;
+            padding: 10px;
+        }
+        
+        .timestamp {
+            font-size: 0.7em;
+            color: var(--text-dim);
+            float: right;
+            opacity: 0.5;
+        }
+        
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        
+        .controls label {
+            cursor: pointer;
+        }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <label>
+            <input type="checkbox" id="showThoughts" checked onchange="toggleThoughts()">
+            Show character thoughts
+        </label>
+    </div>
+    
+    <div class="container">
+        <h1>📖 Story Log</h1>
+        <p class="subtitle">Generated: 2026-01-27 00:29</p>
+        
+        <div class="story">
+
+            <div class="event movement"><span class="timestamp">00:26</span>elara-swift travels to Market Square...</div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:26</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">*leaning toward Ronn with a playful grin, stirring a spice jar* Hey Ronn, you ever noticed how the spices in the north corner always seem to be the first to get moved? Like someone’s been watching the docks. Just curious, you know? Maybe you’ve got a clue about who’s been slipping in and out of the market at night.</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:26</span>
+                <div class="speaker">elara-swift</div>
+                <div class="message">*approach Ronn with a slight lean, eyes sharp but calm* Hey, Ronn. You’ve been acting a little... off. I know you’re not the kind of guy to keep secrets, but I’ve been looking for anyone who might know what happened to my brother. He vanished near the river three weeks ago — and I’m not giving up. You’re the only one I’ve seen who might know something. What do you know?</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:26</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">*leaning forward slightly, eyes sharp and steady* Ronn, I know you’ve been here long enough to notice things. My brother vanished near the river three weeks ago — I’m hoping you’ve seen something odd, anything that might help me find him.</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:27</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">*approach Ronn with a slight bow, hand resting on the guard-pendant* Ronn, I know you’ve been watching this market. I need to know — did you see anything near the river? The dockmaster... was he acting strange that night? My brother vanished right after he left the dock. I’m not asking for gossip — I’m asking for truth.</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:27</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">*approach Ronn, leaning in with a serious expression* Ronn, I need to know what you know. My brother, Kaelen — he vanished near the river three weeks ago. You’ve got a nose for trouble, right? Do you know anything about the dockmaster or what happened that night?</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:27</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">Ronn, I know you’ve been watching the docks. My brother vanished near the river three weeks ago — if you saw anything, I need to know. Don’t play it cool, tell me what you saw.</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:27</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">Ronn, I need to know what you know. My brother vanished near the river three weeks ago — did you see anything? Anyone? Anything at all that might help me find him?</div>
+            </div>
+
+            <div class="event action">
+                <span class="timestamp">00:28</span>
+                <span class="actor">elara-swift</span> approach ronn-spice-merchant quietly, keeping my posture low and my gaze steady
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:28</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">*leaning in slightly, voice low and calm* Ronn, I know you’ve been watching the docks. If you’ve seen anything — anything at all — that might help me find my brother, I’d be grateful. I’m not here to cause trouble, just to ask.</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:28</span>
+                <div class="speaker">elara-swift</div>
+                <div class="message">*approaching Ronn with a tilted head, leaning in slightly* Ronn, I need to know what you’ve seen about Alan the dockmaster. He was the only one who knew Kaelen was heading toward the river. If he’s acting off, he might be hiding something—or maybe he’s the key to finding my brother. What do you know?</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:28</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">Hello, Ronn. I’m looking for anyone who knows anything about the dockmaster or the river patrol. My brother vanished near the river three weeks ago — I need to know if you’ve heard anything. Maybe you’ve seen someone who knows what happened.</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:29</span>
+                <div class="speaker">elara-swift</div>
+                <div class="message">*approach Ronn, leaning in with a sharp, direct tone* You’re the one who knows the dockmaster, right? I need to know — did you see anything near the river that night? Anything that could’ve led to my brother disappearing?</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:29</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">*approach Ronn with a tilted head, eyes sharp and curious* You’ve been watching me, haven’t you? I know you’re not just selling spices. What’s going on with my brother? He vanished near the river three weeks ago — and I’m not letting go until I find out why.</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:29</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">Ronn, I heard you’ve got a tip about the dockmaster Alan. I’m looking for someone who knows what happened to my brother. If you know anything, I’d really appreciate it — no pressure, just honesty.</div>
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:29</span>
+                <div class="speaker">elara-swift → ronn-spice-merchant</div>
+                <div class="message">*leaning in, voice low and steady* Ronn, I’ve been looking for someone who knows what happened to my brother. You’ve got a tip about the dockmaster — is he the one who might know something? Or… have you seen anything odd near the river lately? I’m not here to be dramatic — just to get answers. Quietly. Please.</div>
+            </div>
+
+        </div>
+    </div>
+    
+    <script>
+        function toggleThoughts() {
+            const show = document.getElementById('showThoughts').checked;
+            document.querySelectorAll('[data-thought]').forEach(el => {
+                el.classList.toggle('hidden', !show);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,65 +1,21 @@
 [
   {
     "id": "valley-bridge",
-    "name": "Valley Bridge",
     "description": "An old stone bridge crossing the silver river. Lanterns flicker each evening.",
-    "tags": [
-      "travel",
-      "scenic",
-      "low-threat"
-    ],
-    "danger_level": 2,
-    "connections": [
-      "market-square",
-      "forest-trail"
-    ],
-    "features": [
-      "stone railing",
-      "flickering lanterns",
-      "river below",
-      "worn path stones"
-    ]
+    "connections": ["market-square", "forest-trail"],
+    "features": ["river below", "worn path stones"]
   },
   {
     "id": "market-square",
-    "name": "Market Square",
     "description": "Bustling market with stalls selling spices, trinkets, and rumors.",
-    "tags": [
-      "social",
-      "trade"
-    ],
-    "danger_level": 2,
-    "connections": [
-      "valley-bridge",
-      "guild-hall"
-    ],
-    "features": [
-      "notice board",
-      "fountain",
-      "merchant carts"
-    ],
-    "items": [
-      "strange coin"
-    ]
+    "connections": ["valley-bridge", "guild-hall"],
+    "features": ["notice board","fountain","street performers"],
+    "items": ["strange coin"]
   },
   {
     "id": "guild-hall",
-    "name": "Guild Hall",
-    "description": "A grand wooden building where merchants and artisans gather. The floorboards creak with secrets.",
-    "tags": [
-      "social",
-      "indoor"
-    ],
-    "danger_level": 1,
-    "connections": [
-      "market-square",
-      "spice-cellar"
-    ],
-    "features": [
-      "creaky floorboards",
-      "guild ledger",
-      "meeting table",
-      "fireplace"
-    ]
+    "description": "A grand wooden building where merchants and artisans gather.",
+    "connections": ["market-square", "trade-dock"],
+    "features": ["guild ledger","meeting table"]
   }
 ]

@@ -14,7 +14,7 @@ class TestSkillChecks(BaseTestCase):
                 "char-1": Character(
                     id="char-1", name="Rogue", type="pc", race="Elf", class_name="Rogue",
                     backstory="Expert lockpicker.", stats=CharacterStats(hp=10, max_hp=10, ac=12),
-                    location_id="loc-1"
+                    location="loc-1"
                 )
             },
             history=["Rogue is standing before a locked door."]
@@ -33,8 +33,8 @@ class TestSkillChecks(BaseTestCase):
         action = self.agent.decide_action(self.state, guidance=guidance)
         print(f"Character Action: {action}")
         
-        self.assertEqual(action["tool"], "attempt_skill")
-        self.assertIn("lock", action["action_description"].lower())
+        self.assertEqual(action["tool"], "skill_check")
+        self.assertIn("lock", action["description"].lower())
         # Allow various valid skill names
         self.assertIn(action["skill"], ["sleight_of_hand", "dexterity", "thieves_tools", "lockpicking"])
 
@@ -56,10 +56,10 @@ class TestSkillChecks(BaseTestCase):
         try:
             # Execute the tool directly
             result = engine.execute_tool(
-                "attempt_skill", 
+                "skill_check", 
                 character_id="char-1", 
                 skill="sleight_of_hand", 
-                action_description="I pick the lock."
+                description="I pick the lock."
             )
             
             print(f"Engine Result: {result}")

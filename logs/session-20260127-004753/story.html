@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📖 Story Log</title>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #eaeaea;
+            --text-dim: #a0a0a0;
+            --accent: #e94560;
+            --accent2: #0f3460;
+            --gold: #f4d03f;
+        }
+        
+        body {
+            font-family: 'Georgia', serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.8;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: var(--gold);
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            margin-bottom: 40px;
+        }
+        
+        .scene-header {
+            background: linear-gradient(135deg, var(--accent2), var(--card-bg));
+            padding: 20px 30px;
+            margin: 40px -20px;
+            border-left: 4px solid var(--accent);
+        }
+        
+        .scene-header h2 {
+            margin: 0;
+            color: var(--gold);
+            font-size: 1.5em;
+        }
+        
+        .event {
+            margin: 20px 0;
+            padding: 15px 20px;
+            border-radius: 8px;
+        }
+        
+        .dialogue {
+            background: var(--card-bg);
+            border-left: 3px solid var(--accent);
+        }
+        
+        .dialogue .speaker {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .dialogue .message {
+            font-size: 1.1em;
+            margin-top: 8px;
+            font-style: italic;
+        }
+        
+        .dialogue .message::before { content: '"'; color: var(--gold); }
+        .dialogue .message::after { content: '"'; color: var(--gold); }
+        
+        .narration {
+            background: transparent;
+            color: var(--text-dim);
+            font-style: italic;
+            padding: 10px 30px;
+            border-left: 2px solid var(--accent2);
+        }
+        
+        .action {
+            background: var(--accent2);
+            border-left: 3px solid var(--gold);
+        }
+        
+        .action .actor {
+            color: var(--gold);
+            font-weight: bold;
+        }
+        
+        .thought {
+            background: rgba(244, 208, 63, 0.1);
+            border: 1px dashed var(--gold);
+            font-size: 0.95em;
+        }
+        
+        .thought-label {
+            color: var(--gold);
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .thought-content {
+            color: var(--text-dim);
+            font-style: italic;
+        }
+        
+        .world-change {
+            text-align: center;
+            color: var(--gold);
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        .world-change::before { content: '✨ '; }
+        .world-change::after { content: ' ✨'; }
+        
+        .movement {
+            text-align: center;
+            color: var(--text-dim);
+            font-style: italic;
+            padding: 10px;
+        }
+        
+        .timestamp {
+            font-size: 0.7em;
+            color: var(--text-dim);
+            float: right;
+            opacity: 0.5;
+        }
+        
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        
+        .controls label {
+            cursor: pointer;
+        }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <label>
+            <input type="checkbox" id="showThoughts" checked onchange="toggleThoughts()">
+            Show character thoughts
+        </label>
+    </div>
+    
+    <div class="container">
+        <h1>📖 Story Log</h1>
+        <p class="subtitle">Generated: 2026-01-27 00:52</p>
+        
+        <div class="story">
+
+            <div class="event movement"><span class="timestamp">00:47</span>elara-swift travels to Market Square...</div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:48</span>
+                <div class="speaker">elara-swift</div>
+                <div class="message">*leaning toward Ronn with a sharp, questioning glance* Ronn, you’ve been acting odd lately. Do you know anything about the dockmaster Alan? Or have you seen anything strange around here that might point to what happened to my brother?</div>
+            </div>
+
+            <div class="event narration"><span class="timestamp">00:48</span>Elara Swift stepped into the shop with a sharp, questioning glance, her eyes narrowing as they locked onto Ronn’s. The brass bells above the door chimed once, echoing in the quiet space, and she didn’t flinch — only leaned forward, her posture taut with urgency. She didn’t wait for him to speak. Her voice cut through the air like a blade: “Ronn, you’ve been acting odd lately. Do you know anything about the dockmaster Alan? Or have you seen anything strange around here that might point to what happened to my brother?” Her fingers tapped the edge of her cloak, a nervous tic she’d learned to hide beneath the surface. Ronn’s hands, usually busy arranging candles, froze mid-motion, his face flushing as he looked away — not from her, but from the truth he’d been avoiding. The market square buzzed outside, but inside, the silence stretched like taut rope — ready to snap. Elara’s gaze never wavered, and the shop’s scent of cinnamon and old paper hung heavy, a silent witness to the tension brewing between them.</div>
+
+            <div class="event thought" data-thought="true">
+                <span class="timestamp">00:48</span>
+                <div class="thought-label">💭 ronn-spice-merchant's thoughts</div>
+                <div class="thought-content"><strong>Realizes:</strong> Elara Swift is searching for her brother Kaelen, who was last seen heading toward Alan, the dockmaster. Alan has been acting suspiciously. I must remain silent until I know if the rescue crew is ready to act.</div>
+            </div>
+
+            <div class="event action">
+                <span class="timestamp">00:48</span>
+                <span class="actor">ronn-spice-merchant</span> I glance at the notice board, then the strange coin, then back at Elara — all the while keeping my silence, letting the tension simmer. I don’t move, don’t speak — just watch, waiting for her to break the silence or for something else to happen.
+            </div>
+
+            <div class="event narration"><span class="timestamp">00:48</span>Ronn’s gaze drifted like a trapped bird — first to the ragged parchment pinned to the notice board, then to the strange, silver coin resting on the counter beside the spice jars. He didn’t touch it, didn’t flinch, but his eyes lingered as if it held a secret he was too afraid to name. When he looked back at Elara, his face was still, but his shoulders tensed — a silent tremor beneath the surface. He didn’t move, didn’t speak, just watched, letting the silence between them stretch like a noose. Outside, the market bustled with laughter and clattering carts, but inside the shop, the air felt thick, heavy with unspoken words. Elara’s fingers twitched near her cloak’s edge — a nervous tic she’d learned to hide beneath the surface — and Ronn knew: she was waiting. Waiting for him to break the silence, or for something else to happen. The coin glinted in the lamplight — a relic of the Marsh Raiders, perhaps, or a clue to Kaelen’s disappearance. Either way, it was a silent accusation. And Ronn? He was the only one who could answer it — if he dared.</div>
+
+            <div class="event narration"><span class="timestamp">00:49</span>The brass bells above the door chimed again — a soft, metallic chime that echoed through the quiet shop like a warning. Elara’s eyes never left Ronn’s, her gaze sharp as a blade, unyielding. The scent of cinnamon and old paper clung to the air, thick and familiar, but now it felt like a shroud — heavy with secrets and silence. Ronn’s fingers twitched over the counter, where the strange silver coin lay, catching the lamplight like a mocking eye. He didn’t move, didn’t speak — not yet. His shoulders remained tense, a silent tremor beneath the surface, as if the weight of his silence had become a burden he could no longer bear. Outside, the market square buzzed with laughter and clattering carts, but inside, the air felt thick, heavy with unspoken words. Elara’s fingers twitched near her cloak’s edge — a nervous tic she’d learned to hide beneath the surface — and Ronn knew: she was waiting. Waiting for him to break the silence, or for something else to happen. The coin glinted in the lamplight — a relic of the Marsh Raiders, perhaps, or a clue to Kaelen’s disappearance. Either way, it was a silent accusation. And Ronn? He was the only one who could answer it — if he dared.</div>
+
+            <div class="event thought" data-thought="true">
+                <span class="timestamp">00:49</span>
+                <div class="thought-label">💭 ronn-spice-merchant's thoughts</div>
+                <div class="thought-content"><strong>Feeling:</strong> Tense, but resolute. I’ve seen the coin, the parchment, Alan’s behavior — I know what’s at stake. But I’m not ready to act yet. I’ll wait for the right moment.<br><strong>Realizes:</strong> Elara Swift is searching for her brother Kaelen, who was last seen heading toward Alan, the dockmaster. Alan has been acting suspiciously. I must remain silent until I know if the rescue crew is ready to act.</div>
+            </div>
+
+            <div class="event narration"><span class="timestamp">00:49</span>The brass bells above the door chimed again — a soft, metallic chime that echoed through the quiet shop like a warning. Elara’s eyes never left Ronn’s, her gaze sharp as a blade, unyielding. The scent of cinnamon and old paper clung to the air, thick and familiar, but now it felt like a shroud — heavy with secrets and silence. Ronn’s fingers twitched over the counter, where the strange silver coin lay, catching the lamplight like a mocking eye. He didn’t move, didn’t speak — not yet. His shoulders remained tense, a silent tremor beneath the surface, as if the weight of his silence had become a burden he could no longer bear. Outside, the market square buzzed with laughter and clattering carts, but inside, the air felt thick, heavy with unspoken words. Elara’s fingers twitched near her cloak’s edge — a nervous tic she’d learned to hide beneath the surface — and Ronn knew: she was waiting. Waiting for him to break the silence, or for something else to happen. The coin glinted in the lamplight — a relic of the Marsh Raiders, perhaps, or a clue to Kaelen’s disappearance. Either way, it was a silent accusation. And Ronn? He was the only one who could answer it — if he dared.</div>
+
+            <div class="event narration"><span class="timestamp">00:49</span>The brass bells chimed once more — a sharp, metallic note that echoed through the shop like a warning. Elara’s gaze never left Ronn’s, her expression unreadable but her posture taut with urgency. She didn’t move, didn’t breathe — she waited, letting the silence stretch between them like a noose. Ronn’s fingers twitched over the counter, where the silver coin glinted under the lamplight, its surface worn smooth by time and mystery. He didn’t touch it — not yet. His shoulders remained tense, a silent tremor beneath the surface, as if the weight of his silence had become a burden he could no longer bear. Outside, the market square buzzed with laughter and clattering carts, but inside, the air felt thick, heavy with unspoken words. Elara’s fingers twitched near her cloak’s edge — a nervous tic she’d learned to hide beneath the surface — and Ronn knew: she was waiting. Waiting for him to break the silence, or for something else to happen. The coin glinted in the lamplight — a relic of the Marsh Raiders, perhaps, or a clue to Kaelen’s disappearance. Either way, it was a silent accusation. And Ronn? He was the only one who could answer it — if he dared.</div>
+
+            <div class="event thought" data-thought="true">
+                <span class="timestamp">00:50</span>
+                <div class="thought-label">💭 ronn-spice-merchant's thoughts</div>
+                <div class="thought-content"><strong>Feeling:</strong> Tense, uneasy, but resolute — I can’t keep pretending I don’t know anything.<br><strong>Goal:</strong> I must speak the truth — if it’s safe to do so. I have to decide whether to reveal what I know or keep it hidden until the rescue crew is ready.<br><strong>Realizes:</strong> Elara is searching for her brother Kaelen, who was last seen heading toward Alan, the dockmaster. Alan has been acting suspiciously. I must remain silent until I know if the rescue crew is ready to act.</div>
+            </div>
+
+            <div class="event action">
+                <span class="timestamp">00:50</span>
+                <span class="actor">ronn-spice-merchant</span> Examine the strange silver coin on the counter, looking for any hidden symbols or clues.
+            </div>
+
+            <div class="event dialogue">
+                <span class="timestamp">00:50</span>
+                <div class="speaker">ronn-spice-merchant → elara-swift</div>
+                <div class="message">*leaning forward, eyes locked on Elara with a mix of urgency and fear* I’ve been watching Alan. He’s been acting odd — too quiet, too sharp. He’s been avoiding the docks at night. And I’ve seen him talking to someone… someone who knows where Kaelen went. The coin? It’s from the Marsh Raiders — I don’t know how it got here, but it’s been calling me. And now… now I can’t keep pretending I don’t know anything. You want the truth? I’ll give it to you — but only if you promise not to run away. Because if we don’t act, Kaelen’s not coming back.</div>
+            </div>
+
+            <div class="event narration"><span class="timestamp">00:50</span>Ronn leaned forward, his hands gripping the counter as if anchoring himself against the tide of unspoken dread. His eyes locked onto Elara’s — sharp, unflinching, and heavy with the weight of what he’d been avoiding. The brass bells above the door chimed once more, a metallic echo that seemed to vibrate through the air like a warning. He didn’t speak at first, but his voice when it came was low, urgent, and threaded with fear — as if the words were tearing from his throat rather than forming there. &quot;I’ve been watching Alan,&quot; he began, his fingers trembling slightly as he shifted the coin aside with a flick of his wrist. &quot;He’s been acting odd — too quiet, too sharp. He’s been avoiding the docks at night. And I’ve seen him talking to someone… someone who knows where Kaelen went. The coin? It’s from the Marsh Raiders — I don’t know how it got here, but it’s been calling me. And now… now I can’t keep pretending I don’t know anything. You want the truth? I’ll give it to you — but only if you promise not to run away. Because if we don’t act, Kaelen’s not coming back.&quot;
+
+Elara’s breath hitched, her gaze never wavering. The scent of cinnamon and old paper clung to the air, thick and familiar, but now it felt like a shroud — heavy with secrets and silence. She didn’t move, didn’t speak — she simply waited, her fingers tapping the edge of her cloak, a nervous tic she’d learned to hide beneath the surface. The coin glinted in the lamplight — a relic of the Marsh Raiders, perhaps, or a clue to Kaelen’s disappearance. Either way, it was a silent accusation. And Ronn? He was the only one who could answer it — if he dared. The silence stretched between them, thick with unspoken words, the weight of their shared fear pressing down like a noose. Outside, the market square buzzed with laughter and clattering carts, but inside, the air felt heavy, heavy with the truth they were both desperate to find — and the danger of revealing it too late. Elara’s fingers twitched near her cloak’s edge — a nervous tic she’d learned to hide beneath the surface — and Ronn knew: she was waiting. Waiting for him to break the silence, or for something else to happen. The coin glinted in the lamplight — a relic of the Marsh Raiders, perhaps, or a clue to Kaelen’s disappearance. Either way, it was a silent accusation. And Ronn? He was the only one who could answer it — if he dared.</div>
+
+            <div class="event thought" data-thought="true">
+                <span class="timestamp">00:50</span>
+                <div class="thought-label">💭 elara-swift's thoughts</div>
+                <div class="thought-content"><strong>Realizes:</strong> Ronn has seen Alan acting odd and has seen him talking to someone who knows where Kaelen went. The strange silver coin is from the Marsh Raiders and is calling Ronn. He is willing to tell Elara the truth if she promises not to run away.</div>
+            </div>
+
+            <div class="event movement"><span class="timestamp">00:50</span>elara-swift travels to Valley Bridge...</div>
+
+            <div class="event thought" data-thought="true">
+                <span class="timestamp">00:50</span>
+                <div class="thought-label">💭 elara-swift's thoughts</div>
+                <div class="thought-content"><strong>Realizes:</strong> Ronn has confirmed Alan’s suspicious behavior and his connection to someone who knows Kaelen’s whereabouts. The silver coin is from the Marsh Raiders and is calling Ronn — a potential key to the mystery. Elara has not run away, and Ronn’s offer of truth is conditional — she must remain here to act on it.</div>
+            </div>
+
+            <div class="event action">
+                <span class="timestamp">00:50</span>
+                <span class="actor">elara-swift</span> examine the river below
+            </div>
+
+            <div class="event thought" data-thought="true">
+                <span class="timestamp">00:50</span>
+                <div class="thought-label">💭 elara-swift's thoughts</div>
+                <div class="thought-content"><strong>Realizes:</strong> The river below the bridge is a potential clue — it&#x27;s where Kaelen vanished. I need to investigate carefully, as it may hold traces or signs of his disappearance. I also need to stay alert for any suspicious activity or hidden items that might connect to Alan or the Marsh Raiders.</div>
+            </div>
+
+            <div class="event narration"><span class="timestamp">00:50</span>Elara Swift stood at the edge of the valley bridge, her boots crunching softly on the worn stone path that led down to the river below. The air hummed with the distant murmur of the water — a low, rhythmic thrumming that seemed to echo through the earth itself, as if the river remembered something lost. She crouched slightly, her fingers brushing the cool, moss-dappled stones, her breath shallow but steady. The river stretched before her, its surface fractured by ripples and reflections — not of the sky, but of something deeper, something unseen. She could hear the whisper of the wind through the willows, the faint scent of wet earth and moss clinging to her skin. The bridge was old, its wooden planks creaking with every step she took, as if the structure itself were holding its breath. She looked down — not at the water, but at the shadows it cast, where the current seemed to swirl with something darker, more dangerous. She knew the river had been where Kaelen vanished. And now, she was here — alone, silent, and desperate to find a clue. The river didn’t answer. But it was watching. And Elara? She was ready to listen.</div>
+
+        </div>
+    </div>
+    
+    <script>
+        function toggleThoughts() {
+            const show = document.getElementById('showThoughts').checked;
+            document.querySelectorAll('[data-thought]').forEach(el => {
+                el.classList.toggle('hidden', !show);
+            });
+        }
+    </script>
+</body>
+</html>
