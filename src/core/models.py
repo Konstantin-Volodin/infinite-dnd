@@ -28,6 +28,7 @@ class CharacterStats(BaseModel):
 
 class Location(BaseModel):
     id: str
+    name: str = ""
     description: str = ""
     connections: List[str] = []
     features: List[str] = []

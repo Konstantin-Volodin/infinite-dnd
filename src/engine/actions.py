@@ -259,6 +259,7 @@ class ActionExecutor:
 
         self.state.locations[location] = Location(
             id=location,
+            name=name,
             description=description,
             connections=unique_connections,
         )

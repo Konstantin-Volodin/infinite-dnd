@@ -358,18 +358,94 @@ Make your choice. Don't deliberate - DECIDE and ACT.
             self.output("   📝 story.md")
             self.output("   🔧 debug_viewer.html")
 
+        # Extract automated metrics
+        try:
+            from src.core.metrics import extract_session_metrics
+            
+            self.output("\n📈 Extracting automated metrics...")
+            
+            # Load world state for metrics extraction
+            import json
+            world_state_dict = None
+            world_state_path = os.path.join(os.path.dirname(self.session_dir), "..", "world-state", "world_state.json")
+            if os.path.exists(world_state_path):
+                with open(world_state_path, 'r', encoding='utf-8') as f:
+                    world_state_dict = json.load(f)
+            
+            metrics = extract_session_metrics(
+                self.llm_log_path, 
+                self.session_dir,
+                world_state_dict
+            )
+            
+            # Save automated metrics
+            metrics_path = os.path.join(self.session_dir, "session_metrics.json")
+            with open(metrics_path, "w", encoding="utf-8") as f:
+                json.dump(metrics.to_dict(), f, indent=2, ensure_ascii=False)
+            self.output(f"   📊 session_metrics.json")
+            
+            # Convert metrics to dict for reviewer
+            automated_metrics_dict = {
+                'narrative_coherence': {
+                    'actor_usage_distribution': metrics.narrative_coherence.actor_usage_distribution,
+                    'action_type_distribution': metrics.narrative_coherence.action_type_distribution,
+                    'consecutive_narration_repetitions': metrics.narrative_coherence.consecutive_narration_repetitions,
+                    'actor_usage_entropy': metrics.narrative_coherence.actor_usage_entropy,
+                },
+                'dramatic_pacing': {
+                    'total_turns': metrics.dramatic_pacing.total_turns,
+                    'scene_type_distribution': metrics.dramatic_pacing.scene_type_distribution,
+                    'dramatic_purpose_distribution': metrics.dramatic_pacing.dramatic_purpose_distribution,
+                    'location_changes': metrics.dramatic_pacing.location_changes,
+                    'story_beats_completed': metrics.dramatic_pacing.story_beats_completed,
+                },
+                'character_authenticity': {
+                    'character_action_counts': metrics.character_authenticity.character_action_counts,
+                    'character_tool_usage': metrics.character_authenticity.character_tool_usage,
+                    'dialogue_to_action_ratio': metrics.character_authenticity.dialogue_to_action_ratio,
+                    'unique_speakers': metrics.character_authenticity.unique_speakers,
+                },
+                'world_responsiveness': {
+                    'dm_modify_calls': metrics.world_responsiveness.dm_modify_calls,
+                    'world_state_changes': metrics.world_responsiveness.world_state_changes,
+                    'quest_progress_events': metrics.world_responsiveness.quest_progress_events,
+                },
+                'prose_quality': {
+                    'avg_narration_length': metrics.prose_quality.avg_narration_length,
+                    'total_words': metrics.prose_quality.total_words,
+                    'sensory_word_count': metrics.prose_quality.sensory_word_count,
+                    'repetitive_phrase_count': metrics.prose_quality.repetitive_phrase_count,
+                    'most_common_phrases': metrics.prose_quality.most_common_phrases,
+                },
+            }
+            
+        except Exception as e:
+            self.output(f"   ⚠️  Could not extract metrics: {e}")
+            automated_metrics_dict = None
+
         try:
             if self.reviewer:
-                self.output("\n📝 Generating session review...")
-                review = self.reviewer.summarize_session(self.engine.state)
+                self.output("\n📝 Generating LLM-scored review...")
+                review = self.reviewer.summarize_session(self.engine.state, automated_metrics_dict)
                 review_path = os.path.join(self.session_dir, "review.json")
                 with open(review_path, "w", encoding="utf-8") as f:
                     import json
 
                     f.write(json.dumps(review, indent=2, ensure_ascii=False))
-                self.output(f"   Saved to: {review_path}")
+                self.output(f"   ✅ review.json")
+                
+                # Print summary
+                overall = review.get('overall_score', 'N/A')
+                self.output(f"\n   Overall Score: {overall}/10")
+                self.output(f"   Narrative Coherence: {review.get('narrative_coherence', {}).get('score', 'N/A')}/10")
+                self.output(f"   Dramatic Pacing: {review.get('dramatic_pacing', {}).get('score', 'N/A')}/10")
+                self.output(f"   Character Authenticity: {review.get('character_authenticity', {}).get('score', 'N/A')}/10")
+                self.output(f"   World Responsiveness: {review.get('world_responsiveness', {}).get('score', 'N/A')}/10")
+                self.output(f"   Prose Quality: {review.get('prose_quality', {}).get('score', 'N/A')}/10")
         except Exception as e:
-            self.output(f"   Could not generate review: {e}")
+            import traceback
+            self.output(f"   ⚠️  Could not generate review: {e}")
+            self.output(traceback.format_exc())
 
         # mark finalized so callers can safely check
         self._finalized = True

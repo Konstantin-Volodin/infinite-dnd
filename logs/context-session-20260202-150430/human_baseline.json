@@ -1,0 +1,53 @@
+{
+  "session_id": "session-20260202-150430",
+  "reviewer": "YOUR_NAME",
+  "review_date": "2026-02-02",
+  
+  "scores": {
+    "narrative_coherence": {
+      "score": null,
+      "notes": "",
+      "contradictions_found": [],
+      "context_alignment_issues": []
+    },
+    "dramatic_pacing": {
+      "score": null,
+      "notes": "",
+      "felt_rushed": false,
+      "felt_draggy": false,
+      "tension_curve_description": "",
+      "quest_progress_observations": ""
+    },
+    "character_authenticity": {
+      "score": null,
+      "notes": "",
+      "voice_drift_examples": [],
+      "characters_underused": [],
+      "characters_overused": []
+    },
+    "world_responsiveness": {
+      "score": null,
+      "notes": "",
+      "consequences_felt_earned": true,
+      "missed_reaction_opportunities": []
+    },
+    "prose_quality": {
+      "score": null,
+      "notes": "",
+      "show_dont_tell_violations": [],
+      "standout_passages": [],
+      "repetitive_phrases": []
+    }
+  },
+  
+  "overall_score": null,
+  "overall_notes": "",
+  
+  "scoring_rubric_reference": {
+    "1-2": "Broken - fundamental failures",
+    "3-4": "Poor - significant issues detract from experience",
+    "5-6": "Acceptable - functional but unremarkable", 
+    "7-8": "Good - engaging with minor issues",
+    "9-10": "Excellent - compelling, immersive, polished"
+  }
+}

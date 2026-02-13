@@ -40,6 +40,7 @@ class StateManager:
         for loc in locations_json:
             locations[loc["id"]] = Location(
                 id=loc["id"],
+                name=loc.get("name") or loc["id"].replace("-", " ").title(),
                 description=loc["description"],
                 connections=loc.get("connections", []),
                 features=loc.get("features", []),
