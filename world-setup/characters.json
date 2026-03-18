@@ -1,0 +1,31 @@
+[
+  {
+    "id": "elara-swift",
+    "type": "pc",
+    "location": "valley-bridge",
+
+    "role": "former-guard",
+    "stats": {"hp": 20, "max_hp": 20},
+    "backstory": "I was a royal guard once. I left when my brother disappeared - finding him matters more than any oath.",
+    "personality": "When I decide to act, I don't stop until it's done. I'd rather solve a problem than fight my way through it. Stray animals trust me - maybe because I know what it's like to be lost.",
+    "goal": "Find my brother. He vanished near the river three weeks ago. Someone in this market knows something.",
+    "inventory": ["guard-pendant"],
+    "knowledge": [],
+    "relationships": {"kaelen-swift": "brother" }
+  },
+  {
+    "id": "ronn-spice-merchant",
+    "stats": {"hp": 5, "max_hp": 5},
+    "role": "merchant",
+    "location": "market-square",
+    "backstory": "I've been selling spices in this market for thirty years. I know everyone, and everyone knows me. What they don't know is that I fund a small crew that rescues people from the Raiders.",
+    "personality": "I'm loud, I'm friendly, and I remember every face. Gossip flows through me like water - but the secrets that matter? Those I keep locked tight. My friends are family, and I protect family.",
+    "goal": "Keep my ears open for trouble. Help Elara find her brother if she asks - but the rescue crew stays secret unless there's no other choice.",
+    "knowledge": [
+      "Kaelen Swift was last seen heading toward to meet the dockmaster Alan.",
+      "The dockmaster Alan has been acting suspiciously lately."
+    ],
+    "inventory": ["spice-bag","coin-purse"],
+    "relationships": {"alan-dockmaster": "contact" }
+  }
+]

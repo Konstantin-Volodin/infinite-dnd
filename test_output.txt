@@ -1,0 +1,12 @@
+============================= test session starts =============================
+platform win32 -- Python 3.9.13, pytest-8.4.2, pluggy-1.6.0 -- D:\Documents\Projects\Personal\Personal-CheckingOutLLMs\dnd-ai-dm\infinite-dnd\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\Documents\Projects\Personal\Personal-CheckingOutLLMs\dnd-ai-dm\infinite-dnd
+configfile: pyproject.toml
+plugins: anyio-4.11.0, asyncio-1.2.0
+asyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_engine.py::test_slugify PASSED                                [100%]
+
+============================== 1 passed in 0.39s ==============================
