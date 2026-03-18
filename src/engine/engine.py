@@ -1,12 +1,10 @@
 """Main game engine - coordinates action execution and state management."""
 
-import os
-import re
 import warnings
-from datetime import datetime
 from typing import Any, Dict
 from ..core.state import StateManager
 from ..core.models import WorldState
+from ..core.utils import slugify
 from .actions import ActionExecutor
 
 
@@ -31,16 +29,6 @@ class Engine:
     # INTERNAL HELPERS
     # =========================================================================
 
-    def _slugify(self, text: str) -> str:
-        """Converts a string to a URL-friendly slug."""
-        if not text: return ""
-        s = text.strip().lower().replace("_", " ")
-        s = re.sub(r"[^a-z0-9\s\-]", "", s)
-        s = re.sub(r"\s+", "-", s)
-        s = re.sub(r"-+", "-", s)
-        s = s.strip("-")
-        return s
-
     def save_state(self):
         """Save the current game state."""
         self.state_manager.save_state(self.state)
@@ -59,7 +47,7 @@ class Engine:
         if raw_location in locations: return raw_location
 
         # Slug match
-        normalized = self._slugify(raw_location)
+        normalized = slugify(raw_location)
         if normalized in locations: return normalized
 
         warnings.warn(f"Could not resolve location '{raw_location}' to a known ID.")
@@ -118,58 +106,21 @@ class Engine:
         if resolved_anchor:
             args["anchor_location"] = resolved_anchor
 
-        # Handle a few normalized special cases using a small dispatch map
-        def _narrate(a):
-            return method(a.get("content") or a.get("narration") or a.get("text") or "")
+        # Normalize narrate content aliases
+        if tool_name == "narrate":
+            content = args.get("content") or args.get("narration") or args.get("text") or ""
+            return method(content)
 
-        def _create_location(a):
-            # Prioritize 'location' (resolved ID), create from name if missing
-            loc_id = a.get("location") or (
-                a.get("name", "").lower().replace(" ", "-") if a.get("name") else ""
-            )
-            conn = a.get("connected_to")
+        # Normalize connected_to for create_location
+        if tool_name == "create_location":
+            conn = args.get("connected_to")
             if isinstance(conn, str):
                 conn = [conn]
-            conn_list = [self.resolve_location_id(c) for c in (conn or []) if c]
-            
-            return method(
-                location=loc_id, 
-                name=a.get("name", ""), 
-                description=a.get("description", ""), 
-                connected_to=conn_list, 
-                anchor_location=a.get("anchor_location")
-            )
+            args["connected_to"] = [self.resolve_location_id(c) for c in (conn or []) if c]
+            if not args.get("location") and args.get("name"):
+                args["location"] = args["name"].lower().replace(" ", "-")
 
-        def _create_item(a):
-            return method(a.get("item_name", ""), a.get("location", ""))
-
-        def _spawn_npc(a):
-            return method(
-                npc_id=a.get("npc_id", ""), 
-                name=a.get("name", ""), 
-                role=a.get("role", ""), 
-                location=a.get("location", ""), 
-                description=a.get("description", ""), 
-                goal=a.get("goal", "")
-            )
-
-        def _remove_npc(a):
-            return method(a.get("npc_id", ""), a.get("reason", ""))
-
-        special = {
-            "narrate": _narrate,
-            "create_location": _create_location,
-            "create_item": _create_item,
-            "spawn_npc": _spawn_npc,
-            "remove_npc": _remove_npc,
-        }
-
-        if tool_name in special:
-            return special[tool_name](args)
-
-        # Generic fallback for any other tool (like the new character tools)
-        # We pass all kwargs as arguments to the method, but filter out 'tool' keys
-        # This assumes the method signature matches the kwargs provided
+        # Generic dispatch: pass all kwargs to the method, filtering out 'tool' keys
         try:
             clean_args = {
                 k: v for k, v in args.items() if k not in ["tool", "tool_name"]

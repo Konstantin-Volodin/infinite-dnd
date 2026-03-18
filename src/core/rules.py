@@ -37,8 +37,9 @@ def get_skill_modifier(character, skill_name: str) -> int:
     skill = skill_name.lower().replace(" ", "_")
     attribute = SKILL_MAP.get(skill, "dexterity")  # Default to dex if unknown
 
-    # Get attribute score
-    attr_score = getattr(character.stats.attributes, attribute, 10)
+    # Get attribute score (default 10 when no attributes exist)
+    attrs = getattr(character.stats, "attributes", None)
+    attr_score = getattr(attrs, attribute, 10) if attrs else 10
     mod = get_modifier(attr_score)
 
     # Add proficiency bonus if applicable (simplified: level/4 + 2)

@@ -82,6 +82,13 @@ class StoryExtractor:
         if name in ["select_next_actor", "update_narrative", "direct"]:
             return None
 
+        # If this is a character tool call from a casting-style agent,
+        # prefer the explicit character_id over the generic agent label.
+        if name in ["act", "speak", "move", "think"]:
+            char_id = args.get("character_id")
+            if isinstance(char_id, str) and char_id.strip():
+                agent = char_id.strip()
+
         event = {"timestamp": ts, "agent": agent, "action": name, "args": args}
 
         # Categorize event type

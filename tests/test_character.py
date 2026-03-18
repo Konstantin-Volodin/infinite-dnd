@@ -1,86 +1,65 @@
-"""
-Test Character Agent - Verify roleplay and decision making.
-"""
+"""Test Character Agent casting behavior."""
+
 import sys
 import os
 import unittest
-from unittest.mock import MagicMock
 
-# Add src to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from src.core.models import WorldState, Character, CharacterStats, Location, NarrativeState
+from src.core.models import WorldState, Character, CharacterStats, Location, CharacterType
 from src.agents.character import CharacterAgent
-from tests.base_test import BaseTestCase
 
-class TestCharacterAgent(BaseTestCase):
-    
+
+class TestCharacterAgent(unittest.TestCase):
     def setUp(self):
-        # Create a basic world state
         self.state = WorldState(
-            narrative=NarrativeState(scene_type="social", tension="low"),
             locations={
-                "loc-1": Location(id="loc-1", name="Tavern", description="A rowdy tavern.")
+                "loc-1": Location(id="loc-1", name="Tavern", description="A rowdy tavern."),
             },
             characters={
                 "char-1": Character(
-                    id="char-1", name="Hero", type="pc", race="Human", class_name="Fighter",
-                    backstory="A brave hero looking for adventure.", stats=CharacterStats(hp=10, max_hp=10, ac=10),
-                    location="loc-1", inventory=["sword"]
+                    id="char-1",
+                    name="Hero",
+                    type=CharacterType.PC,
+                    role="fighter",
+                    backstory="A brave hero looking for adventure.",
+                    stats=CharacterStats(hp=10, max_hp=10),
+                    location="loc-1",
+                    inventory=["sword"],
                 ),
                 "char-2": Character(
-                    id="char-2", name="Villain", type="npc", race="Orc", class_name="Warrior",
-                    backstory="A mean orc who hates heroes.", stats=CharacterStats(hp=10, max_hp=10, ac=10),
-                    location="loc-1", inventory=["axe"]
-                )
+                    id="char-2",
+                    name="Villain",
+                    type=CharacterType.NPC,
+                    role="warrior",
+                    backstory="A mean rival.",
+                    stats=CharacterStats(hp=10, max_hp=10),
+                    location="loc-1",
+                    inventory=["axe"],
+                ),
             },
-            history=[
-                "Hero entered the Tavern."
-            ]
+            history=["Hero entered the Tavern."],
         )
-        self.agent = CharacterAgent("char-1")
+        self.agent = CharacterAgent()
 
-    def test_social_response(self):
-        """Test if character responds to dialogue."""
-        print("\n--- Testing Character Social Response ---")
-        
-        # Simulate someone talking to the character
-        self.state.history.append('Villain says: "Get out of my tavern, weakling!"')
-        
-        # Provide situation context but NO direct command - Hero must decide
-        guidance = "SITUATION: The Villain has just insulted the Hero in a crowded tavern."
-        
-        action = self.agent.decide_action(self.state, guidance=guidance)
-        print(f"Character Action: {action}")
-        
-        self.assertEqual(action["tool"], "dialogue")
-        dialogue = action.get("message")
-        self.assertIsNotNone(dialogue)
-        # Just check that they said something substantial
-        self.assertTrue(len(dialogue) > 10, "Character should respond with a sentence.")
+    def test_decide_and_act_uses_dm_prompt_when_valid(self):
+        self.agent.llm.chat_with_tools = lambda system, user, tools, require_tool=False: {
+            "type": "tool_calls",
+            "calls": [{"tool": "speak", "arguments": {"message": "I answer at once.", "character_id": "char-1"}}],
+        }
+        action = self.agent.decide_and_act(self.state, dm_prompt="char-1")
+        self.assertEqual(action.get("character_id"), "char-1")
+        self.assertEqual(action.get("tool"), "speak")
 
-    def test_combat_action(self):
-        """Test if character attacks in combat."""
-        print("\n--- Testing Character Combat Action ---")
-        
-        # Set up combat via history context
-        self.state.history.append("Combat has started!")
-        self.state.history.append("Villain attacks Hero!")
-        
-        # Provide situation context
-        guidance = "SITUATION: Combat has started. The Villain is attacking you. Fight back!"
-        
-        action = self.agent.decide_action(self.state, guidance=guidance)
-        print(f"Character Action: {action}")
-        
-        # Should use act (which covers combat actions)
-        self.assertEqual(action["tool"], "act")
+    def test_decide_and_act_invalid_prompt_falls_back_softly(self):
+        self.agent.llm.chat_with_tools = lambda system, user, tools, require_tool=False: {
+            "type": "tool_calls",
+            "calls": [{"tool": "think", "arguments": {"knowledge": "I observe the room."}}],
+        }
+        action = self.agent.decide_and_act(self.state, dm_prompt="missing-character")
+        self.assertIn(action.get("character_id"), self.state.characters)
+        self.assertEqual(action.get("tool"), "think")
 
-    def test_context_building(self):
-        """Test character context building."""
-        print("\n--- Testing Character Context Building ---")
-        
-        
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

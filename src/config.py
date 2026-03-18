@@ -7,7 +7,6 @@ class Config:
     # Game Settings
     RESET_WORLD = os.getenv("GAME_RESET_WORLD", "true").lower() == "true"
     MAX_SCENES = int(os.getenv("GAME_MAX_SCENES", "25"))
-    GAME_MODE = os.getenv("GAME_MODE", "storyteller")  # options: "storyteller", "classic"
     
     # Logging
     LOG_LEVEL = os.getenv("GAME_LOG_LEVEL", "INFO").upper()
@@ -24,8 +23,3 @@ class Config:
         "state_file": "world-state/world_state.json",
         "logs_dir": "logs"
     }
-
-# Backwards compatibility if needed, though we should prefer using Config.value
-game_config = {
-    "setup_dir": Config.PATHS["setup_dir"]
-}

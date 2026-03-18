@@ -1,96 +1,49 @@
-"""
-Character Agent - Controls player and NPC characters.
-"""
+"""Character Agent - selects who acts and executes that character's turn."""
+from __future__ import annotations
 
 from typing import Dict, Any
 from .base import BaseAgent
-from ..core.models import WorldState
-from ..prompts import build_character_system_prompt, build_character_context
+from ..core.models import WorldState, CharacterType
+from ..core.utils import slugify
+from ..prompts import (
+    build_character_system_prompt,
+    build_character_context,
+    build_casting_system_prompt,
+    build_casting_context,
+)
 from ..tools import get_character_tools
 
 
 class CharacterAgent(BaseAgent):
-    """Agent that controls a single character (PC or NPC)."""
+    """Casting-style character agent for ping-pong turns."""
 
-    def __init__(self, character_id: str):
+    def __init__(self, character_id: str | None = None):
         super().__init__()
         self.character_id = character_id
 
-    def decide_action(self, state: WorldState, guidance: str = "") -> Dict[str, Any]:
-        """Decide what action this character should take.
+    def _default_character_id(self, state: WorldState) -> str:
+        if self.character_id and self.character_id in state.characters:
+            return self.character_id
+        pc = next((cid for cid, c in state.characters.items() if c.type == CharacterType.PC), None)
+        if pc:
+            return pc
+        return next(iter(state.characters.keys()), "")
 
-        Args:
-            guidance: Optional suggestion from the director about what to do.
-        """
-        char = state.characters.get(self.character_id)
-        if not char:
-            return {"tool": "think", "reason": "Character not found"}
+    def _active_location(self, state: WorldState, preferred_character_id: str | None = None) -> str | None:
+        if preferred_character_id and preferred_character_id in state.characters:
+            return state.characters[preferred_character_id].location
 
-        context = build_character_context(char, state)
-        if guidance:
-            context = f"{guidance}\n\n{context}"
+        default_id = self._default_character_id(state)
+        if default_id and default_id in state.characters:
+            return state.characters[default_id].location
+        return None
 
-            action = self._decide(
-            system_prompt=build_character_system_prompt(char)
-            + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
-            context=context,
-            tools=get_character_tools(),
-            fallback_tool="think",
-            require_tool=False,  # Allow natural prose introspection sometimes
-        )
+    def _normalize_targets(self, state: WorldState, action: Dict[str, Any]) -> None:
+        if "target" in action and isinstance(action["target"], str):
+            normalized_t = action["target"].replace("char.id-", "")
+            if normalized_t in state.characters:
+                action["target"] = state.characters[normalized_t].id
 
-        # Ensure character_id is attached
-        if "character_id" not in action:
-            action["character_id"] = self.character_id
-
-        # Precompute local references
-        loc = state.locations.get(char.location)
-
-        # Validate basic target coherence and re-request action if invalid (simple fix)
-        def _is_valid_action(a: Dict[str, Any]) -> bool:
-            tool = a.get("tool")
-            if tool == "move":
-                # require destination be a connected location or existing loc name
-                dest = a.get("location")
-                if dest:
-                    # Prevent moving to current location
-                    if dest == char.location or (loc and dest == loc.id):
-                        return False
-
-                    found = any(
-                        dest.lower() in lid.lower() or dest.lower() in loc.id.lower()
-                        for lid, loc in state.locations.items()
-                    )
-                    if not found:
-                        return False
-            return True
-
-        # If initial action invalid, re-run once with clarified guidance
-        if not _is_valid_action(action):
-            new_guidance = (
-                guidance
-                + "\n\nNOTE: Your previous action targeted something invalid. You cannot move to your current location. Use 'move' to go to CONNECTED locations."
-            )
-            action = self._decide(
-                system_prompt=build_character_system_prompt(char)
-                + "\n\nYou can use many tools simultaneously and should output all tool calls in 1 response.",
-                context=new_guidance + "\n\n" + context,
-                tools=get_character_tools(),
-                fallback_tool="think",
-            )
-            if "character_id" not in action:
-                action["character_id"] = self.character_id
-
-        # Normalize target references: if an id was returned for a target, map to name for test expectations
-        if "target" in action:
-            t = action["target"]
-            if isinstance(t, str):
-                # Support returned ids like 'char.id-char-1' or plain 'char-1'
-                normalized_t = t.replace("char.id-", "")
-                if normalized_t in state.characters:
-                    action["target"] = state.characters[normalized_t].id
-
-        # Normalize all_calls target fields too
         if "all_calls" in action:
             for call in action["all_calls"]:
                 args = call.get("arguments", {})
@@ -99,4 +52,85 @@ class CharacterAgent(BaseAgent):
                     if normalized_args_t in state.characters:
                         args["target"] = state.characters[normalized_args_t].id
 
+    def _canonical_character_id(self, state: WorldState, raw_id: str | None) -> str | None:
+        if not raw_id or not isinstance(raw_id, str):
+            return raw_id
+        if raw_id in state.characters:
+            return raw_id
+
+        lowered = raw_id.lower()
+        slugged = slugify(raw_id)
+        for cid in state.characters.keys():
+            if cid.lower() == lowered or slugify(cid) == slugged:
+                return cid
+        return raw_id
+
+    def decide_and_act(
+        self,
+        state: WorldState,
+        dm_prompt: str | None = None,
+    ) -> Dict[str, Any]:
+        """Pick which character acts and return their tool call payload.
+
+        Soft-hint behavior:
+        - If `dm_prompt` is a valid character id, that character is used.
+        - Otherwise fallback to casting across current scope.
+        """
+        if not state.characters:
+            return {"tool": "think", "character_id": "", "reason": "No characters"}
+
+        hinted_id = dm_prompt if dm_prompt in state.characters else None
+
+        if hinted_id:
+            char = state.characters[hinted_id]
+            context = build_character_context(char, state)
+            action = self._decide(
+                system_prompt=build_character_system_prompt(char)
+                + "\n\nAlways include `character_id` with your tool call.",
+                context=context,
+                tools=get_character_tools(),
+                fallback_tool="think",
+                fallback_args={"character_id": hinted_id},
+                require_tool=False,
+            )
+            action["character_id"] = action.get("character_id") or hinted_id
+        else:
+            scoped_location = self._active_location(state)
+            action = self._decide(
+                system_prompt=build_casting_system_prompt(),
+                context=build_casting_context(state, location_id=scoped_location),
+                tools=get_character_tools(),
+                fallback_tool="think",
+                fallback_args={"character_id": self._default_character_id(state)},
+                require_tool=True,
+            )
+            if not action.get("character_id") or action["character_id"] not in state.characters:
+                action["character_id"] = self._default_character_id(state)
+
+        action["character_id"] = self._canonical_character_id(state, action.get("character_id"))
+        if "all_calls" in action:
+            for call in action["all_calls"]:
+                args = call.get("arguments", {})
+                if "character_id" in args:
+                    args["character_id"] = self._canonical_character_id(state, args.get("character_id"))
+
+        char_id = action.get("character_id")
+        char = state.characters.get(char_id)
+        if not char:
+            fallback_id = self._default_character_id(state)
+            action["character_id"] = fallback_id
+            char = state.characters.get(fallback_id)
+
+        loc = state.locations.get(char.location) if char else None
+        if action.get("tool") == "move":
+            dest = action.get("location")
+            if isinstance(dest, str) and char:
+                if dest == char.location or (loc and dest == loc.id):
+                    action = {
+                        "tool": "think",
+                        "character_id": char.id,
+                        "knowledge": f"I considered moving to {dest}, but I'm already here.",
+                    }
+
+        self._normalize_targets(state, action)
         return action

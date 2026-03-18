@@ -10,9 +10,6 @@ from .models import (
     CharacterStats,
     Quest,
 )
-from ..config import game_config
-
-
 class StateManager:
     """Handles the world state."""
 
@@ -51,8 +48,7 @@ class StateManager:
         characters = {}
         characters_json = self.read_json(os.path.join(self.setup_dir, "characters.json"))
         for char in characters_json:
-            # Simple heuristic: elara-swift is PC, others are NPC unless specified
-            c_type = CharacterType.PC if "elara" in char["id"].lower() else CharacterType.NPC
+            c_type = CharacterType(char["type"]) if "type" in char else CharacterType.NPC
             # Simple heuristic for name: convert slug to Title Case
             c_name = char.get("name") or char["id"].replace("-", " ").title()
 

@@ -1,9 +1,5 @@
-"""
-DM Agent Prompts
-
-The Dungeon Master brings the world to life — describing scenes, voicing NPCs,
-and creating new world elements as needed.
-"""
+"""DM Agent Prompts for reactive ping-pong narration."""
+from __future__ import annotations
 
 from src.core.models import WorldState
 
@@ -13,61 +9,25 @@ from src.core.models import WorldState
 # =============================================================================
 
 SYSTEM_PROMPT = """
-# Welcome, Dungeon Master! 🎲
+# Reactive Dungeon Master
 
-You are the **Storyteller's Voice** — you transform scene directions into vivid prose. You write full scenes with atmosphere, action, dialogue, and emotion.
+You react to the latest character action.
 
----
+Core loop responsibilities:
+- Narrate concrete consequences of what just happened.
+- Voice NPC replies and world reactions.
+- Apply world changes with `create` or `modify` only when justified.
+- Keep momentum and clarity.
 
-## Your Primary Role: Scene Writing
+Tool guidance:
+- Use `narrate` for immediate outcomes and scene texture.
+- Optional `prompts_character` on `narrate` is a soft hint for who should respond next.
+- Use `create` / `modify` only when state should change.
 
-You receive scene directions from the Storyteller and write **2-4 paragraphs of rich prose**. Think of yourself as writing a fantasy novel.
-
-### Example Scene Direction:
-> "Ronn sees Elara enter his shop. He knows about her brother but is nervous to reveal the Marsh Raiders' involvement. Build tension."
-
-### Your Scene:
-> *The brass bells above the door chimed as Elara stepped into Ronn's Sundries, and the merchant's practiced smile faltered. He'd been dreading this moment since word reached him about Aldric's disappearance.*
->
-> *"Miss Elara!" Ronn's hands found sudden business rearranging candles that needed no rearranging. "What a pleasant surprise. Candles? Rope? I have a lovely—"*
->
-> *"Where is my brother?" Her voice cut through his babbling like a blade.*
->
-> *Ronn's hands stilled. He glanced toward the door, then back to her face. Whatever answer he'd been preparing died in his throat.*
-
-## What You Write
-
-- **Full prose scenes** — Multiple paragraphs with description, action, and dialogue
-- **NPC dialogue** — You speak for NPCs directly. Give them voice, mannerisms, personality.
-- **Atmosphere** — What do characters see, hear, smell? What's the mood?
-- **Body language** — How do people move? What betrays their emotions?
-
-## What You DON'T Write
-
-- **PC decisions** — You describe what PCs do, but don't decide for them
-- **Future events** — Stay in the present moment of the scene
-- **Summaries** — Write immersive prose, not "Then Elara asked about her brother"
-
-## Your Tools
-
-| Tool | When to Use |
-|------|-------------|
-| `narrate` | Write the scene prose. This is your main tool. |
-| `create` | Add something new: location, item, or NPC |
-| `modify` | Change the world: update quest status, remove NPC |
-
-## Prose Guidelines
-
-- **Third person past tense** — "She said," not "I say"
-- **Show, don't tell** — "His hands trembled" not "He was nervous"
-- **Give NPCs voice** — Each should speak distinctively
-- **Vary sentence rhythm** — Mix short punchy sentences with longer flowing ones
-- **End scenes with hooks** — Leave readers wanting to know what happens next
-
----
-
-Write every scene like it matters. Because it does. ✨
-"""
+Constraints:
+- Do not decide the next character action directly.
+- Keep narration grounded in recent events and current world state.
+""".strip()
 
 
 def build_dm_system_prompt() -> str:
@@ -81,13 +41,31 @@ def build_dm_system_prompt() -> str:
 # =============================================================================
 
 
-def build_dm_context(state: WorldState) -> str:
-    """Build the DM's context from current state."""
+def build_dm_context(state: WorldState, last_action: dict | None = None) -> str:
+    """Build the DM's context from current state and latest character action."""
     sections = []
 
     # --- Section 1: Story Context ---
     lines = ["## 📖 Story Context", ""]
     lines.append(f"**Turn:** {state.time}")
+    sections.append("\n".join(lines))
+
+    # --- Section 2: Last Character Action ---
+    lines = ["## ⚡ Last Character Action", ""]
+    if last_action:
+        char_id = last_action.get("character_id", "unknown")
+        tool = last_action.get("tool", "unknown")
+        result = last_action.get("result") or {}
+        lines.append(f"- Character: **{char_id}**")
+        lines.append(f"- Tool: **{tool}**")
+        if result.get("intent"):
+            lines.append(f"- Intent: {result['intent']}")
+        if result.get("message"):
+            lines.append(f"- Result: {result['message']}")
+        if result.get("status"):
+            lines.append(f"- Status: {result['status']}")
+    else:
+        lines.append("- No prior character action. Establish the opening beat.")
     sections.append("\n".join(lines))
 
     # --- Section 3: Recent Events ---
@@ -116,11 +94,9 @@ def build_dm_context(state: WorldState) -> str:
         hp = getattr(char.stats, "hp", "?") if char.stats else "?"
         max_hp = getattr(char.stats, "max_hp", "?") if char.stats else "?"
 
-        lines.append(f"**{char.id}** at {loc_name} — HP: {hp}/{max_hp} ({hs}")
+        lines.append(f"**{char.id}** at {loc_name} — HP: {hp}/{max_hp} ({hs})")
         if char.goal:
             lines.append(f"  - 🎯 Goal: {char.goal}")
-        # if char.current_motivation:
-        #     lines.append(f"  - 💭 Focus: {char.current_motivation}")
         lines.append("")
     sections.append("\n".join(lines))
 

@@ -7,10 +7,6 @@ import requests
 from typing import List, Dict
 from datetime import datetime
 from pathlib import Path
-from dotenv import load_dotenv
-
-load_dotenv()
-
 from ..config import Config
 
 # === Singleton Logger ===
@@ -98,8 +94,7 @@ class LLMClient:
         """Make API call with logging."""
         start = time.time()
         try:
-            # Increased timeout for thinking models
-            timeout = 600 if self.is_thinking else 600
+            timeout = 600
             resp = requests.post(
                 f"{self.base_url}/chat/completions", json=payload, timeout=timeout
             )

@@ -6,7 +6,6 @@ from .models import (
     Location,
     CharacterType,
     CharacterStats,
-    Attributes,
 )
 from .state import StateManager
 from .llm import LLMClient, get_logger, setup_logger
@@ -17,7 +16,6 @@ __all__ = [
     "Location",
     "CharacterType",
     "CharacterStats",
-    "Attributes",
     "StateManager",
     "LLMClient",
     "get_logger",

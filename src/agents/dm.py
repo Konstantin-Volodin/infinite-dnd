@@ -1,6 +1,7 @@
 """
 DM Agent - Dungeon Master that narrates and controls the world.
 """
+from __future__ import annotations
 
 from typing import Dict, Any
 from .base import BaseAgent
@@ -12,15 +13,9 @@ from ..tools import get_dm_tools
 class DMAgent(BaseAgent):
     """Dungeon Master agent that narrates and creates world content."""
 
-    def decide_action(self, state: WorldState, guidance: str = "") -> Dict[str, Any]:
-        """Returns DM action(s) using tools: narrate, create, modify.
-
-        Args:
-            guidance: Optional suggestion from the director about what to do.
-        """
-        context = build_dm_context(state)
-        if guidance:
-            context = f"**Director's guidance:** {guidance}\n\n{context}"
+    def react(self, state: WorldState, last_action: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """React to the latest character action using DM tools."""
+        context = build_dm_context(state, last_action=last_action)
 
         return self._decide(
             system_prompt=build_dm_system_prompt()

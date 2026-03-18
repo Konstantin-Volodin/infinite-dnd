@@ -3,14 +3,13 @@
 This module handles all game actions:
 - Character actions: act, speak, move, think
 - DM actions: narrate, create, modify
-- Director actions: direct (scene transitions handled in game_loop)
 """
 
 import random
-import sys
 from typing import Dict, Optional
 from ..core.models import WorldState, Location, Character, CharacterType, CharacterStats
 from ..core.rules import get_skill_modifier
+from ..core.utils import slugify
 
 
 class ActionExecutor:
@@ -46,13 +45,6 @@ class ActionExecutor:
                 ):
                     return c
         return None
-
-    def _sanitize_id(self, id_str: str) -> str:
-        """Sanitize ID to be lowercase, no spaces, no special chars."""
-        import re
-
-        clean = re.sub(r"[^a-z0-9\-]", "", id_str.lower().replace(" ", "-"))
-        return re.sub(r"-+", "-", clean).strip("-")
 
     def _default_anchor_location(self) -> Optional[str]:
         """Pick a reasonable anchor location for new content."""
@@ -94,10 +86,13 @@ class ActionExecutor:
             total = roll + modifier
             roll_info = f"[{skill}: {roll}+{modifier}={total}]"
 
-        # Build intent for DM narration (don't emit directly)
+        # Build intent for DM narration
         intent = f"{char.id} {description}"
         if roll_info:
             intent += f" {roll_info}"
+
+        self.log_action("⚔️", intent)
+        self.save_history(intent)
 
         return {
             "status": "success",
@@ -127,6 +122,9 @@ class ActionExecutor:
             intent = f'{char.id} says to {target_name}: "{message}"'
         else:
             intent = f'{char.id} says: "{message}"'
+
+        self.log_action("💬", intent)
+        self.save_history(intent)
 
         return {
             "status": "success",
@@ -242,7 +240,7 @@ class ActionExecutor:
         anchor_location: Optional[str] = None,
     ) -> Dict:
         """Create a new location in the world."""
-        location = self._sanitize_id(location)
+        location = slugify(location)
 
         if location in self.state.locations:
             return {"status": "error", "message": "Location already exists"}
@@ -294,7 +292,7 @@ class ActionExecutor:
         goal: str = "",
     ) -> Dict:
         """Create a new NPC."""
-        npc_id = self._sanitize_id(npc_id)
+        npc_id = slugify(npc_id)
 
         if npc_id in self.state.characters:
             return {"status": "error", "message": "NPC already exists"}
@@ -305,12 +303,12 @@ class ActionExecutor:
 
         self.state.characters[npc_id] = Character(
             id=npc_id,
+            name=name,
             type=CharacterType.NPC,
-            race="Human",
-            class_name=role,
+            role=role,
             backstory=description,
             goal=goal,
-            stats=CharacterStats(hp=15, max_hp=15, ac=10),
+            stats=CharacterStats(hp=15, max_hp=15),
             location=location,
         )
         self.save_state()
@@ -337,11 +335,11 @@ class ActionExecutor:
         quest = self.state.quests.get(quest_id)
         if not quest:
             # Fuzzy match
-            q_slug = self._sanitize_id(quest_id)
+            q_slug = slugify(quest_id)
             for q in self.state.quests.values():
                 if (
-                    self._sanitize_id(q.id) == q_slug
-                    or self._sanitize_id(q.title) == q_slug
+                    slugify(q.id) == q_slug
+                    or slugify(q.title) == q_slug
                 ):
                     quest = q
                     break
@@ -372,7 +370,7 @@ class ActionExecutor:
     ) -> Dict:
         """Unified create tool - creates location, item, or NPC."""
         if type == "location":
-            location = self._sanitize_id(id or name)
+            location = slugify(id or name)
             return self.create_location(
                 location=location,
                 name=name,
@@ -393,7 +391,7 @@ class ActionExecutor:
                 if not anchor:
                     return {"status": "error", "message": "No location for NPC"}
                 location = anchor
-            npc_id = self._sanitize_id(id or name)
+            npc_id = slugify(id or name)
             return self.spawn_npc(
                 npc_id=npc_id,
                 name=name,

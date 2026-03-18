@@ -4,6 +4,7 @@ Character Agent Prompts
 Characters experience the world in first-person, making choices based on
 their goals, knowledge, and personality.
 """
+from __future__ import annotations
 
 from src.core.models import WorldState, Character
 
@@ -21,12 +22,9 @@ def build_character_system_prompt(char: Character) -> str:
 
     # Build personality section if defined
     personality_section = ""
-    if char.personality or char.speaking_style:
+    if char.personality:
         personality_section = "\n## Who I Am\n\n"
-        if char.personality:
-            personality_section += f"> {char.personality}\n"
-        # if char.speaking_style:
-        #     personality_section += f">\n> **How I speak:** {char.speaking_style}\n"
+        personality_section += f"> {char.personality}\n"
 
     # Build relationships section if defined
     relationships_section = ""
@@ -99,6 +97,26 @@ Now — what do I do?
 """
 
 
+def build_casting_system_prompt() -> str:
+    """System prompt for selecting who acts, then acting as them in one tool call."""
+    return """
+# Character Casting Agent
+
+You control all characters currently in scene scope.
+
+Your job each turn:
+1) Choose the single most appropriate character to act now.
+2) Immediately perform that character's action with ONE tool call.
+
+Rules:
+- Always include `character_id` in your tool call.
+- Prioritize direct replies when someone was just addressed.
+- Prefer meaningful forward motion over repetitive chatter.
+- Stay consistent with each character's goals and personality.
+- If no strong action is needed, use `think` with a small update.
+""".strip()
+
+
 # =============================================================================
 # CONTEXT BUILDER
 # =============================================================================
@@ -124,9 +142,7 @@ def build_character_context(char: Character, state: WorldState) -> str:
 
         # Check if someone is talking to me
         last_event = state.history[-1].lower()
-        char_mentioned = (
-            char.id.lower() in last_event or char.id.lower() in last_event
-        )
+        char_mentioned = char.id.lower() in last_event
         has_dialogue = (
             '"' in state.history[-1] or "says" in last_event or "asks" in last_event
         )
@@ -191,8 +207,6 @@ def build_character_context(char: Character, state: WorldState) -> str:
     lines = ["## 🎯 What Drives Me", ""]
     if char.goal:
         lines.append(f"**My Goal:** {char.goal}")
-    if getattr(char, "current_motivation", None):
-        lines.append(f"**Right Now:** {char.current_motivation}")
     if len(lines) > 2:
         sections.append("\n".join(lines))
 
@@ -244,4 +258,54 @@ def build_character_context(char: Character, state: WorldState) -> str:
     # --- Action Prompt ---
     sections.append("---\n\n**What do I do?**")
 
+    return "\n\n".join(sections)
+
+
+def build_casting_context(state: WorldState, location_id: str | None = None) -> str:
+    """Build context for selecting and acting as one character.
+
+    If location_id is provided and exists, scope selection to that location.
+    Otherwise, scope to all characters.
+    """
+    sections = []
+
+    scope_label = "all locations"
+    scoped_chars = list(state.characters.values())
+
+    if location_id and location_id in state.locations:
+        scope_label = location_id
+        scoped_chars = [c for c in state.characters.values() if c.location == location_id]
+
+    if not scoped_chars:
+        scoped_chars = list(state.characters.values())
+        scope_label = "all locations"
+
+    lines = ["## Turn Scope", "", f"Selection scope: **{scope_label}**", ""]
+    sections.append("\n".join(lines))
+
+    lines = ["## Candidates", ""]
+    for c in scoped_chars:
+        loc = state.locations.get(c.location)
+        loc_name = loc.id if loc else c.location
+        lines.append(f"### {c.id}")
+        lines.append(f"- Location: {loc_name}")
+        if c.goal:
+            lines.append(f"- Goal: {c.goal}")
+        if c.personality:
+            lines.append(f"- Personality: {c.personality}")
+        if c.knowledge:
+            lines.append(f"- Recent knowledge: {'; '.join(c.knowledge[-3:])}")
+        lines.append("")
+    sections.append("\n".join(lines))
+
+    lines = ["## Recent Events", ""]
+    if state.history:
+        for i, event in enumerate(state.history[-8:]):
+            marker = "→" if i == len(state.history[-8:]) - 1 else "-"
+            lines.append(f"{marker} {event}")
+    else:
+        lines.append("_No events yet._")
+    sections.append("\n".join(lines))
+
+    sections.append("---\n\nChoose one character and act now with a tool call including `character_id`.")
     return "\n\n".join(sections)

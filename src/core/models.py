@@ -10,20 +10,10 @@ class CharacterType(str, Enum):
     NPC = "npc"
 
 
-class Attributes(BaseModel):
-    strength: int = 10
-    dexterity: int = 10
-    constitution: int = 10
-    intelligence: int = 10
-    wisdom: int = 10
-    charisma: int = 10
-
-
 class CharacterStats(BaseModel):
     hp: int = 5
     max_hp: int = 5
     level: int = 1
-    # attributes: Attributes = Field(default_factory=Attributes)
 
 
 class Location(BaseModel):
@@ -33,7 +23,6 @@ class Location(BaseModel):
     connections: List[str] = []
     features: List[str] = []
     items: List[str] = []
-
 
 
 class Memory(BaseModel):
@@ -59,7 +48,6 @@ class Character(BaseModel):
     memory: List[Memory] = []  # memories for characters to recall
 
 
-
 class Quest(BaseModel):
     id: str
     title: str
@@ -76,4 +64,4 @@ class WorldState(BaseModel):
     quests: Dict[str, Quest] = {}
     history: List[str] = []  # Recent events for context
     story_beats: List[str] = []  # Completed narrative beats (e.g., "ronn_reveals_cellar")
-    inspected_features: List[str] = []  # track inspected elemnts 
+    inspected_features: List[str] = []  # track inspected elements

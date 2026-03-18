@@ -1,6 +1,7 @@
 [
   {
     "id": "elara-swift",
+    "type": "pc",
     "location": "valley-bridge",
 
     "role": "former-guard",

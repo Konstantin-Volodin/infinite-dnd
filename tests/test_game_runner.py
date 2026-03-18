@@ -4,13 +4,51 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 
-from run_game import GameRunner, output, OutputLevel, _default_runner
+from run_game import GameRunner
+
+
+class FakeCharacterAgent:
+    def __init__(self):
+        self.last_prompt = None
+
+    def decide_and_act(self, state, dm_prompt=None):
+        self.last_prompt = dm_prompt
+        return {
+            "tool": "speak",
+            "character_id": "hero",
+            "message": "I have a plan.",
+        }
+
+
+class FakeDM:
+    def react(self, state, last_action=None):
+        return {
+            "tool": "narrate",
+            "content": "The air tightens as the party waits.",
+            "prompts_character": "hero",
+        }
+
+    def generate_new_item(self, state, item, loc):
+        return {"tool": "create", "type": "item", "name": item, "location": loc, "description": "Generated item"}
+
+    def generate_new_location(self, state, target, origin):
+        return {"tool": "create", "type": "location", "name": target, "location": origin, "description": "Generated location"}
+
+
+class FakeReviewer:
+    def summarize_session(self, state, metrics=None):
+        return {"summary": "ok"}
 
 
 class FakeEngine:
     def __init__(self):
         self.calls = []
-        self.state = SimpleNamespace(characters={}, history=[], time=0, story_beats=[])
+        self.state = SimpleNamespace(
+            characters={"hero": SimpleNamespace(id="hero", location="loc-1")},
+            history=[],
+            time=0,
+            story_beats=[],
+        )
 
     def execute_tool(self, tool, **kwargs):
         self.calls.append((tool, kwargs))
@@ -20,77 +58,44 @@ class FakeEngine:
         pass
 
     def advance_time(self):
-        pass
-
-
-class FakeDM:
-    def __init__(self):
-        self.decide_calls = []
-
-    def decide_action(self, state, guidance=""):
-        self.decide_calls.append(guidance)
-        return {"tool": "say", "arguments": {"message": "ok"}}
-
-    def generate_new_item(self, state, item, loc):
-        return {"tool": "create", "item_name": item, "location_id": loc}
-
-    def generate_new_location(self, state, target, origin):
-        return {"tool": "create_location", "target_name": target, "origin_id": origin}
-
-
-class FakeReviewer:
-    def summarize_session(self, state):
-        return {"summary": "ok"}
+        self.state.time += 1
 
 
 class GameRunnerTests(unittest.TestCase):
-    def test_execute_dm_action_calls_engine(self):
+    def test_execute_dm_reaction_returns_soft_hint(self):
         engine = FakeEngine()
-        dm = FakeDM()
-        runner = GameRunner(engine, dm)
+        runner = GameRunner(engine, dm=FakeDM(), character=FakeCharacterAgent())
 
-        result = runner.execute_dm_action(guidance="say hi")
-        self.assertTrue(result)
-        self.assertTrue(any(call[0] == "say" for call in engine.calls))
-
-    def test_execute_character_action_item_missing_and_intent(self):
-        engine = FakeEngine()
-
-        # character
-        char = SimpleNamespace(name="Hero", location="loc1")
-        engine.state.characters["hero"] = char
-
-        # engine behavior: use_item fails with item_missing first, then create succeeds and retry succeeds
-        call_count = {"use_item": 0}
-
-        def execute_tool(tool, **kwargs):
-            if tool == "use_item":
-                call_count["use_item"] += 1
-                if call_count["use_item"] == 1:
-                    return {"status": "failed", "code": "item_missing", "item_name": "gem"}
-                else:
-                    return {"status": "success", "intent": "I use the gem"}
-            elif tool == "create":
-                return {"status": "success"}
-            else:
-                return {"status": "success"}
-
-        engine.execute_tool = execute_tool
-
-        dm = FakeDM()
-        runner = GameRunner(engine, dm)
-
-        success = runner.execute_character_action("hero", guidance="use the item")
+        success, hint = runner.execute_dm_reaction({"character_id": "hero", "tool": "speak", "result": {"status": "success"}})
         self.assertTrue(success)
+        self.assertEqual(hint, "hero")
+        self.assertTrue(any(call[0] == "narrate" for call in engine.calls))
+
+    def test_execute_character_turn_uses_soft_hint(self):
+        engine = FakeEngine()
+        character = FakeCharacterAgent()
+        runner = GameRunner(engine, dm=FakeDM(), character=character)
+
+        result = runner.execute_character_turn(dm_prompt="hero")
+        self.assertTrue(result["success"])
+        self.assertEqual(character.last_prompt, "hero")
+        self.assertTrue(any(call[0] == "speak" for call in engine.calls))
 
     def test_finalize_session_writes_review(self):
         engine = FakeEngine()
-        dm = FakeDM()
         reviewer = FakeReviewer()
 
         session_dir = tempfile.mkdtemp(prefix="test_session_")
         llm_log_path = os.path.join(session_dir, "llm_log.jsonl")
-        runner = GameRunner(engine, dm, reviewer=reviewer, session_dir=session_dir, llm_log_path=llm_log_path)
+        runner = GameRunner(
+            engine,
+            dm=FakeDM(),
+            character=FakeCharacterAgent(),
+            reviewer=reviewer,
+            session_dir=session_dir,
+            llm_log_path=llm_log_path,
+            report_generator=lambda *_: False,
+        )
 
         runner.finalize_session()
         review_path = os.path.join(session_dir, "review.json")
