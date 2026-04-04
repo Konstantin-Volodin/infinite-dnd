@@ -7,7 +7,7 @@ Each agent type has:
 - build_*_context(): Builds dynamic context from world state
 """
 
-from .dm import build_dm_system_prompt, build_dm_context
+from .dungeon_master import build_dm_system_prompt, build_dm_context
 from .character import (
     build_character_system_prompt,
     build_character_context,
