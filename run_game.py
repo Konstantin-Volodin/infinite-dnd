@@ -1,15 +1,13 @@
 """Infinite D&D - ping-pong loop: Character acts, DM reacts."""
 from __future__ import annotations
 
-import json
 import os
 import time
 from datetime import datetime
 from src.config import Config
 from src.engine import Engine
-from src.agents import DMAgent, CharacterAgent, ReviewerAgent
+from src.agents import DMAgent, CharacterAgent
 from src.core.llm import setup_logger
-from src.core.log_viewer import generate_log_report
 from src.core.utils import slugify
 
 
@@ -44,21 +42,17 @@ class GameRunner:
         llm_log_path = None,
         dm: DMAgent | None = None,
         character: CharacterAgent | None = None,
-        reviewer: ReviewerAgent | None = None,
         output_level: int = OutputLevel.DEFAULT,
-        report_generator=None,
     ):
         """Initialize the GameRunner with agents and settings."""
         self.engine = engine
 
         self.dm = dm or DMAgent()
         self.character = character or CharacterAgent()
-        self.reviewer = reviewer or ReviewerAgent()
 
         self.session_dir = session_dir
         self.llm_log_path = llm_log_path
         self.output_level = output_level
-        self.report_generator = report_generator or generate_log_report
 
     def output(self, msg: str, level: int = OutputLevel.DEFAULT):
         """Instance-scoped output respecting this runner's verbosity."""
@@ -208,9 +202,6 @@ class GameRunner:
 
             pending_character_hint = next_hint
 
-            if self.llm_log_path and self.session_dir:
-                self.report_generator(self.llm_log_path, self.session_dir)
-
             if turns % 3 == 0:
                 self.engine.advance_time()
 
@@ -220,80 +211,8 @@ class GameRunner:
         self.output(f"  SESSION COMPLETE - {turns} turns")
         self.output(f"{'=' * 50}{Colors.ENDC}")
 
-    def finalize_session(self):
-        """Generate reports and run reviewer summary (if present)."""
-        if getattr(self, "_finalized", False):
-            return
-
-        self.output("\n📊 Generating session reports...")
-
-        if self.report_generator and self.report_generator(self.llm_log_path, self.session_dir):
-            self.output("   📖 story.html")
-            self.output("   📝 story.md")
-            self.output("   🔧 debug_viewer.html")
-
-        # Extract automated metrics
-        automated_metrics_dict = None
-        try:
-            from src.core.metrics import extract_session_metrics
-
-            self.output("\n📈 Extracting automated metrics...")
-
-            # Load world state for metrics extraction
-            world_state_dict = None
-            world_state_path = os.path.join(os.path.dirname(self.session_dir), "..", "world-state", "world_state.json")
-            if os.path.exists(world_state_path):
-                with open(world_state_path, 'r', encoding='utf-8') as f:
-                    world_state_dict = json.load(f)
-
-            metrics = extract_session_metrics(
-                self.llm_log_path,
-                self.session_dir,
-                world_state_dict
-            )
-
-            # Save automated metrics
-            metrics_path = os.path.join(self.session_dir, "session_metrics.json")
-            with open(metrics_path, "w", encoding="utf-8") as f:
-                json.dump(metrics.to_dict(), f, indent=2, ensure_ascii=False)
-            self.output(f"   📊 session_metrics.json")
-
-            automated_metrics_dict = metrics.to_dict()
-
-        except Exception as e:
-            self.output(f"   ⚠️  Could not extract metrics: {e}")
-
-        try:
-            if self.reviewer:
-                self.output("\n📝 Generating LLM-scored review...")
-                review = self.reviewer.summarize_session(self.engine.state, automated_metrics_dict)
-                review_path = os.path.join(self.session_dir, "review.json")
-                with open(review_path, "w", encoding="utf-8") as f:
-                    f.write(json.dumps(review, indent=2, ensure_ascii=False))
-                self.output(f"   ✅ review.json")
-
-                # Print summary
-                overall = review.get('overall_score', 'N/A')
-                self.output(f"\n   Overall Score: {overall}/10")
-                self.output(f"   Narrative Coherence: {review.get('narrative_coherence', {}).get('score', 'N/A')}/10")
-                self.output(f"   Dramatic Pacing: {review.get('dramatic_pacing', {}).get('score', 'N/A')}/10")
-                self.output(f"   Character Authenticity: {review.get('character_authenticity', {}).get('score', 'N/A')}/10")
-                self.output(f"   World Responsiveness: {review.get('world_responsiveness', {}).get('score', 'N/A')}/10")
-                self.output(f"   Prose Quality: {review.get('prose_quality', {}).get('score', 'N/A')}/10")
-        except Exception as e:
-            import traceback
-            self.output(f"   ⚠️  Could not generate review: {e}")
-            self.output(traceback.format_exc())
-
-        # mark finalized so callers can safely check
-        self._finalized = True
-
     def run(self, *, turns: int = 30):
-        """Convenience method to run ping-pong loop and finalize safely."""
-        try:
-            self.run_pingpong_loop(max_turns=turns)
-        finally:
-            self.finalize_session()
+        self.run_pingpong_loop(max_turns=turns)
 
 
 def main():
@@ -331,23 +250,13 @@ def main():
         engine,
         dm=DMAgent(),
         character=CharacterAgent(),
-        reviewer=ReviewerAgent(),
         session_dir=log_dir,
         llm_log_path=llm_log_path,
         output_level=output_level,
     )
 
-    try:
-        print("🎭 Mode: Ping-pong (Character ↔ DM)")
-        runner.run(turns=Config.MAX_SCENES)
-    finally:
-
-        # Ensure session is finalized if something went wrong before runner.run completed
-        if runner is not None:
-            try:
-                runner.finalize_session()
-            except Exception:
-                pass
+    print("🎭 Mode: Ping-pong (Character ↔ DM)")
+    runner.run(turns=Config.MAX_SCENES)
 
 
 if __name__ == "__main__":
