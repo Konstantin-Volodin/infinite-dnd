@@ -25,12 +25,6 @@ class Location(BaseModel):
     items: List[str] = []
 
 
-class Memory(BaseModel):
-    content: str
-    importance: str = "medium"
-    turn: int = 0
-
-
 class Character(BaseModel):
     id: str
     name: str = ""
@@ -45,7 +39,6 @@ class Character(BaseModel):
     inventory: List[str] = []
     knowledge: List[str] = []
     relationships: Dict[str, str] = {}  # ally, enemy, contact, etc.
-    memory: List[Memory] = []  # memories for characters to recall
 
 
 class Quest(BaseModel):
@@ -63,5 +56,3 @@ class WorldState(BaseModel):
     characters: Dict[str, Character] = {}
     quests: Dict[str, Quest] = {}
     history: List[str] = []  # Recent events for context
-    story_beats: List[str] = []  # Completed narrative beats (e.g., "ronn_reveals_cellar")
-    inspected_features: List[str] = []  # track inspected elements

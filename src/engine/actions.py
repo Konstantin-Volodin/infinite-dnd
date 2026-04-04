@@ -375,7 +375,7 @@ class ActionExecutor:
                 location=location,
                 name=name,
                 description=description,
-                connected_to=[location] if location else None,
+                connected_to=None,
             )
         elif type == "item":
             if not location:
