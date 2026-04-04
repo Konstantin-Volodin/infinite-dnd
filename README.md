@@ -29,3 +29,8 @@ src/
 ├── prompts/     # System prompts per agent
 └── tools.py     # Tool definitions
 ```
+
+
+# TO TRY
+- pydantic ai
+- jinja template
