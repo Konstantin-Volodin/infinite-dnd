@@ -9,6 +9,7 @@ __pycache__/
 # Testing
 coverage/
 *_old.py
+.pytest_cache/
 
 # Production
 build/
@@ -21,6 +22,7 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+.ruff_cache/
 
 # Logs
 npm-debug.log*
