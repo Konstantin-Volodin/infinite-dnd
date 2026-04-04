@@ -2,12 +2,9 @@
 name = "infinite-dnd"
 version = "0.0.1"
 description = "AI-driven D&D game with autonomous agents"
-readme = "README.md"
+authors = [{ name = "Konstantin Volodin" }]
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [
-    { name = "Konstantin Volodin" }
-]
 keywords = ["dnd", "ai", "game", "llm", "agents"]
 
 dependencies = [

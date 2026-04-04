@@ -7,3 +7,12 @@
 - Before adding a function, check if the file's primary purpose is still singular. If not, it's time for a new module.
 - Prefer inline clarity over clever indirection; if a helper only has one caller, inline it.
 - Every change must leave the code easier to read than before.
+
+## Environment setup
+- `uv venv .venv`
+- `source .venv/Scripts/activate`
+- `uv pip install -e .`
+
+## Running tests
+- `python tests/context/character.py`
+- `python tests/context/dungeon-master.py`
