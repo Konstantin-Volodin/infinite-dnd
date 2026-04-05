@@ -7,7 +7,6 @@ import requests
 from typing import List, Dict
 from datetime import datetime
 from pathlib import Path
-from ..config import Config
 
 # === Singleton Logger ===
 _LOGGER = None
@@ -72,9 +71,9 @@ class LLMClient:
     """Client for LLM API calls with tool support."""
 
     def __init__(self):
-        self.base_url = Config.LLM_BASE_URL
-        self.model = Config.LLM_MODEL
-        self.max_tokens = Config.LLM_MAX_TOKENS
+        self.base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
+        self.model = os.getenv("LLM_MODEL", "")
+        self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "-1"))
         self.logger = get_logger()
 
         # Set parameters based on thinking mode
@@ -82,13 +81,9 @@ class LLMClient:
         if self.is_thinking:
             self.temperature = 0.6
             self.top_p = 0.95
-            self.top_k = 20
-            self.min_p = 0.0
         else:
             self.temperature = 0.7
             self.top_p = 0.8
-            self.top_k = 20
-            self.min_p = 0.0
 
     def _call(self, payload: Dict) -> Dict:
         """Make API call with logging."""
@@ -114,8 +109,6 @@ class LLMClient:
             "messages": messages,
             "temperature": self.temperature,
             "top_p": self.top_p,
-            "top_k": self.top_k,
-            "min_p": self.min_p,
             "max_tokens": self.max_tokens,
             "stream": False,
         }

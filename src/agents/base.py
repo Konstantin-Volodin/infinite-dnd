@@ -2,10 +2,10 @@
 Base Agent - Shared functionality for all LLM agents.
 """
 
+import os
 import json
 from typing import Dict, Any, List, Callable, Optional
 from ..core.llm import LLMClient
-from ..config import Config
 
 
 class BaseAgent:
@@ -39,7 +39,7 @@ class BaseAgent:
             )
 
         if max_steps is None:
-            max_steps = Config.MAX_ACTIONS_PER_TURN
+            max_steps = int(os.getenv("GAME_MAX_ACTIONS_PER_TURN", "3"))
 
         messages = [
             {"role": "system", "content": system_prompt},

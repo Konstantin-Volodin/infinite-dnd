@@ -4,12 +4,14 @@ from __future__ import annotations
 import os
 import time
 from datetime import datetime
-from src.config import Config
+from dotenv import load_dotenv
+
 from src.engine import Engine
 from src.agents import DMAgent, CharacterAgent
 from src.core.llm import setup_logger
 from src.core.utils import slugify
 
+load_dotenv()
 
 # ANSI Colors
 class Colors:
@@ -217,15 +219,15 @@ def main():
 
     # setup logs
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_dir = os.path.join(Config.PATHS["logs_dir"], f"session-{timestamp}")
+    log_dir = os.path.join("logs", f"session-{timestamp}")
     os.makedirs(log_dir, exist_ok=True)
     llm_log_path = os.path.join(log_dir, "llm_log.jsonl")
     print(f"📂 Logs: {log_dir}")
     setup_logger(llm_log_path)
 
     # handle reset
-    state_file = Config.PATHS["state_file"]
-    if Config.RESET_WORLD and os.path.exists(state_file):
+    state_file = "world-state/world_state.json"
+    if os.getenv("GAME_RESET_WORLD", "true").lower() == "true" and os.path.exists(state_file):
         os.remove(state_file)
         print("🔄 World state reset!")
 
@@ -251,7 +253,7 @@ def main():
     )
 
     print("🎭 Mode: Ping-pong (Character ↔ DM)")
-    runner.run(turns=Config.MAX_SCENES)
+    runner.run(turns=int(os.getenv("GAME_MAX_SCENES", "25")))
 
 
 if __name__ == "__main__":
