@@ -46,7 +46,7 @@ _No events yet._
   - features: {{ loc.features | join(', ') }}
 {% endif %}
 {% if loc["items"] %}
-  - items: {{ loc["items"] | join(', ') }}
+  - items: {{ loc.items | join(', ') }}
 {% endif %}
 {% if loc.connections %}
   - exits: {{ loc.connections | join(', ') }}
