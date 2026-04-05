@@ -1,6 +1,6 @@
 #src/prompts/character/build.py
 
-"""Character prompt builders — system prompt and context."""
+"""Character prompt builders - system prompt and context."""
 from __future__ import annotations
 from src.core.models import WorldState, Character
 from src.prompts.loader import render
@@ -8,12 +8,12 @@ from src.core.rules import get_health_status
 
 
 def build_character_system_prompt(char: Character) -> str:
-    """build the character identity."""
+    """Build the character identity."""
     return render("character/system.jinja", char=char)
 
 
 def build_character_context(char: Character, state: WorldState) -> str:
-    """build the character context."""
+    """Build the character context."""
 
     # internal status
     health_status = get_health_status(char)
