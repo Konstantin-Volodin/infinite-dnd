@@ -1,18 +1,13 @@
-"""Render the exact context sent to the Character agent.
+# tests/context/character.py
+"""Render the exact context sent to each Character agent."""
 
-Run:  python tests/context/character.py
-
-Output is printed AND saved to tests/context/archive/<datetime>-character.md
-"""
 from __future__ import annotations
-
 import sys
 import os
 import logging
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-
 from src.core.state import StateManager
 from src.prompts.character import build_character_system_prompt, build_character_context
 
