@@ -11,7 +11,7 @@ from ..prompts import (
     build_director_system_prompt,
     build_director_context,
 )
-from ..tools import get_character_tools
+from ..tools import CHARACTER_TOOLS
 
 
 class CharacterAgent(BaseAgent):
@@ -86,7 +86,7 @@ class CharacterAgent(BaseAgent):
                 system_prompt=build_character_system_prompt(char)
                 + "\n\nAlways include `character_id` with your tool call.",
                 context=context,
-                tools=get_character_tools(),
+                tools=CHARACTER_TOOLS,
                 fallback_tool="wait",
                 fallback_args={"character_id": hinted_id},
                 require_tool=False,
@@ -98,7 +98,7 @@ class CharacterAgent(BaseAgent):
             action = self._decide(
                 system_prompt=build_director_system_prompt(),
                 context=build_director_context(state, location_id=scoped_location),
-                tools=get_character_tools(),
+                tools=CHARACTER_TOOLS,
                 fallback_tool="wait",
                 fallback_args={"character_id": self._default_character_id(state)},
                 require_tool=True,

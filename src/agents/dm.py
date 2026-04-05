@@ -7,7 +7,7 @@ from typing import Dict, Any
 from .base import BaseAgent
 from ..core.models import WorldState
 from ..prompts import build_dm_system_prompt, build_dm_context
-from ..tools import get_dm_tools
+from ..tools import DM_TOOLS
 
 
 class DMAgent(BaseAgent):
@@ -23,7 +23,7 @@ class DMAgent(BaseAgent):
             system_prompt=build_dm_system_prompt()
             + "\n\nYou can take multiple actions per turn. After each action you see the result and decide what to do next. When done, stop calling tools.",
             context=context,
-            tools=get_dm_tools(),
+            tools=DM_TOOLS,
             fallback_tool="narrate",
             fallback_args={"content": "The scene continues..."},
             tool_executor=tool_executor,
@@ -42,7 +42,7 @@ Create this location using the `create` tool with type="location"."""
         return self._decide(
             system_prompt=build_dm_system_prompt(),
             context=prompt,
-            tools=get_dm_tools(),
+            tools=DM_TOOLS,
             fallback_tool="create",
             fallback_args={
                 "type": "location",
@@ -65,7 +65,7 @@ If it makes sense, create it using `create` with type="item". Otherwise, narrate
         return self._decide(
             system_prompt=build_dm_system_prompt(),
             context=prompt,
-            tools=get_dm_tools(),
+            tools=DM_TOOLS,
             fallback_tool="narrate",
             fallback_args={"content": f"You cannot pick up the {item_name}."},
         )
