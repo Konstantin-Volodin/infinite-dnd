@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import os
 import json
+import re
 import logging
 from datetime import datetime
 
@@ -32,7 +33,7 @@ def main():
 
         output = f"##### Character: {char.id}\n\n"
         output += f"##### System Prompt\n{system_prompt}\n\n"
-        output += f"##### Tools\n{json.dumps(CHARACTER_TOOLS, indent=2)}\n\n"
+        output += f"##### Tools\n{json.dumps(CHARACTER_TOOLS, indent=4)}\n\n"
         output += f"##### Context\n{context}"
 
         with open(path, "w", encoding="utf-8") as f: f.write(output)

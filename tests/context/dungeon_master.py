@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import os
 import json
+import re
 import logging
 from datetime import datetime
 
@@ -28,12 +29,12 @@ def main():
 
     output = f"##### Dungeon Master\n\n"
     output += f"##### System Prompt\n{system_prompt}\n\n"
-    output += f"##### Tools\n{json.dumps(DM_TOOLS, indent=2)}\n\n"
+    output += f"##### Tools\n{json.dumps(DM_TOOLS, indent=4)}\n\n"
     output += f"##### Context\n{context}"
 
     path = os.path.join(archive_dir, f"{stamp}-dungeon_master.md")
     with open(path, "w", encoding="utf-8") as f: f.write(output)
-    logging.info(f"saved DM context to {path}")
+    logging.info(f"saved [DM] context to {path}")
 
 
 if __name__ == "__main__":
