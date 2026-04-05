@@ -1,8 +1,7 @@
-"""Action execution for the game engine.
+"""Action execution — what happens when a tool is called.
 
-This module handles all game actions:
-- Character actions: act, speak, move
-- DM actions: narrate, create, modify
+Character: act, speak, move, think, wait
+DM: narrate, create, modify (and their sub-actions)
 """
 
 import random
@@ -16,15 +15,12 @@ class ActionExecutor:
     """Executes game actions and updates state."""
 
     def __init__(self, state: WorldState, save_state, save_history):
-        """Initialize the action executor."""
         self.state = state
         self.save_state = save_state
         self.save_history = save_history
 
-    def log_action(self, icon: str, msg: str, history_msg: str = None):
-        """Log and record an event."""
-        formatted = f"  {icon} {msg}"
-        print(formatted)
+    def log_action(self, icon: str, msg: str):
+        print(f"  {icon} {msg}")
 
     def _get_char(self, char_id: str) -> Optional[Character]:
         return self.state.characters.get(char_id)
@@ -47,7 +43,6 @@ class ActionExecutor:
         return None
 
     def _default_anchor_location(self) -> Optional[str]:
-        """Pick a reasonable anchor location for new content."""
         first_char = next(iter(self.state.characters.values()), None)
         if first_char and first_char.location in self.state.locations:
             return first_char.location
@@ -64,18 +59,12 @@ class ActionExecutor:
         skill: Optional[str] = None,
         target: Optional[str] = None,
     ) -> Dict:
-        """Perform a physical action in the world.
-
-        This is the primary action tool - covers examining, attacking, using items,
-        picking things up, skill checks, and any other physical interaction.
-        """
         char = self._get_char(character_id)
         if not char:
             return {"status": "error", "message": "Character not found"}
 
         loc = self._get_loc(char.location)
 
-        # Roll skill check if specified
         roll_info = None
         if skill:
             roll = random.randint(1, 20)
@@ -83,7 +72,6 @@ class ActionExecutor:
             total = roll + modifier
             roll_info = f"[{skill}: {roll}+{modifier}={total}]"
 
-        # Build intent for DM narration
         intent = f"{char.id} {description}"
         if roll_info:
             intent += f" {roll_info}"
@@ -105,14 +93,12 @@ class ActionExecutor:
         }
 
     def speak(self, character_id: str, message: str, target: str = None) -> Dict:
-        """Say something out loud. DM will narrate this."""
         char = self._get_char(character_id)
         if not char:
             return {"status": "error", "message": "Character not found"}
         if not message:
             return {"status": "error", "message": "Message is required"}
 
-        # Build context for DM narration
         if target:
             target_char = self._find_target(char, target)
             target_name = target_char.id if target_char else target
@@ -134,7 +120,6 @@ class ActionExecutor:
         }
 
     def move(self, character_id: str, location: str) -> Dict:
-        """Travel to a connected location."""
         char = self._get_char(character_id)
         if not char:
             return {"status": "error", "message": "Character not found"}
@@ -142,7 +127,6 @@ class ActionExecutor:
         current_loc = self._get_loc(char.location)
         new_loc = self._get_loc(location)
         if not new_loc:
-            # Signal engine to generate missing location if it's a valid exit
             if current_loc and location in (current_loc.connections or []):
                 return {
                     "status": "error",
@@ -154,10 +138,7 @@ class ActionExecutor:
             return {"status": "error", "message": "Location not found"}
 
         if not current_loc or location not in current_loc.connections:
-            return {
-                "status": "error",
-                "message": f"Cannot reach {new_loc.id} from here",
-            }
+            return {"status": "error", "message": f"Cannot reach {new_loc.id} from here"}
 
         origin_id = current_loc.id
         self.save_history(f"{char.id} left towards {new_loc.id}", origin_id)
@@ -174,7 +155,6 @@ class ActionExecutor:
         emotions: Optional[str] = None,
         knowledge: Optional[str] = None,
     ) -> Dict:
-        """Update internal state - goals, feelings, or memories."""
         char = self._get_char(character_id)
         if not char:
             return {"status": "error", "message": "Character not found"}
@@ -195,15 +175,10 @@ class ActionExecutor:
 
         return {"status": "success"}
 
-    def wait(
-        self, character_id: str = None, reason: str = None, content: str = None
-    ) -> Dict:
-        """Wait or observe. Also handles natural prose introspection."""
+    def wait(self, character_id: str = None, reason: str = None, content: str = None) -> Dict:
         char = self._get_char(character_id) if character_id else None
 
-        # If there's prose content (natural introspection), record it nicely
         if content and char:
-            # This is the character "thinking out loud" in prose form
             self.log_action("💭", f"{char.id} reflects: {content[:200]}...")
             return {"status": "success", "introspection": content}
 
@@ -216,19 +191,15 @@ class ActionExecutor:
         return {"status": "success"}
 
     # =========================================================================
-    # DM / WORLD ACTIONS
+    # DM ACTIONS
     # =========================================================================
 
     def narrate(self, content: str = None, text: str = None, location: str = "") -> Dict:
-        """DM narration."""
         narration = content or text or ""
         if narration:
             self.log_action("📖", f"DM: {narration}")
             self.save_history(narration, location)
         return {"status": "success"}
-
-    # The legacy `dm_action` handler was removed. Use `narrate`, `create`,
-    # or `modify` for structured DM updates and world changes.
 
     def create_location(
         self,
@@ -238,7 +209,6 @@ class ActionExecutor:
         connected_to: list = None,
         anchor_location: Optional[str] = None,
     ) -> Dict:
-        """Create a new location in the world."""
         location = slugify(location)
 
         if location in self.state.locations:
@@ -246,7 +216,6 @@ class ActionExecutor:
 
         connected_to = [c for c in (connected_to or []) if c]
 
-        # Auto-connect to anchor if no connections specified
         if not connected_to:
             anchor = anchor_location or self._default_anchor_location()
             if anchor and anchor != location and anchor in self.state.locations:
@@ -261,7 +230,6 @@ class ActionExecutor:
             connections=unique_connections,
         )
 
-        # Ensure bidirectional connections
         for conn_id in unique_connections:
             other = self.state.locations.get(conn_id)
             if other and location not in (other.connections or []):
@@ -272,7 +240,6 @@ class ActionExecutor:
         return {"status": "success"}
 
     def create_item(self, item_name: str, location: str) -> Dict:
-        """Add an item to a location."""
         loc = self._get_loc(location)
         if not loc:
             return {"status": "error", "message": "Location not found"}
@@ -290,7 +257,6 @@ class ActionExecutor:
         description: str = "",
         goal: str = "",
     ) -> Dict:
-        """Create a new NPC."""
         npc_id = slugify(npc_id)
 
         if npc_id in self.state.characters:
@@ -313,7 +279,6 @@ class ActionExecutor:
         return {"status": "success"}
 
     def remove_npc(self, npc_id: str, reason: str = "left") -> Dict:
-        """Remove an NPC from the game."""
         char = self._get_char(npc_id)
         if not char:
             return {"status": "error", "message": "Cannot remove"}
@@ -325,19 +290,14 @@ class ActionExecutor:
         return {"status": "success"}
 
     def update_quest(self, quest_id: str, status: str, **_) -> Dict:
-        """Update a quest's status."""
         if not quest_id or not status:
             return {"status": "error", "message": "quest_id and status required"}
 
         quest = self.state.quests.get(quest_id)
         if not quest:
-            # Fuzzy match
             q_slug = slugify(quest_id)
             for q in self.state.quests.values():
-                if (
-                    slugify(q.id) == q_slug
-                    or slugify(q.title) == q_slug
-                ):
+                if slugify(q.id) == q_slug or slugify(q.title) == q_slug:
                     quest = q
                     break
 
@@ -350,10 +310,6 @@ class ActionExecutor:
         self.log_action("📜", f"Quest '{quest.title}': {old} → {status}")
         return {"status": "success"}
 
-    # =========================================================================
-    # UNIFIED DM TOOLS (new minimalist API)
-    # =========================================================================
-
     def create(
         self,
         type: str,
@@ -365,32 +321,22 @@ class ActionExecutor:
         goal: str = None,
         **_,
     ) -> Dict:
-        """Unified create tool - creates location, item, or NPC."""
         if type == "location":
             location = slugify(id or name)
-            return self.create_location(
-                location=location,
-                name=name,
-                description=description,
-                connected_to=None,
-            )
+            return self.create_location(location=location, name=name, description=description)
         elif type == "item":
             if not location:
-                # Default to first PC's location
-                anchor = self._default_anchor_location()
-                if not anchor:
+                location = self._default_anchor_location()
+                if not location:
                     return {"status": "error", "message": "No location for item"}
-                location = anchor
             return self.create_item(item_name=name, location=location)
         elif type == "npc":
             if not location:
-                anchor = self._default_anchor_location()
-                if not anchor:
+                location = self._default_anchor_location()
+                if not location:
                     return {"status": "error", "message": "No location for NPC"}
-                location = anchor
-            npc_id = slugify(id or name)
             return self.spawn_npc(
-                npc_id=npc_id,
+                npc_id=slugify(id or name),
                 name=name,
                 role=role or "commoner",
                 location=location,
@@ -408,7 +354,6 @@ class ActionExecutor:
         reason: str = None,
         **_,
     ) -> Dict:
-        """Unified modify tool - updates quests, removes NPCs, etc."""
         if action == "update_quest":
             if not status:
                 return {"status": "error", "message": "status required for quest update"}
@@ -416,7 +361,6 @@ class ActionExecutor:
         elif action == "remove_npc":
             return self.remove_npc(npc_id=target_id, reason=reason or "left")
         elif action == "update_location":
-            # Future: could update location description, add features, etc.
             loc = self._get_loc(target_id)
             if not loc:
                 return {"status": "error", "message": "Location not found"}
