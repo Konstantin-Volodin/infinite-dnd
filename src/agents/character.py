@@ -8,8 +8,8 @@ from ..core.utils import slugify
 from ..prompts import (
     build_character_system_prompt,
     build_character_context,
-    build_casting_system_prompt,
-    build_casting_context,
+    build_director_system_prompt,
+    build_director_context,
 )
 from ..tools import get_character_tools
 
@@ -97,8 +97,8 @@ class CharacterAgent(BaseAgent):
         else:
             scoped_location = self._active_location(state)
             action = self._decide(
-                system_prompt=build_casting_system_prompt(),
-                context=build_casting_context(state, location_id=scoped_location),
+                system_prompt=build_director_system_prompt(),
+                context=build_director_context(state, location_id=scoped_location),
                 tools=get_character_tools(),
                 fallback_tool="think",
                 fallback_args={"character_id": self._default_character_id(state)},
