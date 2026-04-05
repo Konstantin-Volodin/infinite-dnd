@@ -1,4 +1,4 @@
-"""Infinite D&D - ping-pong loop: Character acts, DM reacts."""
+"""Infinite D&D: Character acts, DM reacts."""
 from __future__ import annotations
 
 import os
@@ -73,43 +73,15 @@ class GameRunner:
                 return cid
         return raw_id
 
-    def _expand_tool_calls(self, action: dict, default_character_id: str | None = None) -> list[dict]:
-        calls = []
-        if "all_calls" in action:
-            for call in action["all_calls"]:
-                payload = call.get("arguments", {}).copy()
-                payload["tool"] = call.get("tool")
-                if default_character_id and "character_id" not in payload:
-                    payload["character_id"] = default_character_id
-                if "character_id" in payload:
-                    payload["character_id"] = self._canonical_character_id(payload.get("character_id"))
-                calls.append(payload)
-        else:
-            payload = action.copy()
-            if default_character_id and "character_id" not in payload:
-                payload["character_id"] = default_character_id
-            if "character_id" in payload:
-                payload["character_id"] = self._canonical_character_id(payload.get("character_id"))
-            calls.append(payload)
-        return calls
+    def _make_character_executor(self, default_character_id: str | None = None):
+        """Create a tool executor for character turns with auto-generation fallbacks."""
+        def executor(tool: str, **kwargs):
+            if default_character_id and "character_id" not in kwargs:
+                kwargs["character_id"] = default_character_id
+            if "character_id" in kwargs:
+                kwargs["character_id"] = self._canonical_character_id(kwargs["character_id"])
 
-    def execute_character_turn(self, dm_prompt: str | None = None) -> dict:
-        """Execute one character turn and return compact action summary."""
-        action = self.character.decide_and_act(self.engine.state, dm_prompt=dm_prompt)
-        character_id = self._canonical_character_id(action.get("character_id"))
-        action["character_id"] = character_id
-        calls = self._expand_tool_calls(action, default_character_id=character_id)
-
-        any_success = False
-        last_result = None
-
-        for call in calls:
-            tool = call.get("tool")
-            if not tool:
-                continue
-
-            payload = {k: v for k, v in call.items() if k != "tool"}
-            result = self.engine.execute_tool(tool, **payload)
+            result = self.engine.execute_tool(tool, **kwargs)
 
             if result.get("code") == "location_missing":
                 target = result.get("target_name")
@@ -117,33 +89,54 @@ class GameRunner:
                 self.output(f"  ✨ Creating '{target}'...", OutputLevel.VERBOSE)
                 gen = self.dm.generate_new_location(self.engine.state, target, origin)
                 self.engine.execute_tool(gen.get("tool"), **{k: v for k, v in gen.items() if k != "tool"})
-                result = self.engine.execute_tool(tool, **payload)
+                result = self.engine.execute_tool(tool, **kwargs)
 
             if result.get("code") == "item_missing":
                 item = result.get("item_name")
-                char = self.engine.state.characters.get(call.get("character_id", ""))
+                char = self.engine.state.characters.get(kwargs.get("character_id", ""))
                 loc = char.location if char else ""
                 self.output(f"  ✨ Checking '{item}'...", OutputLevel.VERBOSE)
                 gen = self.dm.generate_new_item(self.engine.state, item, loc)
                 if gen.get("tool") == "create":
                     self.engine.execute_tool(gen.get("tool"), **{k: v for k, v in gen.items() if k != "tool"})
-                    result = self.engine.execute_tool(tool, **payload)
+                    result = self.engine.execute_tool(tool, **kwargs)
 
-            if result.get("status") == "success":
-                any_success = True
+            return result
+        return executor
 
-            last_result = result
+    def _make_dm_executor(self, narrate_location: str = ""):
+        """Create a tool executor for DM turns with narration location tagging."""
+        def executor(tool: str, **kwargs):
+            if tool == "narrate":
+                kwargs["location"] = narrate_location
+            return self.engine.execute_tool(tool, **kwargs)
+        return executor
+
+    def execute_character_turn(self, dm_prompt: str | None = None) -> dict:
+        """Execute one character turn and return compact action summary."""
+        # Pre-resolve character for executor default
+        hinted_id = dm_prompt if dm_prompt and dm_prompt in self.engine.state.characters else None
+        default_cid = hinted_id or next(iter(self.engine.state.characters.keys()), "")
+
+        executor = self._make_character_executor(default_character_id=default_cid)
+        action = self.character.decide_and_act(
+            self.engine.state, dm_prompt=dm_prompt, tool_executor=executor
+        )
+
+        character_id = self._canonical_character_id(action.get("character_id")) or default_cid
+        results = action.get("all_results", [])
+        any_success = any(r.get("status") == "success" for r in results)
+        last_result = results[-1] if results else {"status": "error", "message": "No character action executed"}
 
         return {
             "character_id": character_id,
             "tool": action.get("tool"),
-            "result": last_result or {"status": "error", "message": "No character action executed"},
+            "result": last_result,
             "success": any_success,
         }
 
     def execute_dm_reaction(self, last_action: dict | None) -> tuple[bool, str | None]:
         """Execute one DM reactive turn and return success + soft hint."""
-        # Resolve the location of the last-acting character for narration tagging
         narrate_location = ""
         if last_action:
             char_id = last_action.get("character_id", "")
@@ -151,26 +144,17 @@ class GameRunner:
             if char:
                 narrate_location = char.location
 
-        action = self.dm.react(self.engine.state, last_action=last_action)
-        calls = self._expand_tool_calls(action)
+        executor = self._make_dm_executor(narrate_location=narrate_location)
+        action = self.dm.react(self.engine.state, last_action=last_action, tool_executor=executor)
 
-        any_success = False
+        results = action.get("all_results", [])
+        any_success = any(r.get("status") == "success" for r in results)
+
+        # Extract prompts_character hint from narrate calls
         prompted_character = None
-
-        for call in calls:
-            tool = call.get("tool")
-            if not tool:
-                continue
-
-            payload = {k: v for k, v in call.items() if k != "tool"}
-            if tool == "narrate":
-                payload["location"] = narrate_location
-            result = self.engine.execute_tool(tool, **payload)
-            if result.get("status") == "success":
-                any_success = True
-
-            if tool == "narrate":
-                hint = call.get("prompts_character")
+        for call in action.get("all_calls", []):
+            if call.get("tool") == "narrate":
+                hint = call.get("arguments", {}).get("prompts_character")
                 hint = self._canonical_character_id(hint)
                 if isinstance(hint, str) and hint in self.engine.state.characters:
                     prompted_character = hint

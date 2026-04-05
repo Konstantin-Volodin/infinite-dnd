@@ -2,8 +2,10 @@
 Base Agent - Shared functionality for all LLM agents.
 """
 
-from typing import Dict, Any, List
+import json
+from typing import Dict, Any, List, Callable, Optional
 from ..core.llm import LLMClient
+from ..config import Config
 
 
 class BaseAgent:
@@ -20,8 +22,82 @@ class BaseAgent:
         fallback_tool: str = "wait",
         fallback_args: Dict = None,
         require_tool: bool = False,
+        tool_executor: Optional[Callable] = None,
+        max_steps: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Make a decision using LLM with tool calling."""
+        """Make a decision using LLM with tool calling.
+
+        When tool_executor is provided, runs an agentic loop: call tools,
+        feed results back to the LLM, repeat until the LLM yields (no tool
+        calls) or max_steps is reached.
+
+        When tool_executor is None, behaves as single-shot (backward compat).
+        """
+        if tool_executor is None:
+            return self._decide_single(
+                system_prompt, context, tools, fallback_tool, fallback_args, require_tool
+            )
+
+        if max_steps is None:
+            max_steps = Config.MAX_ACTIONS_PER_TURN
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": context},
+        ]
+        all_calls: List[Dict[str, Any]] = []
+        all_results: List[Dict[str, Any]] = []
+
+        for step in range(max_steps):
+            result = self.llm.chat_step(
+                messages, tools, require_tool=(require_tool and step == 0)
+            )
+
+            if result["type"] == "error":
+                print(f"Agent error: {result.get('message', 'Unknown error')}")
+                break
+
+            if result["type"] == "text":
+                break
+
+            # Append assistant message to conversation for threading
+            messages.append(result["raw_message"])
+
+            for call in result["calls"]:
+                call_entry = {"tool": call["tool"], "arguments": call.get("arguments", {})}
+                all_calls.append(call_entry)
+
+                tool_result = tool_executor(call["tool"], **call.get("arguments", {}))
+                all_results.append(tool_result)
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": call["id"],
+                    "content": json.dumps(tool_result, default=str),
+                })
+
+        if not all_calls:
+            return {"tool": fallback_tool, **(fallback_args or {"reason": "No action taken"})}
+
+        first_call = all_calls[0]
+        action = {
+            "tool": first_call["tool"],
+            **first_call["arguments"],
+            "all_calls": all_calls,
+            "all_results": all_results,
+        }
+        return action
+
+    def _decide_single(
+        self,
+        system_prompt: str,
+        context: str,
+        tools: List[Dict[str, Any]],
+        fallback_tool: str = "wait",
+        fallback_args: Dict = None,
+        require_tool: bool = False,
+    ) -> Dict[str, Any]:
+        """Original single-shot decision (no agentic loop)."""
         result = self.llm.chat_with_tools(
             system_prompt, context, tools, require_tool=require_tool
         )

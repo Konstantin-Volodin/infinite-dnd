@@ -66,6 +66,7 @@ class CharacterAgent(BaseAgent):
         self,
         state: WorldState,
         dm_prompt: str | None = None,
+        tool_executor=None,
     ) -> Dict[str, Any]:
         """Pick which character acts and return their tool call payload.
 
@@ -89,6 +90,7 @@ class CharacterAgent(BaseAgent):
                 fallback_tool="wait",
                 fallback_args={"character_id": hinted_id},
                 require_tool=False,
+                tool_executor=tool_executor,
             )
             action["character_id"] = action.get("character_id") or hinted_id
         else:
@@ -100,6 +102,7 @@ class CharacterAgent(BaseAgent):
                 fallback_tool="wait",
                 fallback_args={"character_id": self._default_character_id(state)},
                 require_tool=True,
+                tool_executor=tool_executor,
             )
             if not action.get("character_id") or action["character_id"] not in state.characters:
                 action["character_id"] = self._default_character_id(state)

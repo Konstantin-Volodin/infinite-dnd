@@ -13,17 +13,20 @@ from ..tools import get_dm_tools
 class DMAgent(BaseAgent):
     """Dungeon Master agent that narrates and creates world content."""
 
-    def react(self, state: WorldState, last_action: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    def react(
+        self, state: WorldState, last_action: Dict[str, Any] | None = None, tool_executor=None
+    ) -> Dict[str, Any]:
         """React to the latest character action using DM tools."""
         context = build_dm_context(state, last_action=last_action)
 
         return self._decide(
             system_prompt=build_dm_system_prompt()
-            + "\n\nYou can use multiple tools in one response.",
+            + "\n\nYou can take multiple actions per turn. After each action you see the result and decide what to do next. When done, stop calling tools.",
             context=context,
             tools=get_dm_tools(),
             fallback_tool="narrate",
             fallback_args={"content": "The scene continues..."},
+            tool_executor=tool_executor,
         )
 
     def generate_new_location(

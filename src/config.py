@@ -7,6 +7,7 @@ class Config:
     # Game Settings
     RESET_WORLD = os.getenv("GAME_RESET_WORLD", "true").lower() == "true"
     MAX_SCENES = int(os.getenv("GAME_MAX_SCENES", "25"))
+    MAX_ACTIONS_PER_TURN = int(os.getenv("GAME_MAX_ACTIONS_PER_TURN", "3"))
     
     # Logging
     LOG_LEVEL = os.getenv("GAME_LOG_LEVEL", "INFO").upper()

@@ -183,6 +183,43 @@ class LLMClient:
             calls.append({"tool": tool_name, "arguments": args})
         return calls
 
+    def chat_step(
+        self, messages: List[Dict], tools: List[Dict], *, require_tool: bool = False
+    ) -> Dict:
+        """Single LLM call returning parsed result + raw assistant message for conversation threading."""
+        resp = self.chat(messages, tools, require_tool=require_tool)
+        if "error" in resp:
+            return {"type": "error", "message": resp["error"]}
+        try:
+            msg = resp["choices"][0]["message"]
+            if msg.get("tool_calls"):
+                calls = []
+                for tc in msg["tool_calls"]:
+                    calls.append({
+                        "id": tc.get("id", f"call_{len(calls)}"),
+                        "tool": tc["function"]["name"],
+                        "arguments": json.loads(tc["function"]["arguments"]),
+                    })
+                return {"type": "tool_calls", "calls": calls, "raw_message": msg}
+            content = msg.get("content", "")
+            if "<tool_call>" in content:
+                parsed = self._parse_xml_tool_calls(content)
+                if parsed:
+                    # Synthesize raw_message with tool_calls for threading
+                    synth_tcs = []
+                    for i, p in enumerate(parsed):
+                        synth_tcs.append({
+                            "id": f"call_{i}",
+                            "type": "function",
+                            "function": {"name": p["tool"], "arguments": json.dumps(p["arguments"])},
+                        })
+                    synth_msg = {"role": "assistant", "tool_calls": synth_tcs}
+                    calls = [{"id": f"call_{i}", **p} for i, p in enumerate(parsed)]
+                    return {"type": "tool_calls", "calls": calls, "raw_message": synth_msg}
+            return {"type": "text", "content": content, "raw_message": msg}
+        except Exception as e:
+            return {"type": "error", "message": str(e)}
+
     def chat_json(self, system: str, user: str, schema: Dict = None) -> Dict:
         """Request JSON response. Schema is included in prompt for guidance."""
         hint = ""
