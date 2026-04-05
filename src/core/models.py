@@ -27,18 +27,21 @@ class Location(BaseModel):
 
 class Character(BaseModel):
     id: str
-    name: str = ""
-    type: CharacterType = CharacterType.NPC
-
-    location: str = ""
-    role: str = ""  # e.g., "merchant", "guard", "villager"
-    stats: CharacterStats = Field(default_factory=CharacterStats)
+    role: str = "" 
     backstory: str = ""
-    personality: str = ""  # personality traits
-    goal: str = ""  # current goal
+    personality: str = "" 
+    goal: str = ""
+    location: str = ""
+    relationships: Dict[str, str] = {}
     inventory: List[str] = []
     knowledge: List[str] = []
-    relationships: Dict[str, str] = {}  # ally, enemy, contact, etc.
+    stats: CharacterStats = Field(default_factory=CharacterStats)
+
+
+class HistoryEvent(BaseModel):
+    text: str
+    location: str
+    characters: List[str] = []
 
 
 class Quest(BaseModel):
@@ -55,4 +58,4 @@ class WorldState(BaseModel):
     locations: Dict[str, Location] = {}
     characters: Dict[str, Character] = {}
     quests: Dict[str, Quest] = {}
-    history: List[str] = []  # Recent events for context
+    history: List[HistoryEvent] = []

@@ -3,7 +3,7 @@
 import warnings
 from typing import Any, Dict
 from ..core.state import StateManager
-from ..core.models import WorldState
+from ..core.models import WorldState, HistoryEvent
 from ..core.utils import slugify
 from .actions import ActionExecutor
 
@@ -54,13 +54,14 @@ class Engine:
         return raw_location
 
 
-    def save_history(self, text: str):
-        """Add to state history, keeping last 50 events for richer context."""
-        # Truncate overly long entries to protect context window
+    def save_history(self, text: str, location: str):
+        """Add to state history, tagging characters at the event location."""
         if len(text) > 1000:
             text = text[:1000] + "...(truncated)"
-        
-        self.state.history.append(text)
+
+        characters = [c.id for c in self.state.characters.values() if c.location == location]
+        event = HistoryEvent(text=text, location=location, characters=characters)
+        self.state.history.append(event)
         if len(self.state.history) > 50:
             self.state.history.pop(0)
         self.save_state()
@@ -109,7 +110,8 @@ class Engine:
         # Normalize narrate content aliases
         if tool_name == "narrate":
             content = args.get("content") or args.get("narration") or args.get("text") or ""
-            return method(content)
+            location = args.get("location", "")
+            return method(content, location=location)
 
         # Normalize connected_to for create_location
         if tool_name == "create_location":

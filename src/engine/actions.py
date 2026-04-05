@@ -92,7 +92,7 @@ class ActionExecutor:
             intent += f" {roll_info}"
 
         self.log_action("⚔️", intent)
-        self.save_history(intent)
+        self.save_history(intent, char.location)
 
         return {
             "status": "success",
@@ -124,7 +124,7 @@ class ActionExecutor:
             intent = f'{char.id} says: "{message}"'
 
         self.log_action("💬", intent)
-        self.save_history(intent)
+        self.save_history(intent, char.location)
 
         return {
             "status": "success",
@@ -162,10 +162,12 @@ class ActionExecutor:
                 "message": f"Cannot reach {new_loc.id} from here",
             }
 
+        origin_id = current_loc.id
+        self.save_history(f"{char.id} left towards {new_loc.id}", origin_id)
         char.location = location
         self.save_state()
+        self.save_history(f"{char.id} arrived from {origin_id}", new_loc.id)
         self.log_action("🚶", f"{char.id} moves to {new_loc.id}")
-        self.save_history(f"{char.id} moved to {new_loc.id}")
         return {"status": "success"}
 
     def think(
@@ -220,12 +222,12 @@ class ActionExecutor:
     # DM / WORLD ACTIONS
     # =========================================================================
 
-    def narrate(self, content: str = None, text: str = None) -> Dict:
+    def narrate(self, content: str = None, text: str = None, location: str = "") -> Dict:
         """DM narration."""
         narration = content or text or ""
         if narration:
             self.log_action("📖", f"DM: {narration}")
-            self.save_history(narration)
+            self.save_history(narration, location)
         return {"status": "success"}
 
     # The legacy `dm_action` handler was removed. Use `narrate`, `create`,
