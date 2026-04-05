@@ -1,20 +1,18 @@
 [
   {
     "id": "elara-swift",
-    "type": "pc",
     "location": "valley-bridge",
-
     "role": "former-guard",
     "stats": {"hp": 20, "max_hp": 20},
     "backstory": "I was a royal guard once. I left when my brother disappeared - finding him matters more than any oath.",
     "personality": "When I decide to act, I don't stop until it's done. I'd rather solve a problem than fight my way through it. Stray animals trust me - maybe because I know what it's like to be lost.",
     "goal": "Find my brother. He vanished near the river three weeks ago. Someone in this market knows something.",
-    "inventory": ["guard-pendant"],
     "knowledge": [],
+    "inventory": ["guard-pendant"],
     "relationships": {"kaelen-swift": "brother" }
   },
   {
-    "id": "ronn-spice-merchant",
+    "id": "ronny-spice",
     "stats": {"hp": 5, "max_hp": 5},
     "role": "merchant",
     "location": "market-square",
