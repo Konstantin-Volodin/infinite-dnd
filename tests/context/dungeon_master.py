@@ -16,20 +16,20 @@ from src.tools import DM_TOOLS
 
 
 def main():
-    sm = StateManager()
-    state = sm.generate_state()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    state = StateManager().generate_state()
 
     archive_dir = os.path.join(os.path.dirname(__file__), "archive")
     os.makedirs(archive_dir, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d")
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    system_prompt = build_dm_system_prompt()
+    system = build_dm_system_prompt()
     context = build_dm_context(state, last_action=None)
+    tools = DM_TOOLS
 
     output = f"##### Dungeon Master\n\n"
-    output += f"##### System Prompt\n{system_prompt}\n\n"
-    output += f"##### Tools\n{json.dumps(DM_TOOLS, indent=4)}\n\n"
+    output += f"##### System Prompt\n{system}\n\n"
+    output += f"##### Tools\n{json.dumps(tools, indent=4)}\n\n"
     output += f"##### Context\n{context}"
 
     path = os.path.join(archive_dir, f"{stamp}-dungeon_master.md")

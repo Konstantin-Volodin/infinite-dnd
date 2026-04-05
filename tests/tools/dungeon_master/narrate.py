@@ -21,7 +21,7 @@ SCENARIO = "elara-swift just forced open the locked chest. Inside is a shattered
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     llm = LLMClient()
-    result = llm.chat_with_tools(system=SYSTEM, user=SCENARIO, tools=[TOOL], require_tool=True)
+    result = llm.chat_with_tools(system=SYSTEM, user=SCENARIO, tools=DM_TOOLS, require_tool=True)
 
     calls = result.get("calls", [])
     passed = result["type"] == "tool_calls" and bool(calls) and calls[0]["tool"] == TOOL["name"]
