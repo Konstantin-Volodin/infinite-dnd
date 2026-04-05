@@ -4,12 +4,14 @@
 from __future__ import annotations
 import sys
 import os
+import json
 import logging
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.core.state import StateManager
-from src.prompts.dungeon_master import build_dm_system_prompt, build_dm_context
+from src.prompts import build_dm_system_prompt, build_dm_context
+from src.tools import DM_TOOLS
 
 
 def main():
@@ -19,12 +21,14 @@ def main():
     archive_dir = os.path.join(os.path.dirname(__file__), "archive")
     os.makedirs(archive_dir, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     system_prompt = build_dm_system_prompt()
     context = build_dm_context(state, last_action=None)
 
     output = f"##### Dungeon Master\n\n"
     output += f"##### System Prompt\n{system_prompt}\n\n"
+    output += f"##### Tools\n{json.dumps(DM_TOOLS, indent=2)}\n\n"
     output += f"##### Context\n{context}"
 
     path = os.path.join(archive_dir, f"{stamp}-dungeon_master.md")
@@ -33,5 +37,4 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     main()
