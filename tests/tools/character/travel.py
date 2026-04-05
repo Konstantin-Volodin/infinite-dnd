@@ -1,0 +1,47 @@
+# tests/tools/character/travel.py
+"""Live test: LLM calls travel given a movement scenario."""
+
+from __future__ import annotations
+import sys
+import os
+import json
+import logging
+from datetime import datetime
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+from src.core.llm import LLMClient
+from src.core.state import StateManager
+from src.tools import CHARACTER_TOOLS
+
+TOOL = next(t for t in CHARACTER_TOOLS if t["name"] == "travel")
+SCENARIO = "You need to move on. Exits from your current location: forest-trail, valley-bridge."
+
+
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    llm = LLMClient()
+    characters = StateManager().generate_initial_setup().characters
+
+    archive_dir = os.path.join(os.path.dirname(__file__), "..", "archive")
+    os.makedirs(archive_dir, exist_ok=True)
+    stamp = datetime.now().strftime("%Y-%m-%d")
+
+    for char in characters.values():
+        system = f"You are {char.id}, {char.role}. You are currently in {char.location}. Goal: {char.goal}"
+        result = llm.chat_with_tools(system=system, user=SCENARIO, tools=[TOOL], require_tool=True)
+
+        calls = result.get("calls", [])
+        passed = result["type"] == "tool_calls" and bool(calls) and calls[0]["tool"] == TOOL["name"]
+
+        output  = f"##### Tool: {TOOL['name']} | {char.id} — {'PASS' if passed else 'FAIL'}\n\n"
+        output += f"##### Scenario\n{SCENARIO}\n\n"
+        output += f"##### Result\n{json.dumps(result, indent=2)}\n"
+
+        path = os.path.join(archive_dir, f"{stamp}-{TOOL['name']}-{char.id}.md")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(output)
+        logging.info(f"[{'PASS' if passed else 'FAIL'}] {TOOL['name']}:{char.id} → {path}")
+
+
+if __name__ == "__main__":
+    main()
