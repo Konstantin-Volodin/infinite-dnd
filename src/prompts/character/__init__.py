@@ -1,11 +1,8 @@
-"""Character prompts — system prompts and context builders."""
+"""Character prompts — system prompt and context builder."""
 
-from .system import build_character_system_prompt, build_casting_system_prompt
-from .context import build_character_context, build_casting_context
+from .build import build_character_system_prompt, build_character_context
 
 __all__ = [
     "build_character_system_prompt",
-    "build_casting_system_prompt",
     "build_character_context",
-    "build_casting_context",
 ]
