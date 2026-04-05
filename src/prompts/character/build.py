@@ -42,7 +42,7 @@ def build_character_context(char: Character, state: WorldState) -> str:
 
     # Others present
     others = [
-        f"{c.id} ({c.role or c.type.value})"
+        f"{c.id} ({c.role})" if c.role else c.id
         for c in state.characters.values()
         if c.location == char.location and c.id != char.id
     ]
