@@ -1,9 +1,7 @@
-"""
-Tool Definitions - JSON schemas for LLM function calling.
+"""Tool definitions — JSON schemas for LLM function calling.
 
-Ping-pong tool set:
-- Character: act, speak, move, think (4)
-- DM: narrate, create, modify (3)
+Character: act, speak, move (3)
+DM: narrate, create, modify (3)
 """
 
 from typing import List, Dict, Any
@@ -12,13 +10,13 @@ from typing import List, Dict, Any
 def _tool(
     name: str, desc: str, params: Dict[str, Any], required: List[str] = None
 ) -> Dict:
-    """Helper to build OpenAI function-calling tool schema."""
+    """Build an OpenAI function-calling tool schema."""
     props = {}
     for k, v in params.items():
         if isinstance(v, str):
             props[k] = {"type": "string", "description": v}
         else:
-            props[k] = v  # Allow full property definitions
+            props[k] = v
     return {
         "type": "function",
         "function": {
@@ -34,50 +32,39 @@ def _tool(
 
 
 # =============================================================================
-# CHARACTER TOOLS (4)
+# CHARACTER TOOLS (3)
 # =============================================================================
 
 CHARACTER_TOOLS = [
     _tool(
         "act",
-        "Perform a physical action. Covers combat, examining, picking up items, using items, skill checks, casting spells, etc.",
+        "Do something physical: attack, examine, pick up, use an item, cast a spell, sneak, climb — anything that isn't talking or traveling.",
         {
-            "character_id": "Who is acting (character ID). Optional but preferred when selecting across multiple characters.",
-            "description": "What you do (e.g., 'attack the guard', 'examine the runes', 'pick up the lantern').",
-            "skill": "Skill involved if uncertain outcome (e.g., 'stealth', 'athletics'). Optional.",
-            "target": "Who/what you interact with. Optional.",
+            "character_id": "Your character ID.",
+            "description": "What you do.",
+            "skill": "Skill for uncertain outcomes (e.g. 'stealth', 'athletics').",
+            "target": "Who or what you interact with.",
         },
-        required=["description"],
+        required=["character_id", "description"],
     ),
     _tool(
         "speak",
-        "Say something out loud. Use full sentences with emotion and body language. Example: '*leaning forward* Listen, I know this is hard to hear, but your brother was seen near the cellar that night.'",
+        "Say something out loud. Include emotion and body language in your message.",
         {
-            "character_id": "Who is speaking (character ID). Optional but preferred when selecting across multiple characters.",
-            "message": "What you say — full dialogue with tone, emotion, body language. Not fragments.",
-            "target": "Who you're speaking to. Optional.",
+            "character_id": "Your character ID.",
+            "message": "What you say — full dialogue with tone and body language.",
+            "target": "Who you're speaking to.",
         },
-        required=["message"],
+        required=["character_id", "message"],
     ),
     _tool(
         "move",
-        "Travel to a connected location.",
+        "Travel to a connected location. Must be a valid exit from your current location.",
         {
-            "character_id": "Who is moving (character ID). Optional but preferred when selecting across multiple characters.",
-            "location": "The location to move to (must be an available exit).",
+            "character_id": "Your character ID.",
+            "location": "Location ID to move to.",
         },
-        required=["location"],
-    ),
-    _tool(
-        "think",
-        "Record internal changes AFTER acting or learning. Not for planning. Use sparingly.",
-        {
-            "character_id": "Who is reflecting (character ID). Optional but preferred when selecting across multiple characters.",
-            "goals": "Updated goals (only if they changed). Optional.",
-            "emotions": "Emotional shift after an event. Optional.",
-            "knowledge": "New fact to remember. Optional.",
-        },
-        required=[],
+        required=["character_id", "location"],
     ),
 ]
 
@@ -89,43 +76,43 @@ CHARACTER_TOOLS = [
 DM_TOOLS = [
     _tool(
         "narrate",
-        "Describe the environment, action outcomes, and transitions. Do NOT speak for NPCs — they have their own turns.",
+        "Describe what happens in the world. Never write dialogue or thoughts for characters — they speak for themselves.",
         {
-            "content": "The narration text.",
-            "prompts_character": "Character ID who should respond next. Optional soft hint.",
+            "content": "The narration.",
+            "prompts_character": "Character ID who should respond next (soft hint).",
         },
         required=["content"],
     ),
     _tool(
         "create",
-        "Add something new to the world: a location, item, or NPC.",
+        "Add a location, item, or NPC to the world.",
         {
             "type": {
                 "type": "string",
                 "enum": ["location", "item", "npc"],
                 "description": "What to create.",
             },
-            "id": "Unique ID (lowercase, hyphens, e.g., 'guard-marcus', 'dark-alley').",
+            "id": "Unique ID (lowercase-hyphenated).",
             "name": "Display name.",
             "description": "Description or backstory.",
-            "location": "Where it appears (required for item/npc, optional for location to set connection).",
-            "role": "NPC role/class (e.g., 'guard', 'merchant'). For NPCs only.",
-            "goal": "NPC goal/motivation. For NPCs only. Optional.",
+            "location": "Where it appears (required for item/npc).",
+            "role": "NPC role (e.g. 'guard', 'merchant'). NPCs only.",
+            "goal": "NPC motivation. NPCs only.",
         },
         required=["type", "name", "description"],
     ),
     _tool(
         "modify",
-        "Change or remove something in the world: update quest status, remove NPC, change location state.",
+        "Change or remove something: update a quest, remove an NPC, update a location.",
         {
             "action": {
                 "type": "string",
                 "enum": ["update_quest", "remove_npc", "update_location"],
-                "description": "What modification to make.",
+                "description": "What to do.",
             },
-            "target_id": "ID of the quest, NPC, or location to modify.",
-            "status": "New status (for quests: active/completed/failed).",
-            "reason": "Why this change is happening (for narration/logging).",
+            "target_id": "ID of the quest, NPC, or location.",
+            "status": "New status (quests: active/completed/failed).",
+            "reason": "Why this change is happening.",
         },
         required=["action", "target_id"],
     ),
@@ -138,10 +125,8 @@ DM_TOOLS = [
 
 
 def get_character_tools() -> List[Dict[str, Any]]:
-    """Return character tools."""
     return CHARACTER_TOOLS
 
 
 def get_dm_tools() -> List[Dict[str, Any]]:
-    """Return DM tools."""
     return DM_TOOLS

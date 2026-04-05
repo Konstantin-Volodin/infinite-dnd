@@ -143,6 +143,14 @@ class GameRunner:
 
     def execute_dm_reaction(self, last_action: dict | None) -> tuple[bool, str | None]:
         """Execute one DM reactive turn and return success + soft hint."""
+        # Resolve the location of the last-acting character for narration tagging
+        narrate_location = ""
+        if last_action:
+            char_id = last_action.get("character_id", "")
+            char = self.engine.state.characters.get(char_id)
+            if char:
+                narrate_location = char.location
+
         action = self.dm.react(self.engine.state, last_action=last_action)
         calls = self._expand_tool_calls(action)
 
@@ -154,7 +162,10 @@ class GameRunner:
             if not tool:
                 continue
 
-            result = self.engine.execute_tool(tool, **{k: v for k, v in call.items() if k != "tool"})
+            payload = {k: v for k, v in call.items() if k != "tool"}
+            if tool == "narrate":
+                payload["location"] = narrate_location
+            result = self.engine.execute_tool(tool, **payload)
             if result.get("status") == "success":
                 any_success = True
 

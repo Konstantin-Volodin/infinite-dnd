@@ -1,13 +1,13 @@
 """Action execution for the game engine.
 
 This module handles all game actions:
-- Character actions: act, speak, move, think
+- Character actions: act, speak, move
 - DM actions: narrate, create, modify
 """
 
 import random
 from typing import Dict, Optional
-from ..core.models import WorldState, Location, Character, CharacterType, CharacterStats
+from ..core.models import WorldState, Location, Character, CharacterStats
 from ..core.rules import get_skill_modifier
 from ..core.utils import slugify
 
@@ -48,12 +48,9 @@ class ActionExecutor:
 
     def _default_anchor_location(self) -> Optional[str]:
         """Pick a reasonable anchor location for new content."""
-        for c in self.state.characters.values():
-            if (
-                getattr(c, "type", None) == CharacterType.PC
-                and c.location in self.state.locations
-            ):
-                return c.location
+        first_char = next(iter(self.state.characters.values()), None)
+        if first_char and first_char.location in self.state.locations:
+            return first_char.location
         return next(iter(self.state.locations.keys()), None)
 
     # =========================================================================
@@ -305,8 +302,6 @@ class ActionExecutor:
 
         self.state.characters[npc_id] = Character(
             id=npc_id,
-            name=name,
-            type=CharacterType.NPC,
             role=role,
             backstory=description,
             goal=goal,
@@ -320,7 +315,7 @@ class ActionExecutor:
     def remove_npc(self, npc_id: str, reason: str = "left") -> Dict:
         """Remove an NPC from the game."""
         char = self._get_char(npc_id)
-        if not char or char.type == CharacterType.PC:
+        if not char:
             return {"status": "error", "message": "Cannot remove"}
 
         name = char.id

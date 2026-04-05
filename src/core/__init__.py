@@ -4,7 +4,6 @@ from .models import (
     WorldState,
     Character,
     Location,
-    CharacterType,
     CharacterStats,
 )
 from .state import StateManager
@@ -14,7 +13,6 @@ __all__ = [
     "WorldState",
     "Character",
     "Location",
-    "CharacterType",
     "CharacterStats",
     "StateManager",
     "LLMClient",

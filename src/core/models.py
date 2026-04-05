@@ -1,13 +1,7 @@
 """Data Models - Pydantic models for game state."""
 
 from typing import List, Dict
-from enum import Enum
 from pydantic import BaseModel, Field
-
-
-class CharacterType(str, Enum):
-    PC = "pc"
-    NPC = "npc"
 
 
 class CharacterStats(BaseModel):

@@ -17,7 +17,7 @@ class BaseAgent:
         system_prompt: str,
         context: str,
         tools: List[Dict[str, Any]],
-        fallback_tool: str = "think",
+        fallback_tool: str = "wait",
         fallback_args: Dict = None,
         require_tool: bool = False,
     ) -> Dict[str, Any]:

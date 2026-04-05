@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 from .base import BaseAgent
-from ..core.models import WorldState, CharacterType
+from ..core.models import WorldState
 from ..core.utils import slugify
 from ..prompts import (
     build_character_system_prompt,
@@ -24,9 +24,6 @@ class CharacterAgent(BaseAgent):
     def _default_character_id(self, state: WorldState) -> str:
         if self.character_id and self.character_id in state.characters:
             return self.character_id
-        pc = next((cid for cid, c in state.characters.items() if c.type == CharacterType.PC), None)
-        if pc:
-            return pc
         return next(iter(state.characters.keys()), "")
 
     def _active_location(self, state: WorldState, preferred_character_id: str | None = None) -> str | None:
@@ -77,7 +74,7 @@ class CharacterAgent(BaseAgent):
         - Otherwise fallback to casting across current scope.
         """
         if not state.characters:
-            return {"tool": "think", "character_id": "", "reason": "No characters"}
+            return {"tool": "wait", "character_id": "", "reason": "No characters"}
 
         hinted_id = dm_prompt if dm_prompt in state.characters else None
 
@@ -89,7 +86,7 @@ class CharacterAgent(BaseAgent):
                 + "\n\nAlways include `character_id` with your tool call.",
                 context=context,
                 tools=get_character_tools(),
-                fallback_tool="think",
+                fallback_tool="wait",
                 fallback_args={"character_id": hinted_id},
                 require_tool=False,
             )
@@ -100,7 +97,7 @@ class CharacterAgent(BaseAgent):
                 system_prompt=build_director_system_prompt(),
                 context=build_director_context(state, location_id=scoped_location),
                 tools=get_character_tools(),
-                fallback_tool="think",
+                fallback_tool="wait",
                 fallback_args={"character_id": self._default_character_id(state)},
                 require_tool=True,
             )
@@ -127,9 +124,9 @@ class CharacterAgent(BaseAgent):
             if isinstance(dest, str) and char:
                 if dest == char.location or (loc and dest == loc.id):
                     action = {
-                        "tool": "think",
+                        "tool": "wait",
                         "character_id": char.id,
-                        "knowledge": f"I considered moving to {dest}, but I'm already here.",
+                        "reason": f"Already at {dest}.",
                     }
 
         self._normalize_targets(state, action)

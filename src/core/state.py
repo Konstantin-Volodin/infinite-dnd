@@ -6,7 +6,6 @@ from .models import (
     WorldState,
     Character,
     Location,
-    CharacterType,
     CharacterStats,
     Quest,
 )
@@ -48,14 +47,8 @@ class StateManager:
         characters = {}
         characters_json = self.read_json(os.path.join(self.setup_dir, "characters.json"))
         for char in characters_json:
-            c_type = CharacterType(char["type"]) if "type" in char else CharacterType.NPC
-            # Simple heuristic for name: convert slug to Title Case
-            c_name = char.get("name") or char["id"].replace("-", " ").title()
-
             characters[char["id"]] = Character(
                 id=char["id"],
-                name=c_name,
-                type=char.get("type", c_type),
                 location=char.get("location", "market-square"),
                 role=char.get("role", ""),
                 stats=CharacterStats(**char.get("stats", {})),
