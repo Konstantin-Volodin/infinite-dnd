@@ -5,12 +5,12 @@ from src.core.models import WorldState
 from src.llm.prompts.loader import render
 
 
-def build_director_system_prompt() -> str:
+def director_system() -> str:
     """Build the director's system prompt."""
     return render("director/system.jinja")
 
 
-def build_director_context(state: WorldState, location_id: str | None = None) -> str:
+def director_context(state: WorldState, location_id: str | None = None) -> str:
     """Build context for selecting and acting as one character."""
     scope_label = "all locations"
     scoped_chars = list(state.characters.values())

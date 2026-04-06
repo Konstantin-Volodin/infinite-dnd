@@ -7,12 +7,12 @@ from src.llm.prompts.loader import render
 from src.core.rules import get_health_status
 
 
-def build_character_system_prompt(char: Character) -> str:
+def character_system(char: Character) -> str:
     """Build the character identity."""
     return render("character/system.jinja", char=char)
 
 
-def build_character_context(char: Character, state: WorldState) -> str:
+def character_context(char: Character, state: WorldState) -> str:
     """Build the character context."""
 
     # internal status

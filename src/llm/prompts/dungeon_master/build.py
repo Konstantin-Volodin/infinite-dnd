@@ -7,12 +7,12 @@ from src.core.rules import get_health_status
 from src.llm.prompts.loader import render
 
 
-def build_dm_system_prompt() -> str:
+def dm_system() -> str:
     """Build the DM's system prompt."""
     return render("dungeon_master/system.jinja")
 
 
-def build_dm_context(state: WorldState, last_action: dict | None = None) -> str:
+def dm_context(state: WorldState, last_action: dict | None = None) -> str:
     """Build the DM's context from current state and latest character action."""
 
     # Characters
