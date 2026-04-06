@@ -1,10 +1,5 @@
-# src/llm/core.py
-"""
-Handles LLM server management and model creation.
-- `LlamaServer`: manages a local llama-server subprocess.
-- `create_model`: factory for OpenAIChatModel from env vars.
-- `ToolCall`, `ToolPlan`: structured output types for agent tool calls.
-"""
+# src/llm/server.py
+"""Handles the llama.cpp server management and model creation."""
 
 import os
 import subprocess
@@ -48,23 +43,3 @@ class LlamaServer:
 
     def __enter__(self): return self
     def __exit__(self, *_): self.stop()
-
-
-def create_model() -> OpenAIChatModel:
-    """Create an OpenAIChatModel from environment variables."""
-    return OpenAIChatModel(
-        os.getenv("LLM_MODEL", ""),
-        provider=OpenAIProvider(
-            base_url=os.getenv("LLM_BASE_URL", "http://localhost:1234/v1"),
-            api_key=os.getenv("LLM_API_KEY", "not-needed"),
-        ),
-    )
-
-
-class ToolCall(BaseModel):
-    tool: str
-    arguments: dict[str, Any] = Field(default_factory=dict)
-
-
-class ToolPlan(BaseModel):
-    calls: list[ToolCall] = Field(default_factory=list)
