@@ -11,7 +11,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.core.state import StateManager
-from src.llm.prompts import build_dm_system_prompt, build_dm_context
+from src.llm.prompts import dm_system, dm_context
 from src.llm.tools import DM_TOOLS
 
 
@@ -23,8 +23,8 @@ def main():
     os.makedirs(archive_dir, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d")
 
-    system = build_dm_system_prompt()
-    context = build_dm_context(state, last_action=None)
+    system = dm_system()
+    context = dm_context(state, last_action=None)
     tools = DM_TOOLS
 
     output = f"##### Dungeon Master\n\n"

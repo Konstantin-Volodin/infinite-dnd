@@ -1,5 +1,5 @@
-# tests/tools/character/speak.py
-"""Live test: LLM calls speak given a dialogue scenario."""
+# tests/tools/character/travel.py
+"""Live test: LLM calls travel given a movement scenario."""
 
 from __future__ import annotations
 import sys
@@ -12,11 +12,11 @@ from datetime import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from src.core.llm import LLMClient
 from src.core.state import StateManager
-from src.llm.prompts.character.build import build_character_system_prompt
+from src.llm.prompts.character.build import character_system
 from src.llm.tools import CHARACTER_TOOLS
 
-TOOL = next(t for t in CHARACTER_TOOLS if t["name"] == "speak")
-SCENARIO = "A hooded merchant (merchant-01) is eyeing you suspiciously from across the market stall. You want to find out what they know."
+TOOL = next(t for t in CHARACTER_TOOLS if t["name"] == "travel")
+SCENARIO = "You need to move on. Exits from your current location: forest-trail, valley-bridge."
 
 
 def main():
@@ -29,7 +29,7 @@ def main():
     stamp = datetime.now().strftime("%Y-%m-%d")
 
     for char_id, char in state.characters.items():
-        system_prompt = build_character_system_prompt(char)
+        system_prompt = character_system(char)
         result = llm.chat_with_tools(system=system_prompt, user=SCENARIO, tools=CHARACTER_TOOLS, require_tool=True)
 
         calls = result.get("calls", [])

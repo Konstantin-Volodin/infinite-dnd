@@ -10,7 +10,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.core.state import StateManager
-from src.llm.prompts import build_character_system_prompt, build_character_context
+from src.llm.prompts import character_system, character_context
 from src.llm.tools import CHARACTER_TOOLS
 
 
@@ -26,8 +26,8 @@ def main():
     for char_id, char in state.characters.items():
         path = os.path.join(archive_dir, f"{stamp}-{char.id}.md")
 
-        system = build_character_system_prompt(char)
-        context = build_character_context(char, state)
+        system = character_system(char)
+        context = character_context(char, state)
         tools = CHARACTER_TOOLS
 
         output = f"##### Character: {char.id}\n\n"
