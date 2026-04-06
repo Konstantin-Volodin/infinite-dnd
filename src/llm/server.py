@@ -17,7 +17,7 @@ class LlamaServer:
     _DEFAULT_MODEL = "Jackrong/Qwopus3.5-4B-v3-GGUF:Q8_0"
 
     def __init__(self):
-        port = os.getenv("LLM_PORT", self._DEFAULT_PORT)
+        port = os.getenv("LLM_PORT", str(self._DEFAULT_PORT))
         model = os.getenv("LLM_MODEL", self._DEFAULT_MODEL)
         cmd = [
             "llama-server", "-hf", model, "--port", port,

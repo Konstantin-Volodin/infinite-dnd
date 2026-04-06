@@ -1,18 +1,12 @@
-"""Action execution — what happens when a tool is called.
+"""Action execution — DM tools: narrate, create, modify (and their sub-actions)."""
 
-Character: act, speak, move, think, wait
-DM: narrate, create, modify (and their sub-actions)
-"""
-
-import random
 from typing import Dict, Optional
 from ...core.models import WorldState, Location, Character, CharacterStats
-from ...core.rules import get_skill_modifier
 from ...core.utils import slugify
 
 
 class ActionExecutor:
-    """Executes game actions and updates state."""
+    """Executes DM game actions and updates state."""
 
     def __init__(self, state: WorldState, save_state, save_history):
         self.state = state
@@ -28,20 +22,6 @@ class ActionExecutor:
     def _get_loc(self, loc_id: str) -> Optional[Location]:
         return self.state.locations.get(loc_id)
 
-    def _find_target(self, char: Character, target_name: str) -> Optional[Character]:
-        """Find a character by name at the same location (fuzzy match)."""
-        target_lower = target_name.lower()
-        for c in self.state.characters.values():
-            if c.location == char.location and c.id != char.id:
-                c_name_lower = c.id.lower()
-                if (
-                    target_lower == c_name_lower
-                    or target_lower in c_name_lower
-                    or c_name_lower in target_lower
-                ):
-                    return c
-        return None
-
     def _default_anchor_location(self) -> Optional[str]:
         first_char = next(iter(self.state.characters.values()), None)
         if first_char and first_char.location in self.state.locations:
@@ -49,146 +29,8 @@ class ActionExecutor:
         return next(iter(self.state.locations.keys()), None)
 
     # =========================================================================
-    # CHARACTER ACTIONS
+    # DM ACTIONS
     # =========================================================================
-
-    def act(
-        self,
-        character_id: str,
-        description: str,
-        skill: Optional[str] = None,
-        target: Optional[str] = None,
-    ) -> Dict:
-        char = self._get_char(character_id)
-        if not char:
-            return {"status": "error", "message": "Character not found"}
-
-        loc = self._get_loc(char.location)
-
-        roll_info = None
-        if skill:
-            roll = random.randint(1, 20)
-            modifier = get_skill_modifier(char, skill)
-            total = roll + modifier
-            roll_info = f"[{skill}: {roll}+{modifier}={total}]"
-
-        intent = f"{char.id} {description}"
-        if roll_info:
-            intent += f" {roll_info}"
-
-        self.log_action("⚔️", intent)
-        self.save_history(intent, char.location)
-
-        return {
-            "status": "success",
-            "character": char.id,
-            "action": description,
-            "skill": skill,
-            "target": target,
-            "location": loc.id if loc else "unknown",
-            "roll_info": roll_info,
-            "action_type": "act",
-            "intent": intent,
-            "dm_guidance": f"Narrate {char.id}'s action: '{description}'" + (f" (Roll: {roll_info})" if roll_info else ""),
-        }
-
-    def speak(self, character_id: str, message: str, target: str = None) -> Dict:
-        char = self._get_char(character_id)
-        if not char:
-            return {"status": "error", "message": "Character not found"}
-        if not message:
-            return {"status": "error", "message": "Message is required"}
-
-        if target:
-            target_char = self._find_target(char, target)
-            target_name = target_char.id if target_char else target
-            intent = f'{char.id} says to {target_name}: "{message}"'
-        else:
-            intent = f'{char.id} says: "{message}"'
-
-        self.log_action("💬", intent)
-        self.save_history(intent, char.location)
-
-        return {
-            "status": "success",
-            "character": char.id,
-            "action_type": "speak",
-            "intent": intent,
-            "message": message,
-            "target": target,
-            "dm_guidance": f"Narrate {char.id}'s dialogue with prose: \"{message}\"",
-        }
-
-    def move(self, character_id: str, location: str) -> Dict:
-        char = self._get_char(character_id)
-        if not char:
-            return {"status": "error", "message": "Character not found"}
-
-        current_loc = self._get_loc(char.location)
-        new_loc = self._get_loc(location)
-        if not new_loc:
-            if current_loc and location in (current_loc.connections or []):
-                return {
-                    "status": "error",
-                    "code": "location_missing",
-                    "target_name": location,
-                    "origin_id": current_loc.id,
-                    "message": "Location not found",
-                }
-            return {"status": "error", "message": "Location not found"}
-
-        if not current_loc or location not in current_loc.connections:
-            return {"status": "error", "message": f"Cannot reach {new_loc.id} from here"}
-
-        origin_id = current_loc.id
-        self.save_history(f"{char.id} left towards {new_loc.id}", origin_id)
-        char.location = location
-        self.save_state()
-        self.save_history(f"{char.id} arrived from {origin_id}", new_loc.id)
-        self.log_action("🚶", f"{char.id} moves to {new_loc.id}")
-        return {"status": "success"}
-
-    def think(
-        self,
-        character_id: str,
-        goals: Optional[str] = None,
-        emotions: Optional[str] = None,
-        knowledge: Optional[str] = None,
-    ) -> Dict:
-        char = self._get_char(character_id)
-        if not char:
-            return {"status": "error", "message": "Character not found"}
-
-        updates = []
-        if goals:
-            char.goal = goals
-            updates.append(f"goals: {goals}")
-        if emotions:
-            updates.append(f"emotions: {emotions}")
-        if knowledge and knowledge not in char.knowledge:
-            char.knowledge.append(knowledge)
-            updates.append(f"learned: {knowledge}")
-
-        if updates:
-            self.save_state()
-            self.log_action("🧠", f"{char.id} updates state: {', '.join(updates)}")
-
-        return {"status": "success"}
-
-    def wait(self, character_id: str = None, reason: str = None, content: str = None) -> Dict:
-        char = self._get_char(character_id) if character_id else None
-
-        if content and char:
-            self.log_action("💭", f"{char.id} reflects: {content[:200]}...")
-            return {"status": "success", "introspection": content}
-
-        if char:
-            msg = f"{char.id} waits"
-            if reason:
-                msg += f" ({reason})"
-            self.log_action("⏳", msg)
-
-        return {"status": "success"}
 
     # =========================================================================
     # DM ACTIONS

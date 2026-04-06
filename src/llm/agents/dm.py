@@ -1,32 +1,39 @@
-"""
-DM Agent - Dungeon Master that narrates and controls the world.
-"""
+"""DM Agent - Dungeon Master that narrates and controls the world."""
 from __future__ import annotations
 
 from typing import Dict, Any
-from .base import BaseAgent
+
+from pydantic_ai import Agent
+
+from ..core import ToolPlan, create_model
 from ...core.models import WorldState
-from ..prompts import build_dm_system_prompt, build_dm_context
+from ..prompts import dm_system, dm_context
 from ..tools import DM_TOOLS
+from .base import run_loop
 
 
-class DMAgent(BaseAgent):
+_tool_lines = "\n".join(f"- {t['name']}: {t.get('description', '')}" for t in DM_TOOLS)
+
+_dm_agent: Agent[None, ToolPlan] = Agent(create_model(), output_type=ToolPlan)
+
+
+@_dm_agent.system_prompt
+def _dm_system_prompt() -> str:
+    return dm_system() + "\n\nAvailable tools:\n" + _tool_lines
+
+
+class DMAgent:
     """Dungeon Master agent that narrates and creates world content."""
 
     def react(
         self, state: WorldState, last_action: Dict[str, Any] | None = None, tool_executor=None
     ) -> Dict[str, Any]:
         """React to the latest character action using DM tools."""
-        context = build_dm_context(state, last_action=last_action)
-
-        return self._decide(
-            system_prompt=build_dm_system_prompt()
-            + "\n\nYou can take multiple actions per turn. After each action you see the result and decide what to do next. When done, stop calling tools.",
-            context=context,
-            tools=DM_TOOLS,
+        context = dm_context(state, last_action=last_action)
+        return run_loop(
+            _dm_agent, context, None, tool_executor,
             fallback_tool="narrate",
             fallback_args={"content": "The scene continues..."},
-            tool_executor=tool_executor,
         )
 
     def generate_new_location(
@@ -36,13 +43,12 @@ class DMAgent(BaseAgent):
         origin_loc = state.locations.get(origin_id)
         origin_name = origin_loc.id if origin_loc else origin_id
 
-        prompt = f"""A character is trying to move to '{target_name}' from '{origin_name}', but it doesn't exist yet.
-Create this location using the `create` tool with type="location"."""
-
-        return self._decide(
-            system_prompt=build_dm_system_prompt(),
-            context=prompt,
-            tools=DM_TOOLS,
+        prompt = (
+            f"A character is trying to move to '{target_name}' from '{origin_name}', but it doesn't exist yet.\n"
+            f"Create this location using the `create` tool with type=\"location\"."
+        )
+        return run_loop(
+            _dm_agent, prompt, None, None,
             fallback_tool="create",
             fallback_args={
                 "type": "location",
@@ -59,13 +65,12 @@ Create this location using the `create` tool with type="location"."""
         loc = state.locations.get(location)
         loc_name = loc.id if loc else location
 
-        prompt = f"""A character is trying to pick up '{item_name}' at {loc_name}, but it doesn't exist in the world data.
-If it makes sense, create it using `create` with type="item". Otherwise, narrate why they can't take it."""
-
-        return self._decide(
-            system_prompt=build_dm_system_prompt(),
-            context=prompt,
-            tools=DM_TOOLS,
+        prompt = (
+            f"A character is trying to pick up '{item_name}' at {loc_name}, but it doesn't exist in the world data.\n"
+            f"If it makes sense, create it using `create` with type=\"item\". Otherwise, narrate why they can't take it."
+        )
+        return run_loop(
+            _dm_agent, prompt, None, None,
             fallback_tool="narrate",
             fallback_args={"content": f"You cannot pick up the {item_name}."},
         )
