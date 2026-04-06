@@ -1,14 +1,15 @@
-"""LLM Client - Wrapper for OpenAI-compatible APIs."""
+"""LLM client wrapper for OpenAI-compatible APIs."""
 
-import os
 import json
+import os
 import time
-import requests
-from typing import List, Dict
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, List
 
-# === Singleton Logger ===
+import requests
+
+
 _LOGGER = None
 
 
@@ -59,7 +60,6 @@ class LLMLogger:
                 else None,
                 "usage": resp.get("usage"),
             }
-            # Capture reasoning from thinking models
             if msg.get("reasoning_content"):
                 cleaned["reasoning"] = msg.get("reasoning_content")
             return cleaned
@@ -76,7 +76,6 @@ class LLMClient:
         self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "-1"))
         self.logger = get_logger()
 
-        # Set parameters based on thinking mode
         self.is_thinking = "thinking" in self.model.lower()
         if self.is_thinking:
             self.temperature = 0.6
@@ -114,8 +113,6 @@ class LLMClient:
         }
         if tools:
             payload["tools"] = tools
-            # "required" forces the model to always call a tool
-            # "auto" lets the model choose
             payload["tool_choice"] = "required" if require_tool else "auto"
         return self._call(payload)
 
@@ -143,7 +140,6 @@ class LLMClient:
                         for tc in msg["tool_calls"]
                     ],
                 }
-            # Fallback: Try to parse XML-style tool calls from content
             content = msg.get("content", "")
             if "<tool_call>" in content:
                 calls = self._parse_xml_tool_calls(content)
@@ -156,19 +152,17 @@ class LLMClient:
     def _parse_xml_tool_calls(self, content: str) -> List[Dict]:
         """Parse XML-style tool calls from model output."""
         import re
+
         calls = []
-        # Pattern: <tool_call>toolname<arg_key>key</arg_key><arg_value>value</arg_value>...</tool_call>
-        tool_pattern = r'<tool_call>(.*?)</tool_call>'
+        tool_pattern = r"<tool_call>(.*?)</tool_call>"
         for match in re.finditer(tool_pattern, content, re.DOTALL):
             tool_content = match.group(1)
-            # Extract tool name (first text before any tag)
-            name_match = re.match(r'([a-z_]+)', tool_content)
+            name_match = re.match(r"([a-z_]+)", tool_content)
             if not name_match:
                 continue
             tool_name = name_match.group(1)
-            # Extract arguments
             args = {}
-            arg_pattern = r'<arg_key>([^<]+)</arg_key><arg_value>([^<]*)</arg_value>'
+            arg_pattern = r"<arg_key>([^<]+)</arg_key><arg_value>([^<]*)</arg_value>"
             for arg_match in re.finditer(arg_pattern, tool_content):
                 key = arg_match.group(1).strip()
                 value = arg_match.group(2).strip()
@@ -188,24 +182,27 @@ class LLMClient:
             if msg.get("tool_calls"):
                 calls = []
                 for tc in msg["tool_calls"]:
-                    calls.append({
-                        "id": tc.get("id", f"call_{len(calls)}"),
-                        "tool": tc["function"]["name"],
-                        "arguments": json.loads(tc["function"]["arguments"]),
-                    })
+                    calls.append(
+                        {
+                            "id": tc.get("id", f"call_{len(calls)}"),
+                            "tool": tc["function"]["name"],
+                            "arguments": json.loads(tc["function"]["arguments"]),
+                        }
+                    )
                 return {"type": "tool_calls", "calls": calls, "raw_message": msg}
             content = msg.get("content", "")
             if "<tool_call>" in content:
                 parsed = self._parse_xml_tool_calls(content)
                 if parsed:
-                    # Synthesize raw_message with tool_calls for threading
                     synth_tcs = []
                     for i, p in enumerate(parsed):
-                        synth_tcs.append({
-                            "id": f"call_{i}",
-                            "type": "function",
-                            "function": {"name": p["tool"], "arguments": json.dumps(p["arguments"])},
-                        })
+                        synth_tcs.append(
+                            {
+                                "id": f"call_{i}",
+                                "type": "function",
+                                "function": {"name": p["tool"], "arguments": json.dumps(p["arguments"])},
+                            }
+                        )
                     synth_msg = {"role": "assistant", "tool_calls": synth_tcs}
                     calls = [{"id": f"call_{i}", **p} for i, p in enumerate(parsed)]
                     return {"type": "tool_calls", "calls": calls, "raw_message": synth_msg}

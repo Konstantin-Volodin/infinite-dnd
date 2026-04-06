@@ -1,4 +1,4 @@
-"""Core module - Data models, state management, game engine, and LLM client."""
+"""Core module - Data models, state management, and game engine."""
 
 from .models import (
     WorldState,
@@ -8,7 +8,8 @@ from .models import (
 )
 from .state import StateManager
 from .engine import Engine
-from .llm import LLMClient, get_logger, setup_logger
+
+from ..llm.core import LLMClient, get_logger, setup_logger
 
 __all__ = [
     "WorldState",

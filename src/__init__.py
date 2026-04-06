@@ -2,7 +2,7 @@
 Infinite D&D - AI-driven roleplaying game.
 
 This package provides the modular game engine with:
-- core/: Data models, state management, game engine, LLM client
+- core/: Data models, state management, game engine
 - agents/: DM and Character agents
 - prompts/: System prompts and context builders
 - tools/: Tool definitions for agents
