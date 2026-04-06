@@ -6,9 +6,8 @@ import time
 from datetime import datetime
 from dotenv import load_dotenv
 
-from src.engine import Engine
-from src.agents import DMAgent, CharacterAgent
-from src.core.llm import setup_logger
+from src.core import Engine, setup_logger
+from src.llm.agents import DMAgent, CharacterAgent
 from src.core.utils import slugify
 
 load_dotenv()

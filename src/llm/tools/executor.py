@@ -2,8 +2,8 @@
 
 import warnings
 from typing import Any, Dict
-from ..core.models import WorldState
-from ..core.utils import slugify
+from ...core.models import WorldState
+from ...core.utils import slugify
 from .actions import ActionExecutor
 
 

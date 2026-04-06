@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from src.core.models import WorldState
-from src.prompts.loader import render
+from src.llm.prompts.loader import render
 
 
 def build_director_system_prompt() -> str:

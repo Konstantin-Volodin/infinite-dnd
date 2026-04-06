@@ -1,5 +1,6 @@
+# src/llm/prompts/__init__.py
 """
-Prompts module - System prompts and context builders for agents.
+Prompts module - system prompts and context builders for agents.
 
 Each agent type has:
 - build_*_system_prompt(): Returns the system prompt

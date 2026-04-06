@@ -5,7 +5,7 @@ Base Agent - Shared functionality for all LLM agents.
 import os
 import json
 from typing import Dict, Any, List, Callable, Optional
-from ..core.llm import LLMClient
+from ...core.llm import LLMClient
 
 
 class BaseAgent:

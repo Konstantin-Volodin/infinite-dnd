@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from src.core.models import WorldState
 from src.core.rules import get_health_status
-from src.prompts.loader import render
+from src.llm.prompts.loader import render
 
 
 def build_dm_system_prompt() -> str:

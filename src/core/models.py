@@ -1,3 +1,4 @@
+# src/core/models.py
 """Data Models - Pydantic models for game state."""
 
 from typing import List, Dict

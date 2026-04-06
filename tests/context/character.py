@@ -10,8 +10,8 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.core.state import StateManager
-from src.prompts import build_character_system_prompt, build_character_context
-from src.tools import CHARACTER_TOOLS
+from src.llm.prompts import build_character_system_prompt, build_character_context
+from src.llm.tools import CHARACTER_TOOLS
 
 
 def main():

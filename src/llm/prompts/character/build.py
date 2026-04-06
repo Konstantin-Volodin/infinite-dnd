@@ -1,9 +1,9 @@
-#src/prompts/character/build.py
+# src/llm/prompts/character/build.py
 
 """Character prompt builders - system prompt and context."""
 from __future__ import annotations
 from src.core.models import WorldState, Character
-from src.prompts.loader import render
+from src.llm.prompts.loader import render
 from src.core.rules import get_health_status
 
 

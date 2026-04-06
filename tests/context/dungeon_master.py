@@ -11,8 +11,8 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.core.state import StateManager
-from src.prompts import build_dm_system_prompt, build_dm_context
-from src.tools import DM_TOOLS
+from src.llm.prompts import build_dm_system_prompt, build_dm_context
+from src.llm.tools import DM_TOOLS
 
 
 def main():

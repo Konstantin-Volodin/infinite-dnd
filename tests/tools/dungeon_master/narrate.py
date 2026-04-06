@@ -10,7 +10,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from src.core.llm import LLMClient
-from src.tools import DM_TOOLS
+from src.llm.tools import DM_TOOLS
 
 TOOL = next(t for t in DM_TOOLS if t["name"] == "narrate")
 

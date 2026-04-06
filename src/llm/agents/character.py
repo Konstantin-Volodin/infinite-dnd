@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Dict, Any
 from .base import BaseAgent
-from ..core.models import WorldState
-from ..core.utils import slugify
+from ...core.models import WorldState
+from ...core.utils import slugify
 from ..prompts import (
     build_character_system_prompt,
     build_character_context,

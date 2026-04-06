@@ -1,9 +1,10 @@
-"""Main game engine - coordinates action execution and state management."""
+"""Game engine - coordinates action execution and state management."""
 
 from typing import Any, Dict
-from ..core.state import StateManager
-from ..core.models import WorldState, HistoryEvent
-from ..tools.executor import ToolExecutor
+
+from .models import HistoryEvent, WorldState
+from .state import StateManager
+from ..llm.tools.executor import ToolExecutor
 
 
 class Engine:

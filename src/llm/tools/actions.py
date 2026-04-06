@@ -6,9 +6,9 @@ DM: narrate, create, modify (and their sub-actions)
 
 import random
 from typing import Dict, Optional
-from ..core.models import WorldState, Location, Character, CharacterStats
-from ..core.rules import get_skill_modifier
-from ..core.utils import slugify
+from ...core.models import WorldState, Location, Character, CharacterStats
+from ...core.rules import get_skill_modifier
+from ...core.utils import slugify
 
 
 class ActionExecutor:

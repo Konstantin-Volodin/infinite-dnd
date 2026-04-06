@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 from .base import BaseAgent
-from ..core.models import WorldState
+from ...core.models import WorldState
 from ..prompts import build_dm_system_prompt, build_dm_context
 from ..tools import DM_TOOLS
 
