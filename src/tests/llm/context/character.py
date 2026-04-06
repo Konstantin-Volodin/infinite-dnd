@@ -8,31 +8,32 @@ import json
 import logging
 from datetime import datetime
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from src.tests import ARCHIVE_DIR
 from src.core.state import StateManager
 from src.llm.prompts import character_system, character_context
-from src.llm.tools import CHARACTER_TOOLS
+from src.llm.character import agent
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     state = StateManager().generate_state()
-
-    archive_dir = os.path.join(os.path.dirname(__file__), "archive")
-    os.makedirs(archive_dir, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d")
 
     # per character context
     for char_id, char in state.characters.items():
-        path = os.path.join(archive_dir, f"{stamp}-{char.id}.md")
+        path = ARCHIVE_DIR / f"{stamp}-{char.id}.md"
 
         system = character_system(char)
         context = character_context(char, state)
-        tools = CHARACTER_TOOLS
+
+        tools = {
+            name: {"description": td.description, "parameters": td.parameters_json_schema}
+            for name, t in agent._function_toolset.tools.items()
+            if (td := t.tool_def)
+        }
 
         output = f"##### Character: {char.id}\n\n"
         output += f"##### System Prompt\n{system}\n\n"
-        output += f"##### Tools\n{json.dumps(tools, indent=4)}\n\n"
+        output += f"##### Tools\n{json.dumps(tools, indent=2)}\n\n"
         output += f"##### Context\n{context}"
 
         with open(path, "w", encoding="utf-8") as f: f.write(output)

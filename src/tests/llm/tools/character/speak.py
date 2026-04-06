@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+from src.tests import ARCHIVE_DIR
 from src.core.llm import LLMClient
 from src.core.state import StateManager
 from src.llm.prompts.character.build import character_system
@@ -20,12 +20,9 @@ SCENARIO = "A hooded merchant (merchant-01) is eyeing you suspiciously from acro
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     llm = LLMClient()
     state = StateManager().generate_state()
 
-    archive_dir = os.path.join(os.path.dirname(__file__), "..", "archive")
-    os.makedirs(archive_dir, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d")
 
     for char_id, char in state.characters.items():
@@ -39,7 +36,7 @@ def main():
         output += f"##### Scenario\n{SCENARIO}\n\n"
         output += f"##### Result\n{json.dumps(result, indent=2)}\n"
 
-        path = os.path.join(archive_dir, f"{stamp}-{TOOL['name']}-{char.id}.md")
+        path = ARCHIVE_DIR / f"{stamp}-{TOOL['name']}-{char.id}.md"
         with open(path, "w", encoding="utf-8") as f: f.write(output)
         logging.info(f"[{'PASS' if passed else 'FAIL'}] {TOOL['name']}:{char.id} → {path}")
 
