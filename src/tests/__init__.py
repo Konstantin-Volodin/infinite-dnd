@@ -8,13 +8,13 @@ load_dotenv()
 ARCHIVE_DIR = Path(__file__).parent / "archive"
 ARCHIVE_DIR.mkdir(exist_ok=True)
 
-_stamp = datetime.now().strftime("%Y-%m-%d")
+stamp = datetime.now().strftime("%Y-%m-%d")
 _fmt = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
 _console = logging.StreamHandler()
 _console.setFormatter(_fmt)
 
-_file = logging.FileHandler(ARCHIVE_DIR / f"{_stamp}.log", encoding="utf-8")
+_file = logging.FileHandler(ARCHIVE_DIR / f"{stamp}.log", encoding="utf-8")
 _file.setFormatter(_fmt)
 
 logging.root.setLevel(logging.INFO)
