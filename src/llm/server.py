@@ -5,9 +5,7 @@ import os
 import subprocess
 import time
 import logging
-from typing import Any
 
-from pydantic import BaseModel, Field
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -43,3 +41,14 @@ class LlamaServer:
 
     def __enter__(self): return self
     def __exit__(self, *_): self.stop()
+
+
+def create_model() -> OpenAIChatModel:
+    """Create an OpenAIChatModel from environment variables."""
+    return OpenAIChatModel(
+        os.getenv("LLM_MODEL", ""),
+        provider=OpenAIProvider(
+            base_url=os.getenv("LLM_BASE_URL", "http://localhost:1234/v1"),
+            api_key=os.getenv("LLM_API_KEY", "not-needed"),
+        ),
+    )

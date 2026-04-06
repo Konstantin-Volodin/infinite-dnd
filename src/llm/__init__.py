@@ -1,5 +1,5 @@
 """LLM integration package."""
 
-from .core import LLMClient, ToolCall, ToolPlan
+from .server import LlamaServer, create_model
 
-__all__ = ["LLMClient", "ToolCall", "ToolPlan"]
+__all__ = ["LlamaServer", "create_model"]
