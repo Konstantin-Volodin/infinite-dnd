@@ -1,6 +1,6 @@
 # src/llm/prompts/character/build.py
-
 """Character prompt builders - system prompt and context."""
+
 from __future__ import annotations
 from src.core.models import WorldState, Character
 from src.llm.prompts.loader import render

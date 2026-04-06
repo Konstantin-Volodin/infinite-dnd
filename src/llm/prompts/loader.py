@@ -1,8 +1,8 @@
-"""Jinja2 template loader for prompt templates."""
+# src/llm/prompts/loader.py
+"""Jinja2 template loader for prompts."""
+
 from __future__ import annotations
-
 from pathlib import Path
-
 from jinja2 import Environment, FileSystemLoader
 
 _PROMPTS_DIR = Path(__file__).parent
@@ -16,7 +16,7 @@ _env = Environment(
 
 
 def render(template_path: str, **kwargs: object) -> str:
-    """Render a .jinja template relative to src/prompts/.
+    """Render a .jinja template relative to src/llm/prompts/.
 
     Example: render("character/system.jinja", char=char)
     """
