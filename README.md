@@ -2,23 +2,19 @@
 
 AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 
-## How It Works
+## Code style                                                   
+- Prefer deletion over addition. If a refactor grows a file, question the approach.
+- Remove dead code, redundant comments, and unused abstractions immediately.
+- Simpler is correct. A smaller diff is usually a better diff.
+- Before adding a function, check if the file's primary purpose is still singular. If not, it's time for a new module.
+- Prefer inline clarity over clever indirection; if a helper only has one caller, inline it.
+- Every change must leave the code easier to read than before.
 
-Two LLM agents alternate in loop:
-- **Character**: Picks a character and acts (move, speak, think, act)
-- **DM**: Reacts with narration and world changes (narrate, create, modify)
+## Environment setup
+- `uv venv .venv`
+- `source .venv/Scripts/activate`
+- `uv pip install -e .`
 
-
-
-```
-src/
-├── agents/      # Character and DM agents
-├── core/        # LLM client, models, state, rules
-├── engine/      # Game loop and action execution
-├── prompts/     # System prompts per agent
-└── tools.py     # Tool definitions
-```
-
-
-## TODO:
-- add dotend?
+## Running tests
+- `python tests/llm/context`
+- `python tests/llm/tools`
