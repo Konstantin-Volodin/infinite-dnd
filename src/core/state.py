@@ -8,15 +8,27 @@ from .models import (
     Location,
     CharacterStats,
     Quest,
+    HistoryEvent,
 )
+
+
+def add_history(state: WorldState, text: str, location: str) -> None:
+    """Append a history event to state. Caps history at 50 entries."""
+    characters = [c.id for c in state.characters.values() if c.location == location]
+    state.history.append(HistoryEvent(text=text, location=location, characters=characters))
+    if len(state.history) > 50:
+        state.history.pop(0)
+
 class StateManager:
     """Handles the world state."""
 
+    _SRC_DIR = os.path.dirname(os.path.dirname(__file__))  # src/
+
     def __init__(self, setup_dir: str = "world-setup", state_dir: str = "world-state"):
         """Initialize the state manager."""
-        self.setup_dir = setup_dir
-        self.state_dir = state_dir
-        self.state_file = os.path.join(state_dir, "world_state.json")
+        self.setup_dir = os.path.join(self._SRC_DIR, setup_dir)
+        self.state_dir = os.path.join(self._SRC_DIR, state_dir)
+        self.state_file = os.path.join(self.state_dir, "world_state.json")
         os.makedirs(self.state_dir, exist_ok=True)
 
     def read_json(self, path: str):

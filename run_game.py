@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from src.core import Engine
 from src.llm.agents import DMAgent, CharacterAgent
+from src.llm.core import LlamaServer
 from src.core.utils import slugify
 
 load_dotenv()
@@ -210,6 +211,12 @@ def main():
     global output_level
 
     print(f"\n{Colors.CYAN}{Colors.BOLD}=== Infinite D&D ==={Colors.ENDC}")
+
+    try:
+        server = LlamaServer() if os.getenv("LLM_AUTO_START", "true").lower() != "false" else None
+    except Exception as e:
+        print(f"⚠️ Failed to start LLM server: {e}")
+        return
 
     # handle reset
     state_file = "world-state/world_state.json"
