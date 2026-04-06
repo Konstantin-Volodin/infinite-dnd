@@ -3,12 +3,10 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime
 from dotenv import load_dotenv
 
 from src.core import Engine
 from src.llm.agents import DMAgent, CharacterAgent
-from src.llm.core import setup_logger
 from src.core.utils import slugify
 
 load_dotenv()
@@ -40,8 +38,6 @@ class GameRunner:
         self,
         engine,
         *,
-        session_dir = None,
-        llm_log_path = None,
         dm: DMAgent | None = None,
         character: CharacterAgent | None = None,
         output_level: int = OutputLevel.DEFAULT,
@@ -52,8 +48,6 @@ class GameRunner:
         self.dm = dm or DMAgent()
         self.character = character or CharacterAgent()
 
-        self.session_dir = session_dir
-        self.llm_log_path = llm_log_path
         self.output_level = output_level
 
     def output(self, msg: str, level: int = OutputLevel.DEFAULT):
@@ -217,14 +211,6 @@ def main():
 
     print(f"\n{Colors.CYAN}{Colors.BOLD}=== Infinite D&D ==={Colors.ENDC}")
 
-    # setup logs
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_dir = os.path.join("logs", f"session-{timestamp}")
-    os.makedirs(log_dir, exist_ok=True)
-    llm_log_path = os.path.join(log_dir, "llm_log.jsonl")
-    print(f"📂 Logs: {log_dir}")
-    setup_logger(llm_log_path)
-
     # handle reset
     state_file = "world-state/world_state.json"
     if os.getenv("GAME_RESET_WORLD", "true").lower() == "true" and os.path.exists(state_file):
@@ -247,8 +233,6 @@ def main():
         engine,
         dm=DMAgent(),
         character=CharacterAgent(),
-        session_dir=log_dir,
-        llm_log_path=llm_log_path,
         output_level=output_level,
     )
 

@@ -1,243 +1,55 @@
-"""LLM client wrapper for OpenAI-compatible APIs."""
+"""Minimal synchronous LLM client built on PydanticAI."""
 
-import json
 import os
-import time
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List
+from typing import Any, TypeVar
 
-import requests
-
-
-_LOGGER = None
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
 
-def setup_logger(path: str):
-    global _LOGGER
-    _LOGGER = LLMLogger(path)
-    return _LOGGER
+class ToolCall(BaseModel):
+    tool: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
 
 
-def get_logger():
-    global _LOGGER
-    return _LOGGER or LLMLogger()
+class ToolPlan(BaseModel):
+    calls: list[ToolCall] = Field(default_factory=list)
 
 
-class LLMLogger:
-    """Logs LLM requests/responses to JSONL."""
-
-    def __init__(self, path: str = None):
-        if path:
-            self.log_file = Path(path)
-            self.log_file.parent.mkdir(parents=True, exist_ok=True)
-        else:
-            Path("logs").mkdir(exist_ok=True)
-            self.log_file = Path("logs") / f"llm_{datetime.now():%Y%m%d_%H%M%S}.jsonl"
-
-    def log(self, req: Dict, resp: Dict, ms: float):
-        entry = {
-            "ts": datetime.now().isoformat(),
-            "ms": round(ms, 2),
-            "req": req,
-            "resp": self._clean(resp),
-        }
-        with open(self.log_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-    def _clean(self, resp: Dict) -> Dict:
-        if "error" in resp:
-            return resp
-        try:
-            msg = resp["choices"][0]["message"]
-            cleaned = {
-                "content": msg.get("content"),
-                "tool_calls": [
-                    {"name": t["function"]["name"], "args": t["function"]["arguments"]}
-                    for t in msg.get("tool_calls", [])
-                ]
-                if msg.get("tool_calls")
-                else None,
-                "usage": resp.get("usage"),
-            }
-            if msg.get("reasoning_content"):
-                cleaned["reasoning"] = msg.get("reasoning_content")
-            return cleaned
-        except Exception:
-            return {"raw": str(resp)[:200]}
+OutputT = TypeVar("OutputT")
 
 
 class LLMClient:
-    """Client for LLM API calls with tool support."""
+    """Thin wrapper for synchronous LLM requests."""
 
     def __init__(self):
         self.base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
-        self.model = os.getenv("LLM_MODEL", "")
-        self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "-1"))
-        self.logger = get_logger()
+        self.api_key = os.getenv("LLM_API_KEY", "not-needed")
+        self.model_name = os.getenv("LLM_MODEL", "")
 
-        self.is_thinking = "thinking" in self.model.lower()
-        if self.is_thinking:
-            self.temperature = 0.6
-            self.top_p = 0.95
-        else:
-            self.temperature = 0.7
-            self.top_p = 0.8
+        if not self.model_name:
+            raise ValueError("LLM_MODEL must be set")
 
-    def _call(self, payload: Dict) -> Dict:
-        """Make API call with logging."""
-        start = time.time()
-        try:
-            timeout = 600
-            resp = requests.post(
-                f"{self.base_url}/chat/completions", json=payload, timeout=timeout
-            )
-            resp.raise_for_status()
-            result = resp.json()
-        except Exception as e:
-            result = {"error": str(e)}
-        self.logger.log(payload, result, (time.time() - start) * 1000)
-        return result
-
-    def chat(
-        self, messages: List[Dict], tools: List = None, require_tool: bool = False
-    ) -> Dict:
-        """Raw chat completion."""
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-            "max_tokens": self.max_tokens,
-            "stream": False,
-        }
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "required" if require_tool else "auto"
-        return self._call(payload)
-
-    def chat_with_tools(
-        self, system: str, user: str, tools: List[Dict], require_tool: bool = False
-    ) -> Dict:
-        """Chat with tool calling."""
-        resp = self.chat(
-            [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            tools,
-            require_tool=require_tool,
+        self.model = OpenAIChatModel(
+            self.model_name,
+            provider=OpenAIProvider(base_url=self.base_url, api_key=self.api_key),
         )
-        if "error" in resp:
-            return {"type": "error", "message": resp["error"]}
-        try:
-            msg = resp["choices"][0]["message"]
-            if msg.get("tool_calls"):
-                return {
-                    "type": "tool_calls",
-                    "calls": [
-                        {
-                            "tool": tc["function"]["name"],
-                            "arguments": json.loads(tc["function"]["arguments"]),
-                        }
-                        for tc in msg["tool_calls"]
-                    ],
-                }
-            content = msg.get("content", "")
-            if "<tool_call>" in content:
-                calls = self._parse_xml_tool_calls(content)
-                if calls:
-                    return {"type": "tool_calls", "calls": calls}
-            return {"type": "text", "content": content}
-        except Exception as e:
-            return {"type": "error", "message": str(e)}
 
-    def _parse_xml_tool_calls(self, content: str) -> List[Dict]:
-        """Parse XML-style tool calls from model output."""
-        import re
+    def complete(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        output_type: type[OutputT] = str,
+    ) -> OutputT:
+        agent = Agent(self.model, instructions=system_prompt, output_type=output_type)
+        result = agent.run_sync(user_prompt)
+        return result.output
 
-        calls = []
-        tool_pattern = r"<tool_call>(.*?)</tool_call>"
-        for match in re.finditer(tool_pattern, content, re.DOTALL):
-            tool_content = match.group(1)
-            name_match = re.match(r"([a-z_]+)", tool_content)
-            if not name_match:
-                continue
-            tool_name = name_match.group(1)
-            args = {}
-            arg_pattern = r"<arg_key>([^<]+)</arg_key><arg_value>([^<]*)</arg_value>"
-            for arg_match in re.finditer(arg_pattern, tool_content):
-                key = arg_match.group(1).strip()
-                value = arg_match.group(2).strip()
-                args[key] = value
-            calls.append({"tool": tool_name, "arguments": args})
-        return calls
+    def complete_text(self, system_prompt: str, user_prompt: str) -> str:
+        return self.complete(system_prompt, user_prompt, output_type=str)
 
-    def chat_step(
-        self, messages: List[Dict], tools: List[Dict], *, require_tool: bool = False
-    ) -> Dict:
-        """Single LLM call returning parsed result + raw assistant message for conversation threading."""
-        resp = self.chat(messages, tools, require_tool=require_tool)
-        if "error" in resp:
-            return {"type": "error", "message": resp["error"]}
-        try:
-            msg = resp["choices"][0]["message"]
-            if msg.get("tool_calls"):
-                calls = []
-                for tc in msg["tool_calls"]:
-                    calls.append(
-                        {
-                            "id": tc.get("id", f"call_{len(calls)}"),
-                            "tool": tc["function"]["name"],
-                            "arguments": json.loads(tc["function"]["arguments"]),
-                        }
-                    )
-                return {"type": "tool_calls", "calls": calls, "raw_message": msg}
-            content = msg.get("content", "")
-            if "<tool_call>" in content:
-                parsed = self._parse_xml_tool_calls(content)
-                if parsed:
-                    synth_tcs = []
-                    for i, p in enumerate(parsed):
-                        synth_tcs.append(
-                            {
-                                "id": f"call_{i}",
-                                "type": "function",
-                                "function": {"name": p["tool"], "arguments": json.dumps(p["arguments"])},
-                            }
-                        )
-                    synth_msg = {"role": "assistant", "tool_calls": synth_tcs}
-                    calls = [{"id": f"call_{i}", **p} for i, p in enumerate(parsed)]
-                    return {"type": "tool_calls", "calls": calls, "raw_message": synth_msg}
-            return {"type": "text", "content": content, "raw_message": msg}
-        except Exception as e:
-            return {"type": "error", "message": str(e)}
-
-    def chat_json(self, system: str, user: str, schema: Dict = None) -> Dict:
-        """Request JSON response. Schema is included in prompt for guidance."""
-        hint = ""
-        if schema:
-            hint = f"\nExpected JSON schema: {json.dumps(schema)}"
-        messages = [
-            {
-                "role": "system",
-                "content": system
-                + hint
-                + "\nRespond ONLY with valid JSON, no markdown.",
-            },
-            {"role": "user", "content": user},
-        ]
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-        }
-
-        resp = self._call(payload)
-        if "error" in resp:
-            return {"type": "error", "message": resp["error"]}
-        try:
-            content = resp["choices"][0]["message"]["content"]
-            if "```" in content:
-                content = content.split("```")[1].split("```")[0].replace("json", "", 1)
-            return {"type": "json", "data": json.loads(content.strip())}
-        except Exception as e:
-            return {"type": "error", "message": str(e)}
+    def plan(self, system_prompt: str, user_prompt: str) -> ToolPlan:
+        return self.complete(system_prompt, user_prompt, output_type=ToolPlan)

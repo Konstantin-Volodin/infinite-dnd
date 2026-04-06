@@ -11,7 +11,8 @@ This package provides the modular game engine with:
 
 from .core import Engine
 from .llm.agents import DMAgent, CharacterAgent
-from .core import WorldState, StateManager, LLMClient
+from .core import WorldState, StateManager
+from .llm import LLMClient
 
 __all__ = [
     "Engine",
