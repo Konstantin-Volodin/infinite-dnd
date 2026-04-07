@@ -42,6 +42,11 @@ src/                        - source code
 │   ├── dungeon_master/         - campaign management
 │   └── director/               - determines turn order
 ├── engine/                 - game engine components
+│   ├── rules.py                - game rules and derived stats
+│   ├── utils.py                - shared engine helpers
+│   ├── state/                  - world models and state persistence
+│   ├── runtime/                - game loop orchestration
+│   └── world/                  - world-state queries, interactions, and mutations
 ├── interface/              - user interface
 ├── tests/                  - test cases & fixtures
 └── world/                  - world generation
