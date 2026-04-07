@@ -18,7 +18,7 @@ class DirectorDeps:
 agent: Agent[DirectorDeps, str] = Agent(
     model=create_model(),
     deps_type=DirectorDeps,
-    output_type=ToolOutput(str, name="return_message"),
+    output_type=ToolOutput(str, name="done"),
     instructions="You are directing which character acts next in a D&D game.",
 )
 

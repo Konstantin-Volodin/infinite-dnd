@@ -2,7 +2,7 @@
 """Agent for narrating and updating the world as the dungeon master."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 from pydantic_ai import Agent, RunContext, ToolOutput
 
 from src.core.models import WorldState
@@ -20,7 +20,7 @@ class DungeonMasterDeps:
 agent: Agent[DungeonMasterDeps, str] = Agent(
     model=create_model(),
     deps_type=DungeonMasterDeps,
-    output_type=ToolOutput(str, name="return_message"),
+    output_type=ToolOutput(str, name="done"),
     instructions="You are the dungeon master in a D&D game.",
 )
 
@@ -48,7 +48,7 @@ def narrate(
 @agent.tool
 def create(
     ctx: RunContext[DungeonMasterDeps],
-    type: str,
+    type: Literal["location", "item", "npc"],
     name: str,
     description: str,
     id: str | None = None,
@@ -71,7 +71,7 @@ def create(
 @agent.tool
 def modify(
     ctx: RunContext[DungeonMasterDeps],
-    action: str,
+    action: Literal["update_quest", "remove_npc", "update_location"],
     target_id: str,
     status: str | None = None,
     reason: str | None = None,

@@ -18,7 +18,7 @@ class CharacterDeps:
 agent: Agent[CharacterDeps, str] = Agent(
     model=create_model(),
     deps_type=CharacterDeps,
-    output_type=ToolOutput(str, name="return_message"),
+    output_type=ToolOutput(str, name="done"),
     instructions="You are a character in a D&D game.",
 )
 
