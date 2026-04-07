@@ -1,13 +1,10 @@
-# tests/context/character.py
 """Render the exact context sent to each Character agent."""
 
-import sys
-import os
 import json
 import logging
 from datetime import datetime
 
-from src.tests import ARCHIVE_DIR
+from src.tests import LOG_DIR
 from src.core.state import StateManager
 from src.llm.prompts import character_system, character_context
 from src.llm.character import agent
@@ -19,7 +16,7 @@ def main():
 
     # per character context
     for char_id, char in state.characters.items():
-        path = ARCHIVE_DIR / f"{stamp}-{char.id}.md"
+        path = LOG_DIR / f"{stamp}-{char.id}.md"
 
         system = character_system(char)
         context = character_context(char, state)

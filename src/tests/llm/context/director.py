@@ -9,7 +9,7 @@ from datetime import datetime
 from src.core.state import StateManager
 from src.llm.director import agent
 from src.llm.prompts import director_context, director_system
-from src.tests import ARCHIVE_DIR
+from src.tests import LOG_DIR
 
 
 def main():
@@ -29,7 +29,7 @@ def main():
     output += f"##### Tools\n{json.dumps(tools, indent=2)}\n\n"
     output += f"##### Context\n{context}"
 
-    path = ARCHIVE_DIR / f"{stamp}-director.md"
+    path = LOG_DIR / f"{stamp}-director.md"
     with open(path, "w", encoding="utf-8") as f:
         f.write(output)
     logging.info(f"saved [Director] context to {path}")
