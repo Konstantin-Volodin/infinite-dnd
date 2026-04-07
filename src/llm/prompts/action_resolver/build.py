@@ -1,10 +1,10 @@
 """Action resolver prompt builders - converts character actions into state changes."""
 
 from src.engine.models import Character, WorldState
+from src.engine.queries import resolve_character, resolve_location_id
 from src.engine.rules import get_health_status
 from src.engine.utils import slugify
 from src.llm.prompts.loader import render
-from src.llm.tools.world import resolve_character, resolve_location_id
 
 
 def _resolve_target_item(char: Character, state: WorldState, target: str | None) -> str | None:

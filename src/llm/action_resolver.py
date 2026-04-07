@@ -5,12 +5,12 @@ from dataclasses import dataclass
 from pydantic_ai import Agent, RunContext, ToolOutput
 
 from src.engine.models import Character, WorldState
+from src.engine.world import add_location_feature, adjust_hit_points, create_item as world_create_item, drop_item
+from src.engine.world import discover_location, spawn_npc as world_spawn_npc
+from src.engine.world import remember as remember_fact
+from src.engine.world import take_item, update_quest_status
 from src.llm.prompts import action_resolver_context, action_resolver_system
 from src.llm.server import create_model
-from src.llm.tools.world import add_location_feature, adjust_hit_points, create_item as world_create_item, drop_item
-from src.llm.tools.world import discover_location, spawn_npc as world_spawn_npc
-from src.llm.tools.world import remember as remember_fact
-from src.llm.tools.world import take_item, update_quest_status
 
 
 @dataclass

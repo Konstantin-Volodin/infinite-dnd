@@ -8,13 +8,13 @@ from pydantic_ai import Agent, RunContext, ToolOutput
 from pydantic_ai.exceptions import ModelRetry
 from pydantic_ai.tools import ToolDefinition
 
+from src.engine.interactions import wait
 from src.engine.models import Character, WorldState
-from src.engine.state import add_history
+from src.engine.queries import characters_in_location, connected_location_ids
 from src.llm.action_resolver import ActionResolverDeps, agent as action_resolver_agent
 from src.llm.prompts import character_context, character_system
 from src.llm.server import create_model
 from src.llm.tools import character_speak, character_travel
-from src.llm.tools.world import characters_in_location, connected_location_ids
 
 
 @dataclass
@@ -164,9 +164,7 @@ def travel_output(
 
 def wait_output(ctx: RunContext[CharacterDeps]) -> str:
     """do nothing for now and wait to see what happens next."""
-    text = f"{ctx.deps.char.id} waits."
-    add_history(ctx.deps.state, text, ctx.deps.char.location)
-    return text
+    return wait(ctx.deps.char, ctx.deps.state)
 
 
 CHARACTER_RESPONSE_OUTPUTS = [

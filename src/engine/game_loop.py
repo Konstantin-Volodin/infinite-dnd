@@ -13,6 +13,7 @@ from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
 from pydantic_graph import End
 
+from src.engine.queries import resolve_character
 from src.engine.models import WorldState
 from src.engine.rules import get_skill_modifier
 from src.engine.state import StateManager
@@ -57,16 +58,6 @@ def _tool_calls(messages: list) -> list[tuple[str, dict]]:
                 name = getattr(part, "tool_name", None)
                 result.append((name, _args_dict(part)))
     return result
-
-
-def _find_character(target: str, state: WorldState):
-    if target in state.characters:
-        return state.characters[target]
-    target_lower = target.lower()
-    for char in state.characters.values():
-        if target_lower in char.id.lower():
-            return char
-    return None
 
 
 def _print_history_since(state: WorldState, since: int) -> None:
@@ -202,7 +193,7 @@ def run_turn(char_id: str, state: WorldState, session_history: list) -> list:
                 else:
                     print(f"  [roll] investigation {roll}+mod={total} vs DC {_DISCOVERY_DC} → {dest} not found", flush=True)
         elif tool_name == "speak" and args.get("target"):
-            target_char = _find_character(args["target"], state)
+            target_char = resolve_character(state, args["target"])
             if target_char and target_char.id != char.id:
                 print(f"  [{target_char.id}]", flush=True)
                 _run(

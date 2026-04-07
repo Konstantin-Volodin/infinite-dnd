@@ -8,16 +8,7 @@ from .models import (
     Location,
     CharacterStats,
     Quest,
-    HistoryEvent,
 )
-
-
-def add_history(state: WorldState, text: str, location: str) -> None:
-    """Append a history event to state. Caps history at 50 entries."""
-    characters = [c.id for c in state.characters.values() if c.location == location]
-    state.history.append(HistoryEvent(text=text, location=location, characters=characters))
-    if len(state.history) > 50:
-        state.history.pop(0)
 
 class StateManager:
     """Handles the world state."""

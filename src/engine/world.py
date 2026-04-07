@@ -1,7 +1,8 @@
-"""Shared world-mutation helpers for agent tools."""
+"""Concrete world-state mutations."""
 
+from src.engine.history import add_history
 from src.engine.models import Character, CharacterStats, Location, Quest, WorldState
-from src.engine.state import add_history
+from src.engine.queries import default_anchor_location, resolve_character, resolve_location_id, resolve_quest
 from src.engine.utils import slugify
 
 
@@ -11,75 +12,6 @@ def _resolve_named_value(values: list[str], raw_value: str) -> str | None:
         if slugify(value) == target:
             return value
     return None
-
-
-def resolve_character(state: WorldState, raw_character_id: str | None) -> Character | None:
-    if not raw_character_id:
-        return None
-    if raw_character_id in state.characters:
-        return state.characters[raw_character_id]
-
-    normalized = slugify(raw_character_id)
-    for char in state.characters.values():
-        if slugify(char.id) == normalized:
-            return char
-    return None
-
-
-def characters_in_location(
-    state: WorldState,
-    location_id: str,
-    *,
-    exclude_character_id: str | None = None,
-) -> list[Character]:
-    return [
-        char
-        for char in state.characters.values()
-        if char.location == location_id and char.id != exclude_character_id
-    ]
-
-
-def resolve_location_id(state: WorldState, raw_location: str | None) -> str | None:
-    if not raw_location:
-        return raw_location
-    if raw_location in state.locations:
-        return raw_location
-
-    normalized = slugify(raw_location)
-    if normalized in state.locations:
-        return normalized
-    return raw_location
-
-
-def default_anchor_location(state: WorldState) -> str:
-    first_char = next(iter(state.characters.values()), None)
-    if first_char and first_char.location in state.locations:
-        return first_char.location
-    first_location = next(iter(state.locations.keys()), "")
-    return first_location
-
-
-def connected_location_ids(state: WorldState, location_id: str) -> list[str]:
-    loc = state.locations.get(location_id)
-    if not loc:
-        return []
-    return [connection_id for connection_id in loc.connections if connection_id in state.locations]
-
-
-def resolve_quest(state: WorldState, target_id: str) -> Quest | None:
-    quest = state.quests.get(target_id)
-    if quest:
-        return quest
-
-    target_slug = slugify(target_id)
-    return next(
-        (
-            candidate
-            for candidate in state.quests.values()
-            if slugify(candidate.id) == target_slug or slugify(candidate.title) == target_slug
-        ),
-        None,
-    )
 
 
 def _quest_event_location(state: WorldState, quest: Quest) -> str:
@@ -146,19 +78,19 @@ def discover_location(
 
 
 def remember(state: WorldState, character_id: str, knowledge: str) -> str:
-    char = resolve_character(state, character_id)
-    if not char:
+    character = resolve_character(state, character_id)
+    if not character:
         return f"Cannot add knowledge to {character_id!r} - character not found."
 
     learned = (knowledge or "").strip()
     if not learned:
         return "Cannot add an empty piece of knowledge."
-    if learned in char.knowledge:
-        return f"{char.id} already knows that."
+    if learned in character.knowledge:
+        return f"{character.id} already knows that."
 
-    char.knowledge.append(learned)
-    add_history(state, f"{char.id} learns: {learned}", char.location)
-    return f"Added knowledge for {char.id}."
+    character.knowledge.append(learned)
+    add_history(state, f"{character.id} learns: {learned}", character.location)
+    return f"Added knowledge for {character.id}."
 
 
 def add_location_feature(state: WorldState, detail: str, location: str | None = None) -> str:
@@ -179,25 +111,25 @@ def add_location_feature(state: WorldState, detail: str, location: str | None = 
 
 
 def adjust_hit_points(state: WorldState, character_id: str, delta: int, reason: str | None = None) -> str:
-    char = resolve_character(state, character_id)
-    if not char:
+    character = resolve_character(state, character_id)
+    if not character:
         return f"Cannot change HP for {character_id!r} - character not found."
 
-    old_hp = char.stats.hp
-    new_hp = max(0, min(char.stats.max_hp, old_hp + delta))
+    old_hp = character.stats.hp
+    new_hp = max(0, min(character.stats.max_hp, old_hp + delta))
     actual_delta = new_hp - old_hp
     if actual_delta == 0:
-        return f"{char.id}'s HP is unchanged."
+        return f"{character.id}'s HP is unchanged."
 
-    char.stats.hp = new_hp
+    character.stats.hp = new_hp
     direction = "gains" if actual_delta > 0 else "loses"
     amount = abs(actual_delta)
-    message = f"{char.id} {direction} {amount} HP"
+    message = f"{character.id} {direction} {amount} HP"
     if reason:
         message += f" ({reason.strip()})"
     message += "."
-    add_history(state, message, char.location)
-    return f"Updated HP for {char.id} to {char.stats.hp}/{char.stats.max_hp}."
+    add_history(state, message, character.location)
+    return f"Updated HP for {character.id} to {character.stats.hp}/{character.stats.max_hp}."
 
 
 def update_quest_status(state: WorldState, target_id: str, status: str) -> str:
@@ -216,11 +148,11 @@ def update_quest_status(state: WorldState, target_id: str, status: str) -> str:
 
 
 def take_item(state: WorldState, character_id: str, item_name: str, location: str | None = None) -> str:
-    char = resolve_character(state, character_id)
-    if not char:
+    character = resolve_character(state, character_id)
+    if not character:
         return f"Cannot take item as {character_id!r} - character not found."
 
-    location_id = resolve_location_id(state, location) or char.location
+    location_id = resolve_location_id(state, location) or character.location
     loc = state.locations.get(location_id)
     if not loc:
         return f"Cannot take item from {location!r} - location not found."
@@ -228,35 +160,35 @@ def take_item(state: WorldState, character_id: str, item_name: str, location: st
     resolved_item = _resolve_named_value(loc.items, item_name)
     if not resolved_item:
         return f"Cannot take item {item_name!r} - item not found at {loc.id}."
-    if resolved_item in char.inventory:
-        return f"{char.id} already has {resolved_item}."
+    if resolved_item in character.inventory:
+        return f"{character.id} already has {resolved_item}."
 
     loc.items.remove(resolved_item)
-    char.inventory.append(resolved_item)
-    add_history(state, f"{char.id} takes {resolved_item} from {loc.id}.", loc.id)
-    return f"{char.id} takes {resolved_item}."
+    character.inventory.append(resolved_item)
+    add_history(state, f"{character.id} takes {resolved_item} from {loc.id}.", loc.id)
+    return f"{character.id} takes {resolved_item}."
 
 
 def drop_item(state: WorldState, character_id: str, item_name: str, location: str | None = None) -> str:
-    char = resolve_character(state, character_id)
-    if not char:
+    character = resolve_character(state, character_id)
+    if not character:
         return f"Cannot drop item as {character_id!r} - character not found."
 
-    location_id = resolve_location_id(state, location) or char.location
+    location_id = resolve_location_id(state, location) or character.location
     loc = state.locations.get(location_id)
     if not loc:
         return f"Cannot drop item at {location!r} - location not found."
 
-    resolved_item = _resolve_named_value(char.inventory, item_name)
+    resolved_item = _resolve_named_value(character.inventory, item_name)
     if not resolved_item:
-        return f"Cannot drop item {item_name!r} - item not carried by {char.id}."
+        return f"Cannot drop item {item_name!r} - item not carried by {character.id}."
     if resolved_item in loc.items:
         return f"{resolved_item} is already at {loc.id}."
 
-    char.inventory.remove(resolved_item)
+    character.inventory.remove(resolved_item)
     loc.items.append(resolved_item)
-    add_history(state, f"{char.id} leaves {resolved_item} at {loc.id}.", loc.id)
-    return f"{char.id} drops {resolved_item}."
+    add_history(state, f"{character.id} leaves {resolved_item} at {loc.id}.", loc.id)
+    return f"{character.id} drops {resolved_item}."
 
 
 def create_item(state: WorldState, item_name: str, description: str | None = None, location: str | None = None) -> str:
@@ -303,3 +235,30 @@ def spawn_npc(
     )
     add_history(state, f"{resolved_id} arrives at {loc.id}.", loc.id)
     return f"Created NPC {resolved_id} at {loc.id}."
+
+
+def remove_npc(state: WorldState, target_id: str, reason: str | None = None) -> str:
+    character = state.characters.get(target_id)
+    if not character:
+        return f"Cannot remove NPC {target_id!r} - character not found."
+
+    location = character.location if character.location in state.locations else default_anchor_location(state)
+    message = f"{character.id} {reason or 'leaves the scene.'}"
+    if not message.endswith("."):
+        message += "."
+
+    del state.characters[target_id]
+    add_history(state, message, location)
+    return f"Removed NPC {target_id}."
+
+
+def update_location(state: WorldState, target_id: str, reason: str | None = None) -> str:
+    location_id = resolve_location_id(state, target_id)
+    location = state.locations.get(location_id or "")
+    if not location:
+        return f"Cannot update location {target_id!r} - location not found."
+
+    if reason:
+        add_history(state, f"{location.id}: {reason}", location.id)
+        return f"Updated location {location.id}."
+    return f"Location {location.id} is unchanged."
