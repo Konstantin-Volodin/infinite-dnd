@@ -1,0 +1,21 @@
+[
+  {
+    "id": "valley-bridge",
+    "description": "An old stone bridge crossing the silver river. Lanterns flicker each evening.",
+    "connections": ["market-square", "forest-trail"],
+    "features": ["lantern post", "railing"]
+  },
+  {
+    "id": "market-square",
+    "description": "Bustling market with stalls selling spices, trinkets, and rumors.",
+    "connections": ["valley-bridge", "guild-hall"],
+    "features": ["notice board","fountain","street performers"]
+  },
+  {
+    "id": "guild-hall",
+    "description": "A grand wooden building where merchants and artisans gather.",
+    "connections": ["market-square", "trade-dock"],
+    "features": ["guild ledger","meeting table"],
+    "items": ["strange coin"]
+  }
+]

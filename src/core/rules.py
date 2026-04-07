@@ -52,13 +52,12 @@ def get_health_status(character) -> str:
     try:
         hp = character.stats.hp
         max_hp = character.stats.max_hp
-        if hp <= 0:
-            return "dead"
         pct = (hp / max_hp) * 100 if max_hp else 0
-        if pct <= 25:
-            return "critical"
-        if pct <= 50:
-            return "injured"
-        return "healthy"
+        
+        if hp <= 0: return "dead"
+        if pct <= 25: return "critical"
+        if pct <= 50: return "injured"
+        else: return "healthy"
+        
     except Exception:
         return "unknown"

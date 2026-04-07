@@ -6,18 +6,29 @@ from .models import (
     WorldState,
     Character,
     Location,
-    CharacterType,
     CharacterStats,
     Quest,
+    HistoryEvent,
 )
+
+
+def add_history(state: WorldState, text: str, location: str) -> None:
+    """Append a history event to state. Caps history at 50 entries."""
+    characters = [c.id for c in state.characters.values() if c.location == location]
+    state.history.append(HistoryEvent(text=text, location=location, characters=characters))
+    if len(state.history) > 50:
+        state.history.pop(0)
+
 class StateManager:
     """Handles the world state."""
 
+    _SRC_DIR = os.path.dirname(os.path.dirname(__file__))  # src/
+
     def __init__(self, setup_dir: str = "world-setup", state_dir: str = "world-state"):
         """Initialize the state manager."""
-        self.setup_dir = setup_dir
-        self.state_dir = state_dir
-        self.state_file = os.path.join(state_dir, "world_state.json")
+        self.setup_dir = os.path.join(self._SRC_DIR, setup_dir)
+        self.state_dir = os.path.join(self._SRC_DIR, state_dir)
+        self.state_file = os.path.join(self.state_dir, "world_state.json")
         os.makedirs(self.state_dir, exist_ok=True)
 
     def read_json(self, path: str):
@@ -48,14 +59,8 @@ class StateManager:
         characters = {}
         characters_json = self.read_json(os.path.join(self.setup_dir, "characters.json"))
         for char in characters_json:
-            c_type = CharacterType(char["type"]) if "type" in char else CharacterType.NPC
-            # Simple heuristic for name: convert slug to Title Case
-            c_name = char.get("name") or char["id"].replace("-", " ").title()
-
             characters[char["id"]] = Character(
                 id=char["id"],
-                name=c_name,
-                type=char.get("type", c_type),
                 location=char.get("location", "market-square"),
                 role=char.get("role", ""),
                 stats=CharacterStats(**char.get("stats", {})),

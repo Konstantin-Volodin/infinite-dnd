@@ -1,0 +1,34 @@
+## Turn Scope
+
+Selection scope: **{{ scope_label }}**
+
+## Candidates
+
+{% for c in candidates %}
+### {{ c.id }}
+- Location: {{ c.loc_name }}
+{% if c.goal %}
+- Goal: {{ c.goal }}
+{% endif %}
+{% if c.personality %}
+- Personality: {{ c.personality }}
+{% endif %}
+{% if c.recent_knowledge %}
+- Recent knowledge: {{ c.recent_knowledge | join('; ') }}
+{% endif %}
+
+{% endfor %}
+## Recent Events
+
+{% if events %}
+{% for event in events[:-1] %}
+- {{ event }}
+{% endfor %}
+→ {{ events[-1] }}
+{% else %}
+_No events yet._
+{% endif %}
+
+---
+
+Choose one character and act now with a tool call including `character_id`.
