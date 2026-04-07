@@ -1,5 +1,4 @@
 """Director prompt builders — system prompt and context."""
-from __future__ import annotations
 
 from src.core.models import WorldState
 from src.llm.prompts.loader import render

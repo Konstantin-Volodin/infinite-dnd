@@ -2,13 +2,12 @@
 """Agent for impersonating characters."""
 
 from dataclasses import dataclass
-
 from pydantic_ai import Agent, RunContext, ToolOutput
 
+from src.core.models import Character, WorldState
 from src.llm.server import create_model
 from src.llm.prompts import character_system, character_context
-from src.llm.tools import action as _action, speak as _speak, travel as _travel
-from src.core.models import Character, WorldState
+from src.llm.tools import character_action, character_speak, character_travel
 
 
 @dataclass
@@ -35,16 +34,27 @@ def context(ctx: RunContext[CharacterDeps]) -> str:
 
 # tools
 @agent.tool
-def action(ctx: RunContext[CharacterDeps], description: str, target: str | None = None) -> str:
+def action(
+    ctx: RunContext[CharacterDeps], 
+    description: str, 
+    target: str | None = None
+) -> str:
     """describe what you want to do and how you want to do it. can target person, item, or feature. be specific and detailed."""
-    return _action(ctx.deps.char, ctx.deps.state, description, target)
+    return character_action(ctx.deps.char, ctx.deps.state, description, target)
 
 @agent.tool
-def speak(ctx: RunContext[CharacterDeps], message: str, target: str | None = None) -> str:
+def speak(
+    ctx: RunContext[CharacterDeps], 
+    message: str, 
+    target: str | None = None
+) -> str:
     """say something. can be targeted dialogue or thinking out loud."""
-    return _speak(ctx.deps.char, ctx.deps.state, message, target)
+    return character_speak(ctx.deps.char, ctx.deps.state, message, target)
 
 @agent.tool
-def travel(ctx: RunContext[CharacterDeps], location: str) -> str:
+def travel(
+    ctx: RunContext[CharacterDeps], 
+    location: str
+) -> str:
     """travel to a connected location."""
-    return _travel(ctx.deps.char, ctx.deps.state, location)
+    return character_travel(ctx.deps.char, ctx.deps.state, location)

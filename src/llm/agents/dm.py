@@ -1,5 +1,4 @@
 """DM Agent - Dungeon Master that narrates and controls the world."""
-from __future__ import annotations
 
 from typing import Dict, Any
 
