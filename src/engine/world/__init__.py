@@ -1,26 +1,8 @@
-"""Engine package for state, world, and runtime helpers."""
+"""World-state helpers, queries, interactions, and mutations."""
 
-from .state import (
-    WorldState,
-    Character,
-    HistoryEvent,
-    Location,
-    CharacterStats,
-    Quest,
-    StateManager,
-)
-from .world import (
-    add_history,
-    action,
-    speak,
-    travel,
-    wait,
-    characters_in_location,
-    connected_location_ids,
-    default_anchor_location,
-    resolve_character,
-    resolve_location_id,
-    resolve_quest,
+from .history import add_history
+from .interactions import action, speak, travel, wait
+from .mutations import (
     add_location_feature,
     adjust_hit_points,
     create_item,
@@ -34,15 +16,16 @@ from .world import (
     update_location,
     update_quest_status,
 )
+from .queries import (
+    characters_in_location,
+    connected_location_ids,
+    default_anchor_location,
+    resolve_character,
+    resolve_location_id,
+    resolve_quest,
+)
 
 __all__ = [
-    "WorldState",
-    "Character",
-    "HistoryEvent",
-    "Location",
-    "CharacterStats",
-    "Quest",
-    "StateManager",
     "add_history",
     "action",
     "speak",

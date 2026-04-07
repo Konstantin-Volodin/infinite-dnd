@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from pydantic_ai import Agent, RunContext, ToolOutput
 
-from src.engine.models import WorldState
+from src.engine.state import WorldState
 from src.llm.server import create_model
 from src.llm.prompts import director_context, director_system
 from src.llm.tools import director_action, director_speak, director_travel

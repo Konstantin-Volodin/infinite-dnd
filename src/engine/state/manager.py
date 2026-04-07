@@ -13,7 +13,7 @@ from .models import (
 class StateManager:
     """Handles the world state."""
 
-    _SRC_DIR = os.path.dirname(os.path.dirname(__file__))  # src/
+    _SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))  # src/
 
     def __init__(self, setup_dir: str = "world-setup", state_dir: str = "world-state"):
         """Initialize the state manager."""

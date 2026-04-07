@@ -1,9 +1,14 @@
 """Concrete world-state mutations."""
 
-from src.engine.history import add_history
-from src.engine.models import Character, CharacterStats, Location, Quest, WorldState
-from src.engine.queries import default_anchor_location, resolve_character, resolve_location_id, resolve_quest
+from src.engine.state import Character, CharacterStats, Location, Quest, WorldState
 from src.engine.utils import slugify
+from src.engine.world.history import add_history
+from src.engine.world.queries import (
+    default_anchor_location,
+    resolve_character,
+    resolve_location_id,
+    resolve_quest,
+)
 
 
 def _resolve_named_value(values: list[str], raw_value: str) -> str | None:

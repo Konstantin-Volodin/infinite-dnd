@@ -1,8 +1,8 @@
 """Character-driven world interactions."""
 
-from src.engine.history import add_history
-from src.engine.models import Character, WorldState
-from src.engine.queries import resolve_location_id
+from src.engine.state import Character, WorldState
+from src.engine.world.history import add_history
+from src.engine.world.queries import resolve_location_id
 
 
 def action(character: Character, state: WorldState, description: str, target: str | None = None) -> str:

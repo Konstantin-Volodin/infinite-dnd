@@ -8,9 +8,9 @@ from pydantic_ai import Agent, RunContext, ToolOutput
 from pydantic_ai.exceptions import ModelRetry
 from pydantic_ai.tools import ToolDefinition
 
-from src.engine.interactions import wait
-from src.engine.models import Character, WorldState
-from src.engine.queries import characters_in_location, connected_location_ids
+from src.engine.state import Character, WorldState
+from src.engine.world.interactions import wait
+from src.engine.world.queries import characters_in_location, connected_location_ids
 from src.llm.action_resolver import ActionResolverDeps, agent as action_resolver_agent
 from src.llm.prompts import character_context, character_system
 from src.llm.server import create_model

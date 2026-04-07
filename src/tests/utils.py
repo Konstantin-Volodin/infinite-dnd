@@ -8,8 +8,7 @@ from typing import Any
 from pydantic_ai import capture_run_messages
 
 from src.tests import LOG_DIR, stamp
-from src.engine.models import Character, WorldState
-from src.engine.state import StateManager
+from src.engine.state import Character, StateManager, WorldState
 
 
 def build_state() -> WorldState:

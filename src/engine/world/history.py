@@ -1,6 +1,6 @@
 """History helpers for world state."""
 
-from src.engine.models import HistoryEvent, WorldState
+from src.engine.state import HistoryEvent, WorldState
 
 
 def add_history(state: WorldState, text: str, location: str) -> None:

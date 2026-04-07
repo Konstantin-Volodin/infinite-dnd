@@ -1,4 +1,4 @@
-from src.engine.game_loop import run_game
+from src.engine.runtime import run_game
 from src.llm import LlamaServer
 
 if __name__ == "__main__":

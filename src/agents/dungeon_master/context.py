@@ -1,7 +1,7 @@
 # src/llm/prompts/dungeon_master/build.py
 """DM prompt builders - system prompt and context."""
 
-from src.engine.models import WorldState
+from src.engine.state import WorldState
 from src.engine.rules import get_health_status
 from src.llm.prompts.loader import render
 

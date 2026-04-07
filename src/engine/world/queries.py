@@ -1,6 +1,6 @@
 """Read-only helpers for world state lookups."""
 
-from src.engine.models import Character, Quest, WorldState
+from src.engine.state import Character, Quest, WorldState
 from src.engine.utils import slugify
 
 

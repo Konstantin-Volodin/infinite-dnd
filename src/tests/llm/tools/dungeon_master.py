@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from src.engine.models import Quest
+from src.engine.state import Quest
 from src.llm.dungeon_master.dungeon_master import DungeonMasterDeps, agent
 from src.tests.utils import build_state, pick_character, run_scenario
 

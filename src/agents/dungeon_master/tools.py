@@ -1,9 +1,9 @@
 # src/llm/tools/dungeon_master.py
 """dungeon master tools logic - defines how world actions affect the world state."""
 
-from src.engine.models import WorldState
-from src.engine.world import create_item, discover_location, narrate as world_narrate
-from src.engine.world import remove_npc, spawn_npc, update_location, update_quest_status
+from src.engine.state import WorldState
+from src.engine.world.mutations import create_item, discover_location, narrate as world_narrate
+from src.engine.world.mutations import remove_npc, spawn_npc, update_location, update_quest_status
 
 
 def narrate(state: WorldState, content: str, location: str = "") -> str:

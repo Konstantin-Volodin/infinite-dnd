@@ -1,8 +1,8 @@
 # src/llm/tools/director.py
 """director tools logic - selects a character and delegates to character tools."""
 
-from src.engine.queries import resolve_character
-from src.engine.models import Character, WorldState
+from src.engine.world.queries import resolve_character
+from src.engine.state import Character, WorldState
 from src.llm.character.character import action as character_action
 from src.llm.character.character import speak as character_speak
 from src.llm.character.character import travel as character_travel

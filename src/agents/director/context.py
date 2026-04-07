@@ -1,6 +1,6 @@
 """Director prompt builders — system prompt and context."""
 
-from src.engine.models import WorldState
+from src.engine.state import WorldState
 from src.llm.prompts.loader import render
 
 
