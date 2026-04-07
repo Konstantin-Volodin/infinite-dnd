@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 
 from src.engine.state import StateManager
-from src.llm.director import agent
+from src.llm.director.director import agent
 from src.llm.prompts import director_context, director_system
 from src.tests import LOG_DIR
 

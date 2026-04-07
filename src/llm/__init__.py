@@ -12,9 +12,9 @@ Generates 4 agents that utilize a shared LLM backend to perform different roles 
 """LLM integration package."""
 
 from .server import LlamaServer
-from .character import agent as CharacterAgent
-from .director import agent as DirectorAgent
-from .dungeon_master import agent as DungeonMasterAgent
+from .character.character import agent as CharacterAgent
+from .director.director import agent as DirectorAgent
+from .dungeon_master.dungeon_master import agent as DungeonMasterAgent
 from .action_resolver import agent as ActionResolverAgent
 
 __all__ = [

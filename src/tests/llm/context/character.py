@@ -9,7 +9,7 @@ from pydantic_ai import RunContext
 from pydantic_ai.usage import RunUsage
 
 from src.tests import LOG_DIR
-from src.llm.character import CharacterDeps, agent
+from src.llm.character.character import CharacterDeps, agent
 from src.llm.server import create_model
 from src.engine.state import StateManager
 from src.llm.prompts import character_system, character_context

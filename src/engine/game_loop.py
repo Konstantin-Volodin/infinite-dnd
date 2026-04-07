@@ -18,8 +18,8 @@ from src.engine.models import WorldState
 from src.engine.rules import get_skill_modifier
 from src.engine.state import StateManager
 from src.interface.logger import Logger
-from src.llm.character import CHARACTER_RESPONSE_OUTPUTS, CharacterDeps, agent as character_agent
-from src.llm.dungeon_master import DungeonMasterDeps, agent as dm_agent
+from src.llm.character.character import CHARACTER_RESPONSE_OUTPUTS, CharacterDeps, agent as character_agent
+from src.llm.dungeon_master.dungeon_master import DungeonMasterDeps, agent as dm_agent
 
 _PEEK = 60
 _DISCOVERY_DC = 12
