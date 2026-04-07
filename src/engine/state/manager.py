@@ -1,153 +1,98 @@
-"""State Manager - load/save world state from JSON files."""
+from src.engine.state import WorldState, Character, Location, CharacterStats, Quest
 
-import json
-from pathlib import Path
-
-from src.engine.state.models import (
-    WorldState,
-    Character,
-    Location,
-    CharacterStats,
-    Quest,
-)
 
 class StateManager:
-    """Handles the world state."""
+    """CRUD operations for D&D world state management."""
 
-    def __init__(self, setup_dir: str = "src/world", state_dir: str = "world-state"):
-        """Initialize the state manager."""
-        self.ROOT_DIR = Path(__file__).resolve().parents[3]
-        self.setup_dir = self.ROOT_DIR / Path(setup_dir)
-        self.state_dir = self.ROOT_DIR / Path(state_dir)
-        self.state_dir.mkdir(exist_ok=True)
+    def __init__(self, state: WorldState):
+        self.state = state
 
-    def read_json(self, path: str | Path):
-        with open(path, "r", encoding="utf-8") as json_file:
-            return json.load(json_file)
+    # ============ LOCATIONS ============
+    def add_location(self, location: Location) -> None:
+        self.state.locations[location.id] = location
 
-    def init_state(self) -> WorldState:
-        """Load fresh world from setup files."""
+    def get_location(self, id: str) -> Location | None:
+        return self.state.locations.get(id)
 
-        locations = {}
-        locations_json = self.read_json(self.setup_dir / "locations.json")
-        for loc in locations_json:
-            locations[loc["id"]] = Location(
-                id=loc["id"],
-                description=loc.get("description", ""),
-                connections=loc.get("connections", []),
-                features=loc.get("features", []),
-                items=loc.get("items", []),
-            )
+    def modify_location(self, id: str, updated_location: Location) -> None:
+        if id in self.state.locations:
+            self.state.locations[id] = updated_location
 
-        characters = {}
-        characters_json = self.read_json(self.setup_dir / "characters.json")
-        for char in characters_json:
-            characters[char["id"]] = Character(
-                id=char["id"],
-                location=char["location"],
-                role=char.get("role", ""),
-                stats=CharacterStats(**char.get("stats", {})),
-                backstory=char.get("backstory", ""),
-                personality=char.get("personality", ""),
-                goal=char.get("goal", ""),
-                inventory=char.get("inventory", []),
-                knowledge=char.get("knowledge", []),
-                relationships=char.get("relationships", {}),
-            )
+    def remove_location(self, id: str) -> None:
+        if id in self.state.locations:
+            del self.state.locations[id]
 
-        quests = {}
-        quests_json = self.read_json(self.setup_dir / "quests.json")
-        for quest in quests_json:
-            quests[quest["id"]] = Quest(
-                id=quest["id"],
-                title=quest.get("title", ""),
-                description=quest.get("description", ""),
-                status=quest.get("status", "active"),
-                owner=quest.get("owner", ""),
-                steps=quest.get("steps", []),
-            )
+    # ============ CHARACTERS ============
+    def add_character(self, character: Character) -> None:
+        self.state.characters[character.id] = character
 
-        word_state = WorldState(
-            locations=locations, 
-            characters=characters, 
-            quests=quests
-        )
-        return word_state
+    def get_character(self, id: str) -> Character | None:
+        return self.state.characters.get(id)
 
-    def load_state(self, world_state_file: str = None) -> WorldState:
-        """Load saved state, or create fresh from setup if none exists."""
+    def modify_character(self, id: str, updated_character: Character) -> None:
+        if id in self.state.characters:
+            self.state.characters[id] = updated_character
 
-        if world_state_file:
-            state_path = self.state_dir / world_state_file
-            if not state_path.exists():
-                raise FileNotFoundError(f"Specified world state file {state_path} does not exist.")
-            return WorldState(**self.read_json(state_path))
-        
-        else:
-            print("🔄 initializing world state...")
-            state = self.init_state()
-            self.save_state(state)
-            return state
+    def remove_character(self, id: str) -> None:
+        if id in self.state.characters:
+            del self.state.characters[id]
 
-    def save_state(self, state: WorldState):
-        """Save current world state to JSON."""
-        state_file = self.state_dir / f"world_state_{state.time}.json"
-        with state_file.open("w", encoding="utf-8") as state_file:
-            state_file.write(state.model_dump_json(indent=2))
+    # ============ QUESTS ============
+    def add_quest(self, quest: Quest) -> None:
+        self.state.quests[quest.id] = quest
+
+    def get_quest(self, id: str) -> Quest | None:
+        return self.state.quests.get(id)
+
+    def modify_quest(self, id: str, updated_quest: Quest) -> None:
+        if id in self.state.quests:
+            self.state.quests[id] = updated_quest
+
+    def remove_quest(self, id: str) -> None:
+        if id in self.state.quests:
+            del self.state.quests[id]
+
+    # ============ HISTORY ============
+    def append_history(self, event: str) -> None:
+        self.state.history.append(event)
+
+    def get_history(self) -> list[str]:
+        return self.state.history
+
+    def get_history_slice(self, start: int = 0, end: int | None = None) -> list[str]:
+        return self.state.history[start:end]
 
 
 if __name__ == "__main__":
     import logging
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+    from src.engine.state import StateLoader
 
-    manager = StateManager()
+    manager = StateLoader()
     state = manager.load_state()
+    sm = StateManager(state)
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
 
-    # check dirs
-    logging.info(f"Initial world state loaded.")
-    logging.info(f"root_dir: {manager.ROOT_DIR}")
-    logging.info(f"setup_dir: {manager.setup_dir}")
-    logging.info(f"state_dir: {manager.state_dir}")
+    # location tests
+    loc = Location(id="test_loc", name="Test Location")
+    sm.add_location(loc)
+    assert sm.get_location("test_loc") == loc
+    print("✓ Location CRUD works")
 
-    # tests
-    assert isinstance(state, WorldState)
-    assert isinstance(state.characters, dict)
-    assert isinstance(state.locations, dict)
-    assert isinstance(state.quests, dict)
-    logging.info("WorldState structure test passed.")
+    # character tests
+    char = Character(id="test_char", name="Test Character", stats=CharacterStats())
+    sm.add_character(char)
+    assert sm.get_character("test_char") == char
+    print("✓ Character CRUD works")
 
-    # check characters
-    for char_id, char in state.characters.items():
-        assert isinstance(char, Character)
-        assert char.id == char_id
-        logging.info(f"Character {char_id} loaded.")
-        logging.info(f"{char}")
-    logging.info("All characters loaded successfully.")
+    # quest tests
+    quest = Quest(id="test_quest", title="Test Quest")
+    sm.add_quest(quest)
+    assert sm.get_quest("test_quest") == quest
+    print("✓ Quest CRUD works")
 
-    # check locations
-    for loc_id, loc in state.locations.items():
-        assert isinstance(loc, Location)
-        assert loc.id == loc_id
-        logging.info(f"Location {loc_id} loaded.")
-        logging.info(f"{loc}")
-    logging.info("All locations loaded successfully.")
+    # history tests
+    sm.append_history("Test event")
+    assert len(sm.get_history()) > 0
+    assert sm.get_history()[-1] == "Test event"
+    print("✓ History works")
 
-    # check quests
-    for quest_id, quest in state.quests.items():
-        assert isinstance(quest, Quest)
-        assert quest.id == quest_id
-        logging.info(f"Quest {quest_id} loaded.")
-        logging.info(f"{quest}")
-    logging.info("All quests loaded successfully.")
-
-    logging.info(f"{__file__} tests completed successfully.")
-
-    # test saving state
-    state.time += 1  # increment time to avoid overwriting initial state
-    manager.save_state(state)
-    logging.info(f"World state saved successfully at time {state.time}.")
-
-    # test loading saved state
-    loaded_state = manager.load_state(world_state_file=f"world_state_{state.time}.json")
-    assert loaded_state == state
-    logging.info("Saved world state loaded successfully and matches current state.")
