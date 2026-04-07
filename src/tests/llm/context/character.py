@@ -1,7 +1,6 @@
 # tests/context/character.py
 """Render the exact context sent to each Character agent."""
 
-from __future__ import annotations
 import sys
 import os
 import json

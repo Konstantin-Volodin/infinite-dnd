@@ -1,5 +1,4 @@
-"""Live tests: character agent calls the right tools given scenarios."""
-from __future__ import annotations
+"""Live tests: dungeon master agent calls the right tools given scenarios."""
 
 import json
 import logging
@@ -10,10 +9,10 @@ from typing import Any
 from pydantic_ai import ModelMessage, ModelResponse, ToolCallPart, capture_run_messages, models
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from src.tests import ARCHIVE_DIR
-from src.core.models import Character, WorldState
+from src.core.models import Character, Quest, WorldState
 from src.core.state import StateManager
-from src.llm.character import CharacterDeps, agent
+from src.llm.dungeon_master import DungeonMasterDeps, agent
+from src.tests import ARCHIVE_DIR
 
 models.ALLOW_MODEL_REQUESTS = False
 
@@ -26,11 +25,8 @@ def pick_character(state: WorldState) -> Character:
     return next(iter(state.characters.values()))
 
 
-def pick_travel_target(state: WorldState, char: Character) -> str:
-    location = state.locations.get(char.location)
-    if not location or not location.connections:
-        raise RuntimeError(f"No connected travel target exists for {char.location!r}")
-    return location.connections[0]
+def pick_quest(state: WorldState) -> Quest:
+    return next(iter(state.quests.values()))
 
 
 def output_arguments(tool_definition: Any) -> dict[str, Any]:
@@ -80,9 +76,22 @@ def assert_tool_call(messages: list[Any], tool_name: str) -> None:
         raise AssertionError(f"expected tool call {tool_name!r}, saw {tool_calls!r}")
 
 
+def get_tool_call_args(messages: list[Any], tool_name: str) -> dict[str, Any]:
+    for message in messages:
+        for part in getattr(message, "parts", []):
+            if getattr(part, "part_kind", None) != "tool-call":
+                continue
+            if getattr(part, "tool_name", None) == tool_name:
+                args = getattr(part, "args", None)
+                if isinstance(args, dict):
+                    return args
+                raise AssertionError(f"expected dict args for {tool_name!r}, got {args!r}")
+    raise AssertionError(f"expected tool call args for {tool_name!r}")
+
+
 def write_archive(name: str, prompt: str, output: str, messages: list[Any]) -> None:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    path = ARCHIVE_DIR / f"{stamp}-character-{name}.md"
+    path = ARCHIVE_DIR / f"{stamp}-dungeon-master-{name}.md"
 
     trace = []
     for message in messages:
@@ -97,12 +106,12 @@ def write_archive(name: str, prompt: str, output: str, messages: list[Any]) -> N
         trace.append({"kind": type(message).__name__, "parts": parts})
 
     content = [
-        f"# Character Scenario: {name}",
+        f"# Dungeon Master Scenario: {name}",
         "",
-        f"## Prompt",
+        "## Prompt",
         prompt,
         "",
-        f"## Output",
+        "## Output",
         output,
         "",
         "## Message Trace",
@@ -114,7 +123,12 @@ def write_archive(name: str, prompt: str, output: str, messages: list[Any]) -> N
     logging.info(f"saved archive trace to {path}")
 
 
-def run_scenario(prompt: str, deps: CharacterDeps, tool_name: str, tool_args: dict[str, Any]) -> str:
+def run_scenario(
+    prompt: str,
+    deps: DungeonMasterDeps,
+    tool_name: str,
+    tool_args: dict[str, Any],
+) -> tuple[str, list[Any]]:
     model = make_forced_model(tool_name, tool_args)
     with capture_run_messages() as messages:
         with agent.override(model=model):
@@ -125,59 +139,94 @@ def run_scenario(prompt: str, deps: CharacterDeps, tool_name: str, tool_args: di
     assert_tool_call(messages, tool_name)
     assert_tool_call(messages, "return_message")
     write_archive(tool_name, prompt, result.output, messages)
-    return result.output
+    return result.output, list(messages)
 
 
-def test_action() -> bool:
+def test_narrate() -> bool:
     state = build_state()
     char = pick_character(state)
-    output = run_scenario(
-        prompt=f"{char.id}, carefully inspect your surroundings and act on the most important clue.",
-        deps=CharacterDeps(char=char, state=state),
-        tool_name="action",
-        tool_args={"description": "carefully inspect your surroundings and act on the most important clue"},
+    deps = DungeonMasterDeps(
+        state=state,
+        last_action={
+            "character_id": char.id,
+            "tool": "action",
+            "result": {"intent": f"{char.id} studies the room.", "status": "success"},
+        },
+        narrate_location=char.location,
     )
-    logging.info(f"[PASS] action - {char.id}: {output!r}")
+    output, messages = run_scenario(
+        prompt="React to the latest character action.",
+        deps=deps,
+        tool_name="narrate",
+        tool_args={
+            "content": "The lantern light shivers across the wet stone.",
+            "prompts_character": char.id,
+        },
+    )
+    tool_args = get_tool_call_args(messages, "narrate")
+    if tool_args.get("prompts_character") != char.id:
+        raise AssertionError(f"expected prompted_character {char.id!r}, got {tool_args.get('prompts_character')!r}")
+    if state.history[-1].text != "The lantern light shivers across the wet stone.":
+        raise AssertionError("narration was not written to history")
+    logging.info(f"[PASS] narrate: {output!r}")
     return True
 
 
-def test_speak() -> bool:
+def test_create() -> bool:
     state = build_state()
     char = pick_character(state)
-    output = run_scenario(
-        prompt=f"{char.id}, say something useful to the people nearby.",
-        deps=CharacterDeps(char=char, state=state),
-        tool_name="speak",
-        tool_args={"message": "I have a feeling something important is happening nearby."},
+    deps = DungeonMasterDeps(state=state, narrate_location=char.location)
+    output, _ = run_scenario(
+        prompt="Create a new explorable location.",
+        deps=deps,
+        tool_name="create",
+        tool_args={
+            "type": "location",
+            "name": "Ancient Library",
+            "description": "Dusty aisles of forgotten tomes.",
+            "location": char.location,
+        },
     )
-    logging.info(f"[PASS] speak - {char.id}: {output!r}")
+    new_location = state.locations.get("ancient-library")
+    if not new_location:
+        raise AssertionError("expected ancient-library to be created")
+    if char.location not in new_location.connections:
+        raise AssertionError("expected new location to connect back to the anchor location")
+    logging.info(f"[PASS] create: {output!r}")
     return True
 
 
-def test_travel() -> bool:
+def test_modify() -> bool:
     state = build_state()
-    char = pick_character(state)
-    target_location = pick_travel_target(state, char)
-    output = run_scenario(
-        prompt=f"{char.id}, travel to {target_location}.",
-        deps=CharacterDeps(char=char, state=state),
-        tool_name="travel",
-        tool_args={"location": target_location},
+    quest = pick_quest(state)
+    deps = DungeonMasterDeps(state=state)
+    output, _ = run_scenario(
+        prompt="Advance a quest after the latest development.",
+        deps=deps,
+        tool_name="modify",
+        tool_args={
+            "action": "update_quest",
+            "target_id": quest.id,
+            "status": "completed",
+            "reason": "The main objective has been resolved.",
+        },
     )
-    logging.info(f"[PASS] travel - {char.id} -> {target_location}: {output!r}")
+    if state.quests[quest.id].status != "completed":
+        raise AssertionError("expected quest status to update")
+    logging.info(f"[PASS] modify: {output!r}")
     return True
 
 
 def main() -> bool:
     scenarios = [
-        ("action", test_action),
-        ("speak", test_speak),
-        ("travel", test_travel),
+        ("narrate", test_narrate),
+        ("create", test_create),
+        ("modify", test_modify),
     ]
 
     total = len(scenarios)
     passed = sum(1 for _, scenario in scenarios if scenario())
-    logging.info(f"Character agent: {passed}/{total} passed")
+    logging.info(f"Dungeon master agent: {passed}/{total} passed")
     return passed == total
 
 
