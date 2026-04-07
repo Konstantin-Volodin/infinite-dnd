@@ -1,8 +1,8 @@
 """REACT prompt builders - action resolution system prompt and context."""
 
-from src.core.models import Character, WorldState
-from src.core.rules import get_health_status
-from src.core.utils import slugify
+from src.engine.models import Character, WorldState
+from src.engine.rules import get_health_status
+from src.engine.utils import slugify
 from src.llm.prompts.loader import render
 from src.llm.tools.world import resolve_character, resolve_location_id
 

@@ -1,8 +1,8 @@
 """Shared world-mutation helpers for agent tools."""
 
-from src.core.models import Character, CharacterStats, Location, Quest, WorldState
-from src.core.state import add_history
-from src.core.utils import slugify
+from src.engine.models import Character, CharacterStats, Location, Quest, WorldState
+from src.engine.state import add_history
+from src.engine.utils import slugify
 
 
 def _resolve_named_value(values: list[str], raw_value: str) -> str | None:

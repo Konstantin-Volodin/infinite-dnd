@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import datetime
 
-from src.core.state import StateManager
+from src.engine.state import StateManager
 from src.llm.dungeon_master import agent
 from src.llm.prompts import dm_context, dm_system
 from src.tests import LOG_DIR

@@ -1,8 +1,8 @@
 # src/llm/tools/dungeon_master.py
 """dungeon master tools logic - defines how world actions affect the world state."""
 
-from src.core.models import WorldState
-from src.core.state import add_history
+from src.engine.models import WorldState
+from src.engine.state import add_history
 from src.llm.tools.world import create_item, discover_location, spawn_npc
 from src.llm.tools.world import default_anchor_location, narrate as world_narrate
 from src.llm.tools.world import resolve_location_id, update_quest_status

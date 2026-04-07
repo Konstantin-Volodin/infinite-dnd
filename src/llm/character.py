@@ -8,8 +8,8 @@ from pydantic_ai import Agent, RunContext, ToolOutput
 from pydantic_ai.exceptions import ModelRetry
 from pydantic_ai.tools import ToolDefinition
 
-from src.core.models import Character, WorldState
-from src.core.state import add_history
+from src.engine.models import Character, WorldState
+from src.engine.state import add_history
 from src.llm.action_resolver import ActionResolverDeps, agent as action_resolver_agent
 from src.llm.prompts import character_context, character_system
 from src.llm.server import create_model

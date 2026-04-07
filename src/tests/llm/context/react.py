@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime
 
-from src.core.state import StateManager
+from src.engine.state import StateManager
 from src.llm.prompts import action_resolver_context, action_resolver_system
 from src.llm.action_resolver import agent
 from src.tests import LOG_DIR

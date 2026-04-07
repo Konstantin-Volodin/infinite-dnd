@@ -13,9 +13,9 @@ from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
 from pydantic_graph import End
 
-from src.core.models import WorldState
-from src.core.rules import get_skill_modifier
-from src.core.state import StateManager
+from src.engine.models import WorldState
+from src.engine.rules import get_skill_modifier
+from src.engine.state import StateManager
 from src.interface.logger import Logger
 from src.llm.character import CHARACTER_RESPONSE_OUTPUTS, CharacterDeps, agent as character_agent
 from src.llm.dungeon_master import DungeonMasterDeps, agent as dm_agent

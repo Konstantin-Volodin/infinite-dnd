@@ -1,8 +1,8 @@
 # src/llm/tools/character/actions.py
 """character tools logic - defines how character actions affect the world state."""
 
-from src.core.models import Character, WorldState
-from src.core.state import add_history
+from src.engine.models import Character, WorldState
+from src.engine.state import add_history
 
 
 def action(char: Character, state: WorldState, description: str, target: str | None = None) -> str:

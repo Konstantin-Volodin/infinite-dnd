@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from pydantic_ai import Agent, RunContext, ToolOutput
 
-from src.core.models import Character, WorldState
+from src.engine.models import Character, WorldState
 from src.llm.prompts import react_context, react_system
 from src.llm.server import create_model
 from src.llm.tools.world import add_location_feature, adjust_hit_points, create_item as world_create_item, drop_item

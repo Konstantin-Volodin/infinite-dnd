@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from pydantic_ai import Agent, RunContext, ToolOutput
 
-from src.core.models import WorldState
+from src.engine.models import WorldState
 from src.llm.prompts import dm_context, dm_system
 from src.llm.server import create_model
 from src.llm.tools import dm_create, dm_modify, dm_narrate
