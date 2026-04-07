@@ -17,7 +17,6 @@ class DungeonMasterDeps:
     last_action: dict[str, Any] | None = None
     narrate_location: str = ""
 
-
 agent: Agent[DungeonMasterDeps, str] = Agent(
     model=create_model(),
     deps_type=DungeonMasterDeps,
@@ -30,7 +29,6 @@ agent: Agent[DungeonMasterDeps, str] = Agent(
 @agent.system_prompt
 def identity(_: RunContext[DungeonMasterDeps]) -> str:
     return dm_system()
-
 
 @agent.instructions
 def context(ctx: RunContext[DungeonMasterDeps]) -> str:
@@ -46,7 +44,6 @@ def narrate(
 ) -> str:
     """describe what happens in the world without speaking for characters."""
     return dm_narrate(ctx.deps.state, content, location=ctx.deps.narrate_location)
-
 
 @agent.tool
 def create(
@@ -70,7 +67,6 @@ def create(
         role=role,
         goal=goal,
     )
-
 
 @agent.tool
 def modify(

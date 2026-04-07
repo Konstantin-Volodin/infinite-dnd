@@ -1,4 +1,4 @@
-"""Core module - Data models, state management, and game engine."""
+"""Core module - data models and state management."""
 
 from .models import (
     WorldState,
@@ -7,7 +7,6 @@ from .models import (
     CharacterStats,
 )
 from .state import StateManager
-from .engine import Engine
 
 __all__ = [
     "WorldState",
@@ -15,5 +14,4 @@ __all__ = [
     "Location",
     "CharacterStats",
     "StateManager",
-    "Engine",
 ]
