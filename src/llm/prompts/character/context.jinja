@@ -1,7 +1,28 @@
 *... recent information about you ...*
 
+## 🎯 current goal
+- **goal:** {{ char.goal or 'none' }}
+
+## 👥 contacts
+{% if char.relationships %}
+{% for char_ids, rel_type in char.relationships.items() %}
+- {{ char_ids }}: {{ rel_type }}
+{% endfor %}
+{% else %}
+- none
+{% endif %}
+
 ## ❤️ condition
 - **{{ health_status }}** - {{ char.stats.hp }}/{{ char.stats.max_hp }} HP
+
+## 🎒 inventory
+{% if char.inventory %}
+{% for item in char.inventory %}
+- {{ item }}
+{% endfor %}
+{% else %}
+- nothing
+{% endif %}
 
 ## 🧠 knowledge
 {% if knowledge %}
@@ -58,6 +79,16 @@ Everything is calm... for now.
 {% else %}
 - *bugged location*
 {% endif %}
+
+## ✅ tool call options
+{% if speak_targets %}
+- **valid `speak.target` ids right now:** {{ speak_targets | join(', ') }}
+{% else %}
+- **valid `speak.target` ids right now:** none, so leave `target` empty if I speak
+{% endif %}
+- for `travel.location`, use one of the connected places listed above under **about my location**
+- if a person or place is not listed, I should use `action` to ask around, inspect, or discover it first
+- if I want to pause and let events unfold, I can use `wait`
 
 {% if warnings %}
 ## 💡 reminders

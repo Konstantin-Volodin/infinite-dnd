@@ -28,6 +28,7 @@ class LlamaServer:
             "--ubatch-size", "512",
             "--flash-attn", "on",
             "--log-disable",
+            "--metrics",
             "--cache-type-k", "q8_0",
             "--cache-type-v", "q8_0",
         ]

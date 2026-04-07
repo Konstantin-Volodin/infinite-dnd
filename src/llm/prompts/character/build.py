@@ -2,8 +2,9 @@
 """Character prompt builders - system prompt and context."""
 
 from src.core.models import WorldState, Character
-from src.llm.prompts.loader import render
 from src.core.rules import get_health_status
+from src.llm.prompts.loader import render
+from src.llm.tools.world import characters_in_location
 
 
 def character_system(char: Character) -> str:
@@ -40,16 +41,11 @@ def character_context(char: Character, state: WorldState) -> str:
         someone_speaking_to_me = is_dialogue and is_someone_else
 
     # Others present
-    others = [
-        f"{c.id} ({c.role})" if c.role else c.id
-        for c in state.characters.values()
-        if c.location == char.location and c.id != char.id
-    ]
-
+    present_characters = characters_in_location(state, char.location, exclude_character_id=char.id)
+    others = [f"{c.id} ({c.role})" if c.role else c.id for c in present_characters]
+    speak_targets = [c.id for c in present_characters]
     # Warnings
     warnings: list[str] = []
-    if recent_events and recent_events[-1].startswith(f"{char.id}"):
-        warnings.append("*I just acted. I should wait to see what happens.*")
     if sum(1 for e in recent_events[-5:] if '"' in e or "says" in e.lower()) >= 4:
         warnings.append("*Lots of talking. Maybe time for action.*")
 
@@ -62,6 +58,7 @@ def character_context(char: Character, state: WorldState) -> str:
         recent_events=recent_events,
         someone_speaking_to_me=someone_speaking_to_me,
         others=others,
+        speak_targets=speak_targets,
         quests=quests,
         warnings=warnings,
     )

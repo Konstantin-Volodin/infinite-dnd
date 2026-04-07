@@ -16,6 +16,16 @@ class DungeonMasterDeps:
     state: WorldState
     last_action: dict[str, Any] | None = None
     narrate_location: str = ""
+    narrated: bool = False
+    created: bool = False
+    modified: bool = False
+
+
+def _claim_tool(ctx: RunContext[DungeonMasterDeps], field: str, blocked_message: str) -> str | None:
+    if getattr(ctx.deps, field):
+        return blocked_message
+    setattr(ctx.deps, field, True)
+    return None
 
 agent: Agent[DungeonMasterDeps, str] = Agent(
     model=create_model(),
@@ -43,6 +53,9 @@ def narrate(
     prompts_character: str | None = None,
 ) -> str:
     """describe what happens in the world without speaking for characters."""
+    blocked = _claim_tool(ctx, "narrated", "Narration already recorded for this DM run. Call done now.")
+    if blocked:
+        return blocked
     return dm_narrate(ctx.deps.state, content, location=ctx.deps.narrate_location)
 
 @agent.tool
@@ -57,6 +70,9 @@ def create(
     goal: str | None = None,
 ) -> str:
     """add a location, item, or NPC to the world."""
+    blocked = _claim_tool(ctx, "created", "Creation already handled for this DM run. Call done now.")
+    if blocked:
+        return blocked
     return dm_create(
         ctx.deps.state,
         type=type,
@@ -77,6 +93,9 @@ def modify(
     reason: str | None = None,
 ) -> str:
     """change a quest, NPC, or location in the world state."""
+    blocked = _claim_tool(ctx, "modified", "Modification already handled for this DM run. Call done now.")
+    if blocked:
+        return blocked
     return dm_modify(
         ctx.deps.state,
         action=action,

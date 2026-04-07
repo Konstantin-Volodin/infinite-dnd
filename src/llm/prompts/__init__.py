@@ -10,6 +10,7 @@ Each agent type has:
 from .dungeon_master.build import dm_system, dm_context
 from .character.build import character_system, character_context
 from .director.build import director_system, director_context
+from .action_resolver.build import action_resolver_system, action_resolver_context
 
 __all__ = [
     "dm_system",
@@ -18,4 +19,6 @@ __all__ = [
     "character_context",
     "director_system",
     "director_context",
+    "action_resolver_system",
+    "action_resolver_context",
 ]
