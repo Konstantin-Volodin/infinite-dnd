@@ -9,15 +9,6 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 <!-- - character creation & tracking -->
 <!-- - Combat system integration -->
 
-
-### 🤖 Code style                                                   
-- Every change must leave the code easier to read than before.
-- Prefer deletion over addition. If a refactor grows a file, question the approach.
-- Remove dead code, redundant comments, and unused abstractions immediately.
-- Simpler is correct. A smaller diff is usually a better diff.
-- Before adding a function, check if the file's primary purpose is still singular. If not, it's time for a new module.
-
-
 ### 📋 Prerequisites
 **python environment**
 - `uv venv .venv`
@@ -33,3 +24,18 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 - `infinite-dnd` - runs the game
 - `infinite-dnd-logs` - runs the log viewer
 - `infinite-dnd-tests` - runs the test suite
+
+### 🤖 Code style                                                   
+- Every change must leave the code easier to read than before.
+- Prefer deletion over addition. If a refactor grows a file, question the approach.
+- Remove dead code, redundant comments, and unused abstractions immediately.
+- Simpler is correct. A smaller diff is usually a better diff.
+- Before adding a function, check if the file's primary purpose is still singular. If not, it's time for a new module.
+
+### 📂 Project Structure
+src/ - everything lives here
+- agents/ - LLM agent implementations
+- engine/ - game engine components
+- interface/ - user interface elements
+- tests/ - test cases and fixtures
+- world/ - world generation
