@@ -25,7 +25,7 @@ class StateManager:
         with open(path, "r", encoding="utf-8") as json_file:
             return json.load(json_file)
 
-    def initialize_world(self) -> WorldState:
+    def init_state(self) -> WorldState:
         """Load fresh world from setup files."""
 
         locations = {}
@@ -74,7 +74,7 @@ class StateManager:
         )
         return word_state
 
-    def generate_state(self, world_state_file: str = None) -> WorldState:
+    def load_state(self, world_state_file: str = None) -> WorldState:
         """Load saved state, or create fresh from setup if none exists."""
 
         if world_state_file:
@@ -85,7 +85,7 @@ class StateManager:
         
         else:
             print("🔄 initializing world state...")
-            state = self.initialize_world()
+            state = self.init_state()
             self.save_state(state)
             return state
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
     manager = StateManager()
-    state = manager.generate_state()
+    state = manager.load_state()
 
     # check dirs
     logging.info(f"Initial world state loaded.")
@@ -141,3 +141,13 @@ if __name__ == "__main__":
     logging.info("All quests loaded successfully.")
 
     logging.info(f"{__file__} tests completed successfully.")
+
+    # test saving state
+    state.time += 1  # increment time to avoid overwriting initial state
+    manager.save_state(state)
+    logging.info(f"World state saved successfully at time {state.time}.")
+
+    # test loading saved state
+    loaded_state = manager.load_state(world_state_file=f"world_state_{state.time}.json")
+    assert loaded_state == state
+    logging.info("Saved world state loaded successfully and matches current state.")
