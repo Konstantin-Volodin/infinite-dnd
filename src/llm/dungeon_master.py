@@ -1,8 +1,8 @@
+# src/llm/dungeon_master.py
 """Agent for narrating and updating the world as the dungeon master."""
 
 from dataclasses import dataclass
 from typing import Any
-
 from pydantic_ai import Agent, RunContext, ToolOutput
 
 from src.core.models import WorldState

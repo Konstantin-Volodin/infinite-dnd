@@ -1,5 +1,5 @@
+# src/llm/tools/director.py
 """director tools logic - selects a character and delegates to character tools."""
-
 
 from src.core.models import Character, WorldState
 from src.core.utils import slugify

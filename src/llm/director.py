@@ -1,6 +1,5 @@
 # src/llm/director.py
-"""Agent for choosing a character and acting through that character."""
-
+"""Agent for choosing a character to act."""
 
 from dataclasses import dataclass
 from pydantic_ai import Agent, RunContext, ToolOutput

@@ -22,6 +22,7 @@ agent: Agent[CharacterDeps, str] = Agent(
     instructions="You are a character in a D&D game.",
 )
 
+
 # context
 @agent.system_prompt
 def identity(ctx: RunContext[CharacterDeps]) -> str:

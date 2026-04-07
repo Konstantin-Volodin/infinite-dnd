@@ -1,3 +1,8 @@
+# src/llm/tools/__init__.py
+"""
+Tools module - allows agents to perform actions in the game world.
+"""
+
 from .character import action as character_action
 from .character import speak as character_speak
 from .character import travel as character_travel

@@ -3,8 +3,8 @@
 Prompts module - system prompts and context builders for agents.
 
 Each agent type has:
-- build_*_system_prompt(): Returns the system prompt
-- build_*_context(): Builds dynamic context from world state
+- A system prompt that defines their identity, role, and behavior guidelines.
+- A context builder that takes the current world state and formats it into a prompt to inform the agent's decisions.
 """
 
 from .dungeon_master.build import dm_system, dm_context
