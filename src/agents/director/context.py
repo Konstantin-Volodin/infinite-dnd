@@ -1,7 +1,7 @@
 """Director prompt builders — system prompt and context."""
 
 from src.engine.state import WorldState
-from src.llm.prompts.loader import render
+from src.agents.utils import render
 
 
 def director_system() -> str:

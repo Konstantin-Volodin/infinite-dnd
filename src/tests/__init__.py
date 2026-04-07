@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
-LOG_DIR = Path(__file__).parent / "archive"
+LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 stamp = datetime.now().strftime("%Y-%m-%d")

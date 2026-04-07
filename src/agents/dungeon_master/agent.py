@@ -6,9 +6,9 @@ from typing import Any, Literal
 from pydantic_ai import Agent, RunContext, ToolOutput
 
 from src.engine.state import WorldState
-from src.llm.prompts import dm_context, dm_system
-from src.llm.server import create_model
-from src.llm.tools import dm_create, dm_modify, dm_narrate
+from src.agents.utils import create_model
+from .context import dm_context, dm_system
+from .tools import create as dm_create, modify as dm_modify, narrate as dm_narrate
 
 
 @dataclass

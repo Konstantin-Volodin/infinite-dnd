@@ -1,8 +1,6 @@
 # src/tests/llm/server.py
 """Live server helpers for real LLM integration runs."""
 
-from contextlib import contextmanager
-from collections.abc import Iterator
 import logging
 import os
 import urllib.request
@@ -10,21 +8,7 @@ import urllib.error
 
 from pydantic_ai import Agent
 
-from src.llm.server import LlamaServer, create_model
-
-
-def _auto_start_enabled() -> bool:
-    return os.getenv("LLM_AUTO_START", "true").lower() != "false"
-
-
-@contextmanager
-def live_server() -> Iterator[LlamaServer | None]:
-    server = LlamaServer() if _auto_start_enabled() else None
-    try:
-        yield server
-    finally:
-        if server is not None:
-            server.stop()
+from src.agents.utils import create_model
 
 
 def server_health() -> bool:

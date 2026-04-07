@@ -42,9 +42,9 @@ class Quest(BaseModel):
     id: str
     title: str
     description: str
-    status: str = "active"  # active, completed, failed
-    owner: str = ""  # Character who owns/is assigned this quest
-    steps: List[str] = [] # description for dm to track progress
+    status: str = "active" 
+    owner: str = "" 
+    steps: List[str] = []
 
 
 class WorldState(BaseModel):

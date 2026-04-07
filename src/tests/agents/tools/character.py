@@ -7,8 +7,8 @@ import sys
 from pydantic_ai import RunContext
 from pydantic_ai.usage import RunUsage
 
-from src.llm.character.character import CharacterDeps, agent
-from src.llm.server import create_model
+from src.agents.character.agent import CharacterDeps, agent
+from src.agents.utils import create_model
 from src.tests.utils import build_state, pick_character, pick_travel_target, run_scenario
 
 PREFIX = "character"

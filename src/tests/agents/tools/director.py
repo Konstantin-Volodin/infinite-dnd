@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from src.llm.director.director import DirectorDeps, agent
+from src.agents.director.agent import DirectorDeps, agent
 from src.tests.utils import build_state, pick_character, pick_travel_target, run_scenario
 
 PREFIX = "director"

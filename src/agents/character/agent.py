@@ -11,10 +11,10 @@ from pydantic_ai.tools import ToolDefinition
 from src.engine.state import Character, WorldState
 from src.engine.world.interactions import wait
 from src.engine.world.queries import characters_in_location, connected_location_ids
-from src.llm.action_resolver import ActionResolverDeps, agent as action_resolver_agent
-from src.llm.prompts import character_context, character_system
-from src.llm.server import create_model
-from src.llm.tools import character_speak, character_travel
+from src.agents.action_resolver.agent import ActionResolverDeps, agent as action_resolver_agent
+from .context import character_context, character_system
+from src.agents.utils import create_model
+from .tools import speak as character_speak, travel as character_travel
 
 
 @dataclass

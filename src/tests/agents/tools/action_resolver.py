@@ -6,8 +6,8 @@ import sys
 from pydantic_ai import RunContext
 from pydantic_ai.usage import RunUsage
 
-from src.llm.action_resolver import ActionResolverDeps, agent, discover_exit as discover_exit_tool
-from src.llm.server import create_model
+from src.agents.action_resolver.agent import ActionResolverDeps, agent, discover_exit as discover_exit_tool
+from src.agents.utils import create_model
 from src.tests.utils import build_state, pick_character, run_scenario
 
 PREFIX = "action_resolver"

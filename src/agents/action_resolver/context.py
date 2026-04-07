@@ -4,7 +4,7 @@ from src.engine.state import Character, WorldState
 from src.engine.world.queries import resolve_character, resolve_location_id
 from src.engine.rules import get_health_status
 from src.engine.utils import slugify
-from src.llm.prompts.loader import render
+from src.agents.utils import render
 
 
 def _resolve_target_item(char: Character, state: WorldState, target: str | None) -> str | None:

@@ -9,8 +9,8 @@ from src.engine.world.mutations import add_location_feature, adjust_hit_points, 
 from src.engine.world.mutations import discover_location, spawn_npc as world_spawn_npc
 from src.engine.world.mutations import remember as remember_fact
 from src.engine.world.mutations import take_item, update_quest_status
-from src.llm.prompts import action_resolver_context, action_resolver_system
-from src.llm.server import create_model
+from src.agents.utils import create_model
+from .context import action_resolver_context, action_resolver_system
 
 
 @dataclass

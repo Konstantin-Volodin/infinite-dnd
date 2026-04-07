@@ -2,19 +2,20 @@
 
 import sys
 
-from src.tests.llm.server import live_server, server_health, basic_completion
-from src.tests.llm.context.character import main as character_context
-from src.tests.llm.context.director import main as director_context
-from src.tests.llm.context.dungeon_master import main as dm_context
-from src.tests.llm.context.react import main as action_resolver_context
-from src.tests.llm.tools.character import run_suite as character_tools
-from src.tests.llm.tools.director import run_suite as director_tools
-from src.tests.llm.tools.dungeon_master import run_suite as dm_tools
-from src.tests.llm.tools.react import run_suite as action_resolver_tools
+from src.agents.server import LlamaServer
+from src.tests.agents.server import server_health, basic_completion
+from src.tests.agents.context.character import main as character_context
+from src.tests.agents.context.director import main as director_context
+from src.tests.agents.context.dungeon_master import main as dm_context
+from src.tests.agents.context.action_resolver import main as action_resolver_context
+from src.tests.agents.tools.character import run_suite as character_tools
+from src.tests.agents.tools.director import run_suite as director_tools
+from src.tests.agents.tools.dungeon_master import run_suite as dm_tools
+from src.tests.agents.tools.action_resolver import run_suite as action_resolver_tools
 
 
 def main() -> bool:
-    with live_server():
+    with LlamaServer():
 
         # context dumps — raise on failure, no bool return
         

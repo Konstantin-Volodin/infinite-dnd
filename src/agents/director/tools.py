@@ -3,9 +3,9 @@
 
 from src.engine.world.queries import resolve_character
 from src.engine.state import Character, WorldState
-from src.llm.character.character import action as character_action
-from src.llm.character.character import speak as character_speak
-from src.llm.character.character import travel as character_travel
+from src.agents.character.tools import action as character_action
+from src.agents.character.tools import speak as character_speak
+from src.agents.character.tools import travel as character_travel
 
 
 def action(state: WorldState, character_id: str, description: str, target: str | None = None) -> str:

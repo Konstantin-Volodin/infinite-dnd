@@ -3,7 +3,7 @@
 
 from src.engine.state import WorldState
 from src.engine.rules import get_health_status
-from src.llm.prompts.loader import render
+from src.agents.utils import render
 
 
 def dm_system() -> str:
