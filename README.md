@@ -32,10 +32,17 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 - Simpler is correct. A smaller diff is usually a better diff.
 - Before adding a function, check if the file's primary purpose is still singular. If not, it's time for a new module.
 
-### 📂 Project Structure
-src/ - everything lives here
-- agents/ - LLM agent implementations
-- engine/ - game engine components
-- interface/ - user interface elements
-- tests/ - test cases and fixtures
-- world/ - world generation
+### 📂 Structure
+
+```
+src/                        - source code
+├── agents/                 - LLM agent implementations
+│   ├── action_resolver/        - resolves character actions
+│   ├── character/              - any character agent
+│   ├── dungeon_master/         - campaign management
+│   └── director/               - determines turn order
+├── engine/                 - game engine components
+├── interface/              - user interface
+├── tests/                  - test cases & fixtures
+└── world/                  - world generation
+```
