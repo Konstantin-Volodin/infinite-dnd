@@ -1,13 +1,30 @@
 """Render the exact context sent to each Character agent."""
 
+import asyncio
 import json
 import logging
 from datetime import datetime
 
+from pydantic_ai import RunContext
+from pydantic_ai.usage import RunUsage
+
 from src.tests import LOG_DIR
+from src.llm.character import CharacterDeps, agent
+from src.llm.server import create_model
 from src.core.state import StateManager
 from src.llm.prompts import character_system, character_context
-from src.llm.character import agent
+
+
+async def _prepared_tools(deps: CharacterDeps) -> dict[str, dict[str, object]]:
+    ctx = RunContext(deps=deps, model=create_model(), usage=RunUsage(), agent=agent)
+    tools: dict[str, dict[str, object]] = {}
+    prepared_toolset = agent._output_toolset.prepared(agent._prepare_output_tools)
+    for name, tool in (await prepared_toolset.get_tools(ctx)).items():
+        tools[name] = {
+            "description": tool.tool_def.description,
+            "parameters": tool.tool_def.parameters_json_schema,
+        }
+    return tools
 
 
 def main():
@@ -20,12 +37,7 @@ def main():
 
         system = character_system(char)
         context = character_context(char, state)
-
-        tools = {
-            name: {"description": td.description, "parameters": td.parameters_json_schema}
-            for name, t in agent._function_toolset.tools.items()
-            if (td := t.tool_def)
-        }
+        tools = asyncio.run(_prepared_tools(CharacterDeps(char=char, state=state)))
 
         output = f"##### Character: {char.id}\n\n"
         output += f"##### System Prompt\n{system}\n\n"

@@ -71,11 +71,20 @@ def write_archive(prefix: str, name: str, prompt: str, output: str, messages: li
     logging.info(f"saved archive trace to {path}")
 
 
-def run_scenario(agent: Any, prefix: str, prompt: str, deps: Any, tool_name: str) -> tuple[str, list[Any]]:
+def run_scenario(
+    agent: Any,
+    prefix: str,
+    prompt: str,
+    deps: Any,
+    tool_name: str,
+    *,
+    expect_done: bool = True,
+) -> tuple[str, list[Any]]:
     with capture_run_messages() as messages:
         result = agent.run_sync(prompt, deps=deps)
     assert isinstance(result.output, str)
     assert_tool_call(messages, tool_name)
-    assert_tool_call(messages, "done")
+    if expect_done:
+        assert_tool_call(messages, "done")
     write_archive(prefix, tool_name, prompt, result.output, messages)
     return result.output, list(messages)
