@@ -20,6 +20,8 @@ dev = [
 
 [project.scripts]
 infinite-dnd = "run_game:main"
+infinite-dnd-logs = "src.interface.viewer:main"
+infinite-dnd-tests = "src.tests:main"
 
 [build-system]
 requires = ["hatchling"]
