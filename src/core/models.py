@@ -1,13 +1,8 @@
+# src/core/models.py
 """Data Models - Pydantic models for game state."""
 
 from typing import List, Dict
-from enum import Enum
 from pydantic import BaseModel, Field
-
-
-class CharacterType(str, Enum):
-    PC = "pc"
-    NPC = "npc"
 
 
 class CharacterStats(BaseModel):
@@ -25,27 +20,23 @@ class Location(BaseModel):
     items: List[str] = []
 
 
-class Memory(BaseModel):
-    content: str
-    importance: str = "medium"
-    turn: int = 0
-
-
 class Character(BaseModel):
     id: str
-    name: str = ""
-    type: CharacterType = CharacterType.NPC
-
-    location: str = ""
-    role: str = ""  # e.g., "merchant", "guard", "villager"
-    stats: CharacterStats = Field(default_factory=CharacterStats)
+    role: str = "" 
     backstory: str = ""
-    personality: str = ""  # personality traits
-    goal: str = ""  # current goal
+    personality: str = "" 
+    goal: str = ""
+    location: str = ""
+    relationships: Dict[str, str] = {}
     inventory: List[str] = []
     knowledge: List[str] = []
-    relationships: Dict[str, str] = {}  # ally, enemy, contact, etc.
-    memory: List[Memory] = []  # memories for characters to recall
+    stats: CharacterStats = Field(default_factory=CharacterStats)
+
+
+class HistoryEvent(BaseModel):
+    text: str
+    location: str
+    characters: List[str] = []
 
 
 class Quest(BaseModel):
@@ -62,6 +53,4 @@ class WorldState(BaseModel):
     locations: Dict[str, Location] = {}
     characters: Dict[str, Character] = {}
     quests: Dict[str, Quest] = {}
-    history: List[str] = []  # Recent events for context
-    story_beats: List[str] = []  # Completed narrative beats (e.g., "ronn_reveals_cellar")
-    inspected_features: List[str] = []  # track inspected elements
+    history: List[HistoryEvent] = []

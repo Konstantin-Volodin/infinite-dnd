@@ -1,0 +1,70 @@
+*... recent information about you ...*
+
+## ❤️ condition
+- **{{ health_status }}** - {{ char.stats.hp }}/{{ char.stats.max_hp }} HP
+
+## 🧠 knowledge
+{% if knowledge %}
+{% for k in knowledge %}
+- {{ k }}
+{% endfor %}
+{% else %}
+- none
+{% endif %}
+
+## 📜 quests
+{% if quests %}
+{% for q in quests %}
+- **{{ q.title }}**: {{ q.description }}
+{% if q.steps %}
+Steps: {{ q.steps | join(', ') }}
+{% endif %}
+{% endfor %}
+{% else %}
+- none
+{% endif %}
+
+*... recent information about the world ...*
+
+## 💭 what just happened
+{% if recent_events %}
+{% for event in recent_events[:-1] %}
+- {{ event }}
+{% endfor %}
+*Just now:* {{ recent_events[-1] }}
+
+{% if someone_speaking_to_me %}
+
+> **Someone just spoke to me.** I should respond.
+{% endif %}
+{% else %}
+Everything is calm... for now.
+{% endif %}
+
+## 🏠 about my location
+{% if loc %}
+{% if others %}
+- **other people here**:  {{ others | join(', ') }}
+{% endif %}
+{% if loc.features %}
+- **location features:** {{ loc.features | join(', ') }}
+{% endif %}
+{% if loc.items %}
+- **items here:** {{ loc.items | join(', ') }}
+{% endif %}
+{% if loc.connections %}
+- **where i can go from here:** {{ loc.connections | join(', ') }}
+{% endif %}
+{% else %}
+- *bugged location*
+{% endif %}
+
+{% if warnings %}
+## 💡 reminders
+{% for w in warnings %}
+> {{ w }}
+{% endfor %}
+{% endif %}
+---
+
+now - what do I want to do?
