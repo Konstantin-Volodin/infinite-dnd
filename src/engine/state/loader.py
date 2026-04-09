@@ -84,7 +84,6 @@ class StateLoader:
             return WorldState(**self.read_json(state_path))
         
         else:
-            print("🔄 initializing world state...")
             state = self.init_state()
             self.save_state(state)
             return state

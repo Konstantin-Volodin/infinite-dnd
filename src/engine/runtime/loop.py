@@ -226,7 +226,7 @@ def run_game(character_id: str = "elara-swift", max_turns: int = 5) -> None:
 
     try:
         manager = StateManager()
-        state = manager.generate_initial_setup()
+        state = manager.init_state()
         session_history: list = []
 
         for turn in range(max_turns):
