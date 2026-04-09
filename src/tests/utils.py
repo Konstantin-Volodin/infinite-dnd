@@ -6,13 +6,27 @@ from datetime import datetime
 from typing import Any
 
 from pydantic_ai import capture_run_messages
+from pydantic_ai.settings import ModelSettings
+from pydantic_ai.usage import UsageLimits
 
 from src.tests import LOG_DIR, stamp
 from src.engine.state import Character, StateManager, WorldState
 
 
+SCENARIO_MODEL_SETTINGS: ModelSettings = {
+    "temperature": 0.0,
+    "max_tokens": 96,
+    "parallel_tool_calls": False,
+    "thinking": False,
+}
+
+SCENARIO_USAGE_LIMITS = UsageLimits(request_limit=4, output_tokens_limit=256)
+
+
+_state_manager = StateManager()
+
 def build_state() -> WorldState:
-    return StateManager().generate_initial_setup()
+    return _state_manager.init_state()
 
 
 def pick_character(state: WorldState) -> Character:
@@ -80,7 +94,12 @@ def run_scenario(
     expect_done: bool = True,
 ) -> tuple[str, list[Any]]:
     with capture_run_messages() as messages:
-        result = agent.run_sync(prompt, deps=deps)
+        result = agent.run_sync(
+            prompt,
+            deps=deps,
+            model_settings=SCENARIO_MODEL_SETTINGS,
+            usage_limits=SCENARIO_USAGE_LIMITS,
+        )
     assert isinstance(result.output, str)
     assert_tool_call(messages, tool_name)
     if expect_done:
