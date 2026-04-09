@@ -1,11 +1,10 @@
 # src/llm/character.py
 """Agent for impersonating characters."""
 
-from copy import deepcopy
-from dataclasses import dataclass, field
+import logging
+from dataclasses import dataclass, replace, field
 
 from pydantic_ai import Agent, RunContext, ToolOutput
-from pydantic_ai.exceptions import ModelRetry
 from pydantic_ai.tools import ToolDefinition
 
 from src.engine.state import Character, WorldState
@@ -17,6 +16,7 @@ from src.agents.utils import create_model
 from .tools import speak as character_speak, travel as character_travel
 
 
+
 @dataclass
 class CharacterDeps:
     char: Character
@@ -24,98 +24,35 @@ class CharacterDeps:
     failed_travels: list[str] = field(default_factory=list)
 
 
-def _available_speak_targets(ctx: RunContext[CharacterDeps]) -> list[str]:
-    return [
-        character.id
-        for character in characters_in_location(
-            ctx.deps.state,
-            ctx.deps.char.location,
-            exclude_character_id=ctx.deps.char.id,
-        )
-    ]
+def _speak_targets(ctx: RunContext[CharacterDeps]) -> list[str]:
+    return [c.id for c in characters_in_location(ctx.deps.state, ctx.deps.char.location, exclude_character_id=ctx.deps.char.id)]
 
 
-def _available_travel_locations(ctx: RunContext[CharacterDeps]) -> list[str]:
+def _travel_options(ctx: RunContext[CharacterDeps]) -> list[str]:
     return connected_location_ids(ctx.deps.state, ctx.deps.char.location)
-
-
-def _prepare_speak_tool(ctx: RunContext[CharacterDeps], tool_def: ToolDefinition) -> ToolDefinition:
-    prepared = deepcopy(tool_def)
-    targets = _available_speak_targets(ctx)
-    prepared.description = (
-        "say something. leave target empty to speak out loud. "
-        + (
-            f"Valid target ids right now: {', '.join(targets)}."
-            if targets
-            else "No other NPCs are here right now."
-        )
-        + " If you want someone else, use action to find or reveal them first."
-    )
-
-    target_schema = prepared.parameters_json_schema["properties"]["target"]
-    if targets:
-        for branch in target_schema.get("anyOf", []):
-            if branch.get("type") == "string":
-                branch["enum"] = targets
-                branch["description"] = f"Optional. Use one of: {', '.join(targets)}."
-    else:
-        prepared.parameters_json_schema["properties"]["target"] = {
-            "type": "null",
-            "default": None,
-            "description": "No one else is here right now. Leave target empty.",
-        }
-    return prepared
-
-
-def _prepare_travel_tool(ctx: RunContext[CharacterDeps], tool_def: ToolDefinition) -> ToolDefinition | None:
-    options = _available_travel_locations(ctx)
-    if not options:
-        return None
-
-    prepared = deepcopy(tool_def)
-    prepared.description = (
-        f"travel to a connected location. Valid location ids right now: {', '.join(options)}. "
-        "If you want somewhere else, use action to discover it first."
-    )
-    location_schema = prepared.parameters_json_schema["properties"]["location"]
-    location_schema["enum"] = options
-    location_schema["description"] = f"Use one of: {', '.join(options)}."
-    return prepared
 
 
 def _prepare_output_tools(
     ctx: RunContext[CharacterDeps],
     tool_defs: list[ToolDefinition],
 ) -> list[ToolDefinition]:
-    prepared_defs: list[ToolDefinition] = []
-    for tool_def in tool_defs:
-        if tool_def.name == "speak":
-            prepared_defs.append(_prepare_speak_tool(ctx, tool_def))
-        elif tool_def.name == "travel":
-            prepared = _prepare_travel_tool(ctx, tool_def)
-            if prepared is not None:
-                prepared_defs.append(prepared)
+    targets = _speak_targets(ctx)
+    options = _travel_options(ctx)
+
+    result: list[ToolDefinition] = []
+    for td in tool_defs:
+        if td.name == "speak":
+            hint = f"Valid targets: {', '.join(targets)}." if targets else "No one else here — leave target empty."
+            result.append(replace(td, description=f"say something. {hint}"))
+        elif td.name == "travel":
+            if options:
+                result.append(replace(td, description=f"travel to a connected location. Valid ids: {', '.join(options)}."))
         else:
-            prepared_defs.append(tool_def)
-    return prepared_defs
+            result.append(td)
+    return result
 
 
-def _validate_speak_target(ctx: RunContext[CharacterDeps], target: str | None = None) -> None:
-    if target is None:
-        return
-
-    options = _available_speak_targets(ctx)
-    if target not in options:
-        if options:
-            raise ModelRetry(
-                f"Invalid speak target {target!r}. Right now you can only target: {', '.join(options)}. "
-                "If you want someone else, use action to find or reveal them first."
-            )
-        raise ModelRetry(
-            "No one else is here right now. Leave speak.target empty to talk out loud, "
-            "or use action to find someone first."
-        )
-
+# ── output tools ─────────────────────────────────────────────────────────
 
 async def action_output(
     ctx: RunContext[CharacterDeps],
@@ -127,11 +64,13 @@ async def action_output(
     if target:
         prompt += f" (target: {target})"
 
+    logging.info(f"  [action_resolver] starting for {ctx.deps.char.id}: {description!r}")
     result = await action_resolver_agent.run(
         prompt,
         deps=ActionResolverDeps(char=ctx.deps.char, state=ctx.deps.state, description=description, target=target),
         usage=ctx.usage,
     )
+    logging.info(f"  [action_resolver] finished: {result.output!r}")
     return result.output
 
 
@@ -141,7 +80,10 @@ def speak_output(
     target: str | None = None,
 ) -> str:
     """say something. can be targeted dialogue or thinking out loud."""
-    _validate_speak_target(ctx, target)
+    targets = _speak_targets(ctx)
+    if target and target not in targets:
+        hint = f"Valid targets: {', '.join(targets)}." if targets else "No one else is here."
+        return f"Cannot speak to {target!r}. {hint}"
     return character_speak(ctx.deps.char, ctx.deps.state, message, target)
 
 
@@ -150,15 +92,12 @@ def travel_output(
     location: str,
 ) -> str:
     """travel to a connected location."""
-    options = _available_travel_locations(ctx)
+    options = _travel_options(ctx)
     if location not in options:
         ctx.deps.failed_travels.append(location)
         if options:
-            return (
-                f"Cannot travel to {location!r}. Right now you can only travel to: {', '.join(options)}. "
-                "If you want somewhere else, use action to discover it first."
-            )
-        return "There are no connected travel options right now. Use action or wait instead."
+            return f"Cannot travel to {location!r}. Valid: {', '.join(options)}."
+        return "No travel options right now. Use action or wait instead."
     return character_travel(ctx.deps.char, ctx.deps.state, location)
 
 

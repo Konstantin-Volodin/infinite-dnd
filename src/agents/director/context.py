@@ -6,7 +6,7 @@ from src.agents.utils import render
 
 def director_system() -> str:
     """Build the director's system prompt."""
-    return render("director/system.jinja")
+    return render("director/identity.jinja")
 
 
 def director_context(state: WorldState, location_id: str | None = None) -> str:
@@ -36,7 +36,7 @@ def director_context(state: WorldState, location_id: str | None = None) -> str:
     events = [e.text for e in state.history[-8:]]
 
     return render(
-        "director/context.jinja",
+        "director/state.jinja",
         scope_label=scope_label,
         candidates=candidates,
         events=events,

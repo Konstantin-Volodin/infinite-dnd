@@ -9,7 +9,7 @@ from src.agents.utils import render
 
 def character_system(char: Character) -> str:
     """Build the character identity."""
-    return render("character/system.jinja", char=char)
+    return render("character/identity.jinja", char=char)
 
 
 def character_context(char: Character, state: WorldState) -> str:
@@ -50,7 +50,7 @@ def character_context(char: Character, state: WorldState) -> str:
         warnings.append("*Lots of talking. Maybe time for action.*")
 
     return render(
-        "character/context.jinja",
+        "character/state.jinja",
         char=char,
         health_status=health_status,
         loc=loc,

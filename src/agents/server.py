@@ -5,6 +5,8 @@ import os
 import subprocess
 import time
 import logging
+import urllib.error
+import urllib.request
 
 class LlamaServer:
     """manages a local llama-server subprocess."""
@@ -15,6 +17,7 @@ class LlamaServer:
     def __init__(self):
         port = os.getenv("LLM_PORT", str(self._DEFAULT_PORT))
         model = os.getenv("LLM_MODEL", self._DEFAULT_MODEL)
+        self._health_url = f"http://localhost:{port}/health"
         cmd = [
             "llama-server", "-hf", model, "--port", port,
             "--ctx-size", "20000",
@@ -30,7 +33,18 @@ class LlamaServer:
         ]
         logging.info(f"Starting LlamaServer with command: {' '.join(str(a) for a in cmd)}")
         self._process = subprocess.Popen(cmd)
-        time.sleep(10)
+
+        # wait for the server to become healthy
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            try:
+                response = urllib.request.urlopen(self._health_url, timeout=1)
+                response.close()
+                break
+            except (urllib.error.URLError, urllib.error.HTTPError):
+                time.sleep(0.25)
+        else:
+            raise RuntimeError(f"llama-server did not become healthy: {self._health_url}")
 
     def stop(self):
         self._process.terminate()

@@ -8,7 +8,7 @@ from src.agents.utils import render
 
 def dm_system() -> str:
     """Build the DM's system prompt."""
-    return render("dungeon_master/system.jinja")
+    return render("dungeon_master/identity.jinja")
 
 
 def dm_context(state: WorldState, last_action: dict | None = None) -> str:
@@ -68,7 +68,7 @@ def dm_context(state: WorldState, last_action: dict | None = None) -> str:
     events = [e.text for e in state.history[-10:]]
 
     return render(
-        "dungeon_master/context.jinja",
+        "dungeon_master/state.jinja",
         last_action=action_data,
         events=events,
         characters=characters,

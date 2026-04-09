@@ -26,7 +26,7 @@ def _resolve_target_item(char: Character, state: WorldState, target: str | None)
 
 def action_resolver_system() -> str:
     """Build the action resolver system prompt."""
-    return render("action_resolver/system.jinja")
+    return render("action_resolver/identity.jinja")
 
 
 def action_resolver_context(char: Character, state: WorldState, description: str, target: str | None = None) -> str:
@@ -50,7 +50,7 @@ def action_resolver_context(char: Character, state: WorldState, description: str
     target_item = _resolve_target_item(char, state, target)
 
     return render(
-        "action_resolver/context.jinja",
+        "action_resolver/state.jinja",
         char=char,
         description=description,
         target=target,
