@@ -11,11 +11,10 @@ from src.engine.state.models import (
     Quest,
 )
 
-class StateLoader:
-    """Handles the world state."""
+class StateManager:
+    """Load, persist, and reset world state."""
 
     def __init__(self, setup_dir: str = "src/world", state_dir: str = "world-state"):
-        """Initialize the state loader."""
         self.ROOT_DIR = Path(__file__).resolve().parents[3]
         self.setup_dir = self.ROOT_DIR / Path(setup_dir)
         self.state_dir = self.ROOT_DIR / Path(state_dir)
@@ -99,7 +98,7 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    manager = StateLoader()
+    manager = StateManager()
     state = manager.load_state()
 
     # check dirs

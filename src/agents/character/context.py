@@ -1,8 +1,6 @@
-# src/llm/prompts/character/build.py
 """Character prompt builders - system prompt and context."""
 
-from src.engine.state import WorldState, Character
-from src.engine.world.queries import characters_in_location
+from src.engine.state import Character, WorldState, characters_in_location
 from src.engine.rules import get_health_status
 from src.agents.utils import render
 

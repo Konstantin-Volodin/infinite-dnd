@@ -1,4 +1,3 @@
-# src/llm/prompts/dungeon_master/build.py
 """DM prompt builders - system prompt and context."""
 
 from src.engine.state import WorldState

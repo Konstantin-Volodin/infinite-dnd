@@ -1,4 +1,3 @@
-# src/llm/character.py
 """Agent for impersonating characters."""
 
 import logging
@@ -7,14 +6,17 @@ from dataclasses import dataclass, replace, field
 from pydantic_ai import Agent, RunContext, ToolOutput
 from pydantic_ai.tools import ToolDefinition
 
-from src.engine.state import Character, WorldState
-from src.engine.world.interactions import wait
-from src.engine.world.queries import characters_in_location, connected_location_ids
+from src.engine.state import (
+    Character,
+    HistoryEvent,
+    WorldOperations,
+    WorldState,
+    characters_in_location,
+    connected_location_ids,
+)
 from src.agents.action_resolver.agent import ActionResolverDeps, agent as action_resolver_agent
-from .context import character_context, character_system
 from src.agents.utils import create_model
-from .tools import speak as character_speak, travel as character_travel
-
+from .context import character_context, character_system
 
 
 @dataclass
@@ -52,8 +54,6 @@ def _prepare_output_tools(
     return result
 
 
-# ── output tools ─────────────────────────────────────────────────────────
-
 async def action_output(
     ctx: RunContext[CharacterDeps],
     description: str,
@@ -84,7 +84,7 @@ def speak_output(
     if target and target not in targets:
         hint = f"Valid targets: {', '.join(targets)}." if targets else "No one else is here."
         return f"Cannot speak to {target!r}. {hint}"
-    return character_speak(ctx.deps.char, ctx.deps.state, message, target)
+    return WorldOperations(ctx.deps.state).speak(ctx.deps.char.id, message, target)
 
 
 def travel_output(
@@ -98,12 +98,15 @@ def travel_output(
         if options:
             return f"Cannot travel to {location!r}. Valid: {', '.join(options)}."
         return "No travel options right now. Use action or wait instead."
-    return character_travel(ctx.deps.char, ctx.deps.state, location)
+    return WorldOperations(ctx.deps.state).move_character(ctx.deps.char.id, location)
 
 
 def wait_output(ctx: RunContext[CharacterDeps]) -> str:
     """do nothing for now and wait to see what happens next."""
-    return wait(ctx.deps.char, ctx.deps.state)
+    char = ctx.deps.char
+    result = f"{char.id} waits."
+    ctx.deps.state.history.append(HistoryEvent(text=result, location=char.location, characters=[char.id]))
+    return result
 
 
 CHARACTER_RESPONSE_OUTPUTS = [
@@ -125,10 +128,10 @@ agent: Agent[CharacterDeps, str] = Agent(
 )
 
 
-# context
 @agent.system_prompt
 def identity(ctx: RunContext[CharacterDeps]) -> str:
     return character_system(ctx.deps.char)
+
 
 @agent.instructions
 def context(ctx: RunContext[CharacterDeps]) -> str:

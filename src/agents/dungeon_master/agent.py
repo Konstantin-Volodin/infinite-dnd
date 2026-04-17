@@ -1,14 +1,13 @@
-# src/llm/dungeon_master.py
 """Agent for narrating and updating the world as the dungeon master."""
 
 from dataclasses import dataclass
 from typing import Any, Literal
+
 from pydantic_ai import Agent, RunContext, ToolOutput
 
-from src.engine.state import WorldState
+from src.engine.state import HistoryEvent, WorldOperations, WorldState, slugify
 from src.agents.utils import create_model
 from .context import dm_context, dm_system
-from .tools import create as dm_create, modify as dm_modify, narrate as dm_narrate
 
 
 @dataclass
@@ -16,16 +15,7 @@ class DungeonMasterDeps:
     state: WorldState
     last_action: dict[str, Any] | None = None
     narrate_location: str = ""
-    narrated: bool = False
-    created: bool = False
-    modified: bool = False
 
-
-def _claim_tool(ctx: RunContext[DungeonMasterDeps], field: str, blocked_message: str) -> str | None:
-    if getattr(ctx.deps, field):
-        return blocked_message
-    setattr(ctx.deps, field, True)
-    return None
 
 agent: Agent[DungeonMasterDeps, str] = Agent(
     model=create_model(),
@@ -35,17 +25,16 @@ agent: Agent[DungeonMasterDeps, str] = Agent(
 )
 
 
-# context
 @agent.system_prompt
 def identity(_: RunContext[DungeonMasterDeps]) -> str:
     return dm_system()
+
 
 @agent.instructions
 def context(ctx: RunContext[DungeonMasterDeps]) -> str:
     return dm_context(ctx.deps.state, last_action=ctx.deps.last_action)
 
 
-# tools
 @agent.tool
 def narrate(
     ctx: RunContext[DungeonMasterDeps],
@@ -53,10 +42,9 @@ def narrate(
     prompts_character: str | None = None,
 ) -> str:
     """describe what happens in the world without speaking for characters."""
-    blocked = _claim_tool(ctx, "narrated", "Narration already recorded for this DM run. Call done now.")
-    if blocked:
-        return blocked
-    return dm_narrate(ctx.deps.state, content, location=ctx.deps.narrate_location)
+    ctx.deps.state.history.append(HistoryEvent(text=content, location=ctx.deps.narrate_location))
+    return content
+
 
 @agent.tool
 def create(
@@ -64,25 +52,26 @@ def create(
     type: Literal["location", "item", "npc"],
     name: str,
     description: str,
-    id: str | None = None,
     location: str | None = None,
     role: str | None = None,
     goal: str | None = None,
 ) -> str:
     """add a location, item, or NPC to the world."""
-    blocked = _claim_tool(ctx, "created", "Creation already handled for this DM run. Call done now.")
-    if blocked:
-        return blocked
-    return dm_create(
-        ctx.deps.state,
-        type=type,
-        name=name,
-        description=description,
-        id=id,
-        location=location,
-        role=role,
-        goal=goal,
-    )
+    ops = WorldOperations(ctx.deps.state)
+    slug = slugify(name)
+    if type == "location":
+        connections = [location] if location else []
+        return ops.add_location(slug, description=description, connections=connections)
+    if type == "item":
+        if not location:
+            return "Cannot create item — location is required."
+        return ops.create_item(name, location)
+    if type == "npc":
+        if not location:
+            return "Cannot create NPC — location is required."
+        return ops.spawn_npc(slug, role=role or "", location_id=location, backstory=description, goal=goal or "")
+    return f"Unknown create type: {type!r}."
+
 
 @agent.tool
 def modify(
@@ -93,13 +82,13 @@ def modify(
     reason: str | None = None,
 ) -> str:
     """change a quest, NPC, or location in the world state."""
-    blocked = _claim_tool(ctx, "modified", "Modification already handled for this DM run. Call done now.")
-    if blocked:
-        return blocked
-    return dm_modify(
-        ctx.deps.state,
-        action=action,
-        target_id=target_id,
-        status=status,
-        reason=reason,
-    )
+    ops = WorldOperations(ctx.deps.state)
+    if action == "update_quest":
+        if not status:
+            return "Cannot update a quest without a status."
+        return ops.advance_quest(target_id, new_status=status)
+    if action == "remove_npc":
+        return ops.delete_npc(target_id, reason=reason or "")
+    if action == "update_location":
+        return ops.modify_location(target_id, description=reason)
+    return f"Unknown modify action: {action!r}."

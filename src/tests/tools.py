@@ -182,7 +182,6 @@ def test_character_speak() -> bool:
 def test_character_travel() -> bool:
     state = _build()
     char = _pick_char(state)
-    origin = char.location
     target = _pick_travel_target(state, char)
     before = len(state.history)
     _run(
@@ -191,9 +190,8 @@ def test_character_travel() -> bool:
         CharacterDeps(char=char, state=state), "travel", expect_done=False,
     )
     assert char.location == target, f"expected {target!r}, got {char.location!r}"
-    assert len(state.history) == before + 2, "travel should append two events"
-    assert state.history[-2].text == f"{char.id} left from {origin}"
-    assert state.history[-1].text == f"{char.id} travelled to {target}"
+    assert len(state.history) == before + 1, "travel should append one event"
+    assert state.history[-1].text == f"{char.id} moved to '{target}'."
     logging.info(f"[PASS] character travel — {char.id} -> {target}")
     return True
 
@@ -222,7 +220,6 @@ def test_resolver_remember() -> bool:
 def test_resolver_discover_exit() -> bool:
     state = _build()
     char = _pick_char(state)
-    before = len(state.history)
     ctx = RunContext(
         deps=ActionResolverDeps(char=char, state=state, description="asks about a hidden cellar"),
         model=create_model(), usage=RunUsage(), agent=resolver_agent,
@@ -231,9 +228,7 @@ def test_resolver_discover_exit() -> bool:
     loc = state.locations.get("hidden-cellar")
     assert loc, "hidden-cellar should be created"
     assert char.location in loc.connections
-    assert len(state.history) == before + 1
-    assert state.history[-1].text == "A new place becomes known: hidden-cellar."
-    assert output == "Created location hidden-cellar."
+    assert output == "Location 'hidden-cellar' added."
     logging.info(f"[PASS] resolver discover_exit — {char.id}")
     return True
 
@@ -276,8 +271,6 @@ def test_dm_create() -> bool:
     loc = state.locations.get("ancient-library")
     assert loc, "ancient-library should be created"
     assert char.location in loc.connections
-    assert len(state.history) == before + 1
-    assert state.history[-1].text == "A new place becomes known: ancient-library."
     logging.info("[PASS] dm create")
     return True
 
@@ -286,7 +279,6 @@ def test_dm_modify() -> bool:
     state = _build()
     quest: Quest = next(iter(state.quests.values()))
     before = len(state.history)
-    old_status = quest.status
     _run(
         dm_agent, "dm",
         f'Call `modify` once: action "update_quest", target_id "{quest.id}", status "completed". Then call `done`.',
@@ -295,7 +287,7 @@ def test_dm_modify() -> bool:
     )
     assert state.quests[quest.id].status == "completed"
     assert len(state.history) == before + 1
-    assert state.history[-1].text == f"Quest '{quest.title}' changed from {old_status} to completed."
+    assert state.history[-1].text == f"Quest '{quest.id}' updated."
     logging.info("[PASS] dm modify")
     return True
 
@@ -337,7 +329,6 @@ def test_director_speak() -> bool:
 def test_director_travel() -> bool:
     state = _build()
     char = _pick_char(state)
-    origin = char.location
     target = _pick_travel_target(state, char)
     before = len(state.history)
     _run(
@@ -346,9 +337,8 @@ def test_director_travel() -> bool:
         DirectorDeps(state=state), "travel",
     )
     assert state.characters[char.id].location == target
-    assert len(state.history) == before + 2
-    assert state.history[-2].text == f"{char.id} left from {origin}"
-    assert state.history[-1].text == f"{char.id} travelled to {target}"
+    assert len(state.history) == before + 1
+    assert state.history[-1].text == f"{char.id} moved to '{target}'."
     logging.info(f"[PASS] director travel — {char.id} -> {target}")
     return True
 

@@ -1,9 +1,7 @@
 """Action resolver prompt builders - converts character actions into state changes."""
 
-from src.engine.state import Character, WorldState
-from src.engine.world.queries import resolve_character, resolve_location_id
+from src.engine.state import Character, WorldState, resolve_character, resolve_location_id, slugify
 from src.engine.rules import get_health_status
-from src.engine.utils import slugify
 from src.agents.utils import render
 
 

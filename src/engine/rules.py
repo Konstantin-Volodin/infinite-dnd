@@ -35,16 +35,11 @@ def get_modifier(score: int) -> int:
 def get_skill_modifier(character, skill_name: str) -> int:
     """Get the total modifier for a skill check."""
     skill = skill_name.lower().replace(" ", "_")
-    attribute = SKILL_MAP.get(skill, "dexterity")  # Default to dex if unknown
+    attribute = SKILL_MAP.get(skill, "dexterity")
 
-    # Get attribute score (default 10 when no attributes exist)
     attrs = getattr(character.stats, "attributes", None)
     attr_score = getattr(attrs, attribute, 10) if attrs else 10
-    mod = get_modifier(attr_score)
-
-    # Add proficiency bonus if applicable (simplified: level/4 + 2)
-    # For now, we'll just use raw stats to keep it simple
-    return mod
+    return get_modifier(attr_score)
 
 
 def get_health_status(character) -> str:

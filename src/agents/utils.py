@@ -25,5 +25,5 @@ _env = Environment(
 )
 
 def render(template_path: str, **kwargs) -> str:
-    """Render a Jinja2 template relative to src/llm/prompts/."""
+    """Render a Jinja2 template relative to src/agents/."""
     return _env.get_template(template_path).render(**kwargs).strip()

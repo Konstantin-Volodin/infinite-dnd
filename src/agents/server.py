@@ -1,5 +1,4 @@
-# src/llm/server.py
-"""Handles the llama.cpp server management."""
+"""Manages a local llama.cpp server subprocess."""
 
 import os
 import subprocess

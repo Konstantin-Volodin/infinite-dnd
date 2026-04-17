@@ -19,7 +19,10 @@ class WorldOps:
 
         if new_status: quest.status = new_status
         if step: quest.steps.append(step)
-        return f"Quest '{quest_id}' updated."
+        result = f"Quest '{quest_id}' updated."
+        owner_loc = self.state.characters.get(quest.owner).location if quest.owner in self.state.characters else ""
+        self._log(result, owner_loc, [quest.owner] if quest.owner else [])
+        return result
 
     # ============ CHARACTERS ============
     def spawn_npc(self, npc_id: str, role: str, location_id: str, backstory: str = "", goal: str = "") -> str:
@@ -132,10 +135,13 @@ if __name__ == "__main__":
     ops = WorldOps(state)
 
     # quests
+    history_before = len(state.history)
     ops.advance_quest("q1", step="Entered the cave")
     assert "Entered the cave" in state.quests["q1"].steps
+    assert state.history[-1].text == "Quest 'q1' updated."
     ops.advance_quest("q1", new_status="completed")
     assert state.quests["q1"].status == "completed"
+    assert len(state.history) == history_before + 2
     logging.info("Quest tests passed.")
 
     # spawn / delete NPC

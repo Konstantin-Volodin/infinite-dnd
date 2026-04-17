@@ -163,7 +163,9 @@ class CharacterOps:
         if fact in char.knowledge: return f"{character_id} already knows that."
 
         char.knowledge.append(fact)
-        return f"{character_id} learns: {fact}"
+        result = f"{character_id} learns: {fact}"
+        self._log(result, char.location, [character_id])
+        return result
 
 
 if __name__ == "__main__":
@@ -247,10 +249,14 @@ if __name__ == "__main__":
     logging.info("Relationship tests passed.")
 
     # knowledge
+    history_before = len(state.history)
     ops.add_knowledge("hero", "The cave has a hidden passage")
     assert "The cave has a hidden passage" in state.characters["hero"].knowledge
-    ops.add_knowledge("hero", "The cave has a hidden passage")
+    assert state.history[-1].text == "hero learns: The cave has a hidden passage"
+    assert len(state.history) == history_before + 1
+    ops.add_knowledge("hero", "The cave has a hidden passage")  # idempotent — no new event
     assert state.characters["hero"].knowledge.count("The cave has a hidden passage") == 1
+    assert len(state.history) == history_before + 1
     logging.info("Knowledge tests passed.")
 
     logging.info(f"{__file__} tests completed successfully.")
