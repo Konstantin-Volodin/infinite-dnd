@@ -11,10 +11,6 @@ from src.engine.state import StateManager
 from src.agents.utils import create_model
 from src.agents.character.agent import CharacterDeps, agent as character_agent
 from src.agents.character.context import character_system, character_context
-from src.agents.director.agent import agent as director_agent
-from src.agents.director.context import director_system, director_context
-from src.agents.dungeon_master.agent import agent as dm_agent
-from src.agents.dungeon_master.context import dm_system, dm_context
 from src.agents.action_resolver.agent import agent as resolver_agent
 from src.agents.action_resolver.context import action_resolver_system, action_resolver_context
 from src.tests import LOG_DIR, stamp
@@ -58,9 +54,6 @@ def dump_all() -> None:
             character_context(char, state),
             asyncio.run(_prepared_output_tools(character_agent, CharacterDeps(char=char, state=state))),
         )
-
-    _write("director", director_system(), director_context(state), _function_tools(director_agent))
-    _write("dungeon_master", dm_system(), dm_context(state), _function_tools(dm_agent))
 
     char = next(iter(state.characters.values()))
     _write(

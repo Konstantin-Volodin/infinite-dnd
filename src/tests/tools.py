@@ -1,4 +1,4 @@
-"""Live tests — verify agents call the right tools and produce correct state changes."""
+"""Live tests — verify proposer agents emit correct intents and Resolver mutates state."""
 
 import asyncio
 import json
@@ -12,16 +12,16 @@ from pydantic_ai import Agent, RunContext, capture_run_messages
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import RunUsage, UsageLimits
 
-from src.engine.state import Character, Quest, StateManager, WorldState
+from src.engine.state import Character, StateManager, WorldState
 from src.agents.utils import create_model
 from src.agents.character.agent import CharacterDeps, agent as character_agent
-from src.agents.director.agent import DirectorDeps, agent as director_agent
-from src.agents.dungeon_master.agent import DungeonMasterDeps, agent as dm_agent
 from src.agents.action_resolver.agent import (
     ActionResolverDeps,
     agent as resolver_agent,
     discover_exit as discover_exit_tool,
+    resolve,
 )
+from src.agents.intents import ActionIntent, SpeakIntent, TravelIntent
 from src.tests import LOG_DIR, stamp
 
 
@@ -63,8 +63,8 @@ def _assert_tool(messages: list[Any], name: str) -> None:
 
 
 def _run(
-    agent: Any, prefix: str, prompt: str, deps: Any, tool: str, *, expect_done: bool = True,
-) -> tuple[str, list[Any]]:
+    agent: Any, prefix: str, prompt: str, deps: Any, tool: str, *, expect_done: bool = False,
+) -> tuple[Any, list[Any]]:
     logging.info(f"  [{prefix}:{tool}] sending prompt ({len(prompt)} chars)...")
     with capture_run_messages() as msgs:
         result = agent.run_sync(prompt, deps=deps, model_settings=_MODEL_SETTINGS, usage_limits=_USAGE_LIMITS)
@@ -75,12 +75,10 @@ def _run(
     ]
     logging.info(f"  [{prefix}:{tool}] done — {len(msgs)} messages, tools called: {calls}")
 
-    assert isinstance(result.output, str)
     _assert_tool(msgs, tool)
     if expect_done:
         _assert_tool(msgs, "done")
 
-    # archive trace for debugging
     trace = [
         {"kind": type(m).__name__, "parts": [
             {"kind": getattr(p, "part_kind", type(p).__name__), "tool": getattr(p, "tool_name", None),
@@ -91,7 +89,7 @@ def _run(
     ]
     path = LOG_DIR / f"{stamp}-{prefix}-{tool}.md"
     path.write_text(
-        f"# {prefix}: {tool}\n\n## Prompt\n{prompt}\n\n## Output\n{result.output}\n\n"
+        f"# {prefix}: {tool}\n\n## Prompt\n{prompt}\n\n## Output\n{result.output!r}\n\n"
         f"## Trace\n```json\n{json.dumps(trace, indent=2, default=str)}\n```",
         encoding="utf-8",
     )
@@ -120,7 +118,7 @@ def test_basic_completion() -> bool:
     return ok
 
 
-# ── character ────────────────────────────────────────────────────────────
+# ── character (intent generator) ─────────────────────────────────────────
 
 def test_character_contextual_tools() -> bool:
     state = _build()
@@ -133,12 +131,10 @@ def test_character_contextual_tools() -> bool:
     prepared = character_agent._output_toolset.prepared(character_agent._prepare_output_tools)
     tools = {n: t.tool_def for n, t in asyncio.run(prepared.get_tools(ctx)).items()}
 
-    # speak description lists targets
     expected_targets = [c.id for c in state.characters.values() if c.location == char.location and c.id != char.id]
     for t in expected_targets:
         assert t in tools["speak"].description, f"speak description missing target {t!r}"
 
-    # travel description lists options, and travel tool exists
     assert "travel" in tools, "travel tool should exist when connections are available"
     expected_travel = [cid for cid in state.locations[char.location].connections if cid in state.locations]
     for loc in expected_travel:
@@ -148,55 +144,69 @@ def test_character_contextual_tools() -> bool:
     return True
 
 
-def test_character_action() -> bool:
-    state, char = _build(), None
+def test_character_action_intent() -> bool:
+    state = _build()
     char = _pick_char(state)
     before = len(state.history)
-    _run(
+    intent, _ = _run(
         character_agent, "character",
         f'Call `action` once with description "carefully inspects the old fountain". No other tools.',
-        CharacterDeps(char=char, state=state), "action", expect_done=False,
+        CharacterDeps(char=char, state=state), "action",
     )
-    assert len(state.history) > before, "action should append history"
-    assert state.history[-1].text.strip(), "action should leave non-empty narration"
-    logging.info(f"[PASS] character action — {char.id}")
+    assert isinstance(intent, ActionIntent), f"expected ActionIntent, got {type(intent).__name__}"
+    assert intent.actor == char.id
+    assert len(state.history) == before, "character agent must not mutate state"
+
+    # Resolver executes it
+    asyncio.run(resolve(intent, state))
+    assert len(state.history) > before, "resolve(action) should append history"
+    logging.info(f"[PASS] character action intent — {char.id}")
     return True
 
 
-def test_character_speak() -> bool:
+def test_character_speak_intent() -> bool:
     state = _build()
     char = _pick_char(state)
     before = len(state.history)
     msg = "I have a feeling something important is happening nearby."
-    _run(
+    intent, _ = _run(
         character_agent, "character",
         f'Call `speak` once with message exactly "{msg}". No other tools.',
-        CharacterDeps(char=char, state=state), "speak", expect_done=False,
+        CharacterDeps(char=char, state=state), "speak",
     )
-    assert len(state.history) == before + 1, "speak should append one event"
+    assert isinstance(intent, SpeakIntent)
+    assert intent.actor == char.id and intent.message == msg
+    assert len(state.history) == before, "character agent must not mutate state"
+
+    asyncio.run(resolve(intent, state))
     assert state.history[-1].text == f'{char.id} says: "{msg}"'
-    logging.info(f"[PASS] character speak — {char.id}")
+    logging.info(f"[PASS] character speak intent — {char.id}")
     return True
 
 
-def test_character_travel() -> bool:
+def test_character_travel_intent() -> bool:
     state = _build()
     char = _pick_char(state)
     target = _pick_travel_target(state, char)
     before = len(state.history)
-    _run(
+    intent, _ = _run(
         character_agent, "character",
         f'Call `travel` once to "{target}". No other tools.',
-        CharacterDeps(char=char, state=state), "travel", expect_done=False,
+        CharacterDeps(char=char, state=state), "travel",
     )
-    assert char.location == target, f"expected {target!r}, got {char.location!r}"
-    assert len(state.history) == before + 1, "travel should append one event"
+    assert isinstance(intent, TravelIntent)
+    assert intent.actor == char.id and intent.destination == target
+    assert len(state.history) == before, "character agent must not mutate state"
+    assert char.location != target, "character agent must not move the character"
+
+    asyncio.run(resolve(intent, state))
+    assert char.location == target
     assert state.history[-1].text == f"{char.id} moved to '{target}'."
-    logging.info(f"[PASS] character travel — {char.id} -> {target}")
+    logging.info(f"[PASS] character travel intent — {char.id} -> {target}")
     return True
 
 
-# ── action resolver ─────────────────────────────────────────────────────
+# ── resolver sub-agent (free-form ActionIntent path) ────────────────────
 
 def test_resolver_remember() -> bool:
     state = _build()
@@ -207,7 +217,7 @@ def test_resolver_remember() -> bool:
         resolver_agent, "resolver",
         f'Call `remember` once with knowledge exactly "{knowledge}". Then call `done` mentioning the fountain.',
         ActionResolverDeps(char=char, state=state, description="carefully inspects the old fountain"),
-        "remember",
+        "remember", expect_done=True,
     )
     assert knowledge in char.knowledge
     assert len(state.history) == before + 1
@@ -233,116 +243,6 @@ def test_resolver_discover_exit() -> bool:
     return True
 
 
-# ── dungeon master ───────────────────────────────────────────────────────
-
-def test_dm_narrate() -> bool:
-    state = _build()
-    char = _pick_char(state)
-    before = len(state.history)
-    narration = "The lantern light shivers across the wet stone."
-    _run(
-        dm_agent, "dm",
-        f'Call `narrate` once with content exactly "{narration}" and prompts_character "{char.id}". Then call `done`.',
-        DungeonMasterDeps(
-            state=state,
-            last_action={"character_id": char.id, "tool": "action",
-                         "result": {"intent": f"{char.id} studies the room.", "status": "success"}},
-            narrate_location=char.location,
-        ),
-        "narrate",
-    )
-    assert len(state.history) == before + 1
-    assert state.history[-1].text == narration
-    logging.info("[PASS] dm narrate")
-    return True
-
-
-def test_dm_create() -> bool:
-    state = _build()
-    char = _pick_char(state)
-    before = len(state.history)
-    _run(
-        dm_agent, "dm",
-        f'Call `create` once: type "location", name "Ancient Library", description "Dusty aisles of forgotten tomes.", '
-        f'location "{char.location}". Then call `done`.',
-        DungeonMasterDeps(state=state, narrate_location=char.location),
-        "create",
-    )
-    loc = state.locations.get("ancient-library")
-    assert loc, "ancient-library should be created"
-    assert char.location in loc.connections
-    logging.info("[PASS] dm create")
-    return True
-
-
-def test_dm_modify() -> bool:
-    state = _build()
-    quest: Quest = next(iter(state.quests.values()))
-    before = len(state.history)
-    _run(
-        dm_agent, "dm",
-        f'Call `modify` once: action "update_quest", target_id "{quest.id}", status "completed". Then call `done`.',
-        DungeonMasterDeps(state=state),
-        "modify",
-    )
-    assert state.quests[quest.id].status == "completed"
-    assert len(state.history) == before + 1
-    assert state.history[-1].text == f"Quest '{quest.id}' updated."
-    logging.info("[PASS] dm modify")
-    return True
-
-
-# ── director ─────────────────────────────────────────────────────────────
-
-def test_director_action() -> bool:
-    state = _build()
-    char = _pick_char(state)
-    before = len(state.history)
-    desc = "carefully inspects the old fountain"
-    _run(
-        director_agent, "director",
-        f'Call `action` once with character_id "{char.id}" and description "{desc}". Then call `done`.',
-        DirectorDeps(state=state), "action",
-    )
-    assert len(state.history) == before + 1
-    assert state.history[-1].text.startswith(f"{char.id} {desc}")
-    logging.info("[PASS] director action")
-    return True
-
-
-def test_director_speak() -> bool:
-    state = _build()
-    char = _pick_char(state)
-    before = len(state.history)
-    msg = "We need to keep moving before the trail goes cold."
-    _run(
-        director_agent, "director",
-        f'Call `speak` once with character_id "{char.id}" and message exactly "{msg}". Then call `done`.',
-        DirectorDeps(state=state), "speak",
-    )
-    assert len(state.history) == before + 1
-    assert state.history[-1].text == f'{char.id} says: "{msg}"'
-    logging.info("[PASS] director speak")
-    return True
-
-
-def test_director_travel() -> bool:
-    state = _build()
-    char = _pick_char(state)
-    target = _pick_travel_target(state, char)
-    before = len(state.history)
-    _run(
-        director_agent, "director",
-        f'Call `travel` once with character_id "{char.id}" and location "{target}". Then call `done`.',
-        DirectorDeps(state=state), "travel",
-    )
-    assert state.characters[char.id].location == target
-    assert len(state.history) == before + 1
-    assert state.history[-1].text == f"{char.id} moved to '{target}'."
-    logging.info(f"[PASS] director travel — {char.id} -> {target}")
-    return True
-
-
 # ── runner ───────────────────────────────────────────────────────────────
 
 def run_all() -> bool:
@@ -351,17 +251,11 @@ def run_all() -> bool:
 
     tests = [
         test_character_contextual_tools,
-        test_character_action,
-        test_character_speak,
-        test_character_travel,
+        test_character_action_intent,
+        test_character_speak_intent,
+        test_character_travel_intent,
         test_resolver_remember,
         test_resolver_discover_exit,
-        test_dm_narrate,
-        test_dm_create,
-        test_dm_modify,
-        test_director_action,
-        test_director_speak,
-        test_director_travel,
     ]
     passed = 0
     for t in tests:
