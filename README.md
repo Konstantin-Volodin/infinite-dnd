@@ -32,15 +32,20 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 - Simpler is correct. A smaller diff is usually a better diff.
 - Before adding a function, check if the file's primary purpose is still singular. If not, it's time for a new module.
 
+### 🧪 Tests
+- Every file should have in-file tests.
+- Tests should be deterministic and fast. If a test is slow, it should be an integration test in a separate file.
+
 ### 📂 Structure
 
 ```
 src/                        - source code
 ├── agents/                 - LLM agent implementations
-│   ├── action_resolver/        - resolves character actions
-│   ├── character/              - any character agent
-│   ├── dungeon_master/         - campaign management
-│   └── director/               - determines turn order
+│   ├── action_resolver/        - sole writer; resolves intents against state
+│   ├── character/              - PC/NPC turn: emits a CharacterTool
+│   ├── quest_reviewer/         - post-tick quest progress (Modify)
+│   ├── time_keeper/            - per-event minute estimates
+│   └── world_builder/          - post-tick entity enrichment (Create)
 ├── engine/                 - game engine components
 │   ├── rules.py                - game rules and derived stats
 │   ├── utils.py                - shared engine helpers
@@ -49,5 +54,5 @@ src/                        - source code
 │   └── world/                  - world-state queries, interactions, and mutations
 ├── interface/              - user interface
 ├── tests/                  - test cases & fixtures
-└── world/                  - world generation
+└── world/                  - scenario data (one subdir per scenario)
 ```
