@@ -1,0 +1,32 @@
+[
+  {
+    "id": "brenna-deep",
+    "location": "harbor-dock",
+    "role": "fisher",
+    "stats": {"hp": 18, "max_hp": 18},
+    "backstory": "I've worked these waters since I was nine. Yesterday my nets came up heavy with a sealed crate I never set out to catch. I cut it open at the dock and what I saw means somebody's coming for this village.",
+    "personality": "I'm blunt. I don't dress things up. The sea taught me that lies sink and truth floats.",
+    "goal": "Expose the smugglers using the cove before they put a knife in someone I know.",
+    "knowledge": [
+      "The smuggler crate I dragged up is still on the dock under a tarp.",
+      "Old Keph used to chart every ship that passed the cove. If anyone knows the black-hulled sloop, it's him."
+    ],
+    "inventory": ["gutting knife", "oilskin coat"],
+    "relationships": {"old-keph": "village-elder"}
+  },
+  {
+    "id": "old-keph",
+    "location": "lighthouse-base",
+    "role": "retired-navigator",
+    "stats": {"hp": 6, "max_hp": 6},
+    "backstory": "Forty years I read the swells from that lamp room. My eyes are softer now but I still know every hull that's wronged this coast.",
+    "personality": "I speak in sea-terms and half-finished sentences. I trust slowly. I notice everything.",
+    "goal": "Help the village without being dragged into another fight. I am too old for cutlasses.",
+    "knowledge": [
+      "A narrow black-hulled sloop has been working the cove at low tide for three weeks. No flag.",
+      "The sloop matches the markings of the Teal Moon, a ship that was supposedly burned in port six years ago."
+    ],
+    "inventory": ["spyglass", "weather-worn logbook"],
+    "relationships": {"brenna-deep": "village-fisher"}
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "harbor-dock",
+    "description": "Salt-bleached planks creak underfoot. Ropes coil like sleeping snakes. Gulls fight over fish heads at the tideline.",
+    "connections": ["fish-market", "lighthouse-base"],
+    "features": ["mooring posts", "Brenna's skiff", "stack of crab pots"],
+    "items": ["smuggler crate"]
+  },
+  {
+    "id": "fish-market",
+    "description": "Stalls under sailcloth awnings. The smell hits before the sight does. Coin clinks under bartering voices.",
+    "connections": ["harbor-dock"],
+    "features": ["gutting tables", "ice barrels", "harbormaster's notice board"]
+  },
+  {
+    "id": "lighthouse-base",
+    "description": "A squat stone tower at the cove's western horn. The lamp above turns slowly, even in daylight. The door at the base is iron-bound.",
+    "connections": ["harbor-dock"],
+    "features": ["iron-bound door", "gull-streaked walls", "old keph's stool"]
+  }
+]
