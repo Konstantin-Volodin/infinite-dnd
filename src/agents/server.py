@@ -5,23 +5,27 @@ import subprocess
 import time
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
+from dotenv import load_dotenv
+load_dotenv()
 
 class LlamaServer:
     """manages a local llama-server subprocess."""
 
-    _DEFAULT_PORT = 1234
-    _DEFAULT_MODEL = "Jackrong/Qwopus3.5-4B-v3-GGUF:Q8_0"
-
     def __init__(self):
-        port = os.getenv("LLM_PORT", str(self._DEFAULT_PORT))
-        model = os.getenv("LLM_MODEL", self._DEFAULT_MODEL)
+        model = os.getenv("LLM_MODEL")
+        if not model:
+            raise RuntimeError("LLM_MODEL must be set")
+        base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
+        port = urllib.parse.urlparse(base_url).port or 1234
         self._health_url = f"http://localhost:{port}/health"
         cmd = [
-            "llama-server", "-hf", model, "--port", port,
-            "--ctx-size", "20000",
+            "llama-server", "-hf", model, "--port", str(port),
+            "--ctx-size", "32768",
             "--n-predict", "-1",
             "-ngl", "99",
+            "--n-cpu-moe", "10",
             "--batch-size", "1024",
             "--ubatch-size", "512",
             "--flash-attn", "on",
@@ -29,6 +33,12 @@ class LlamaServer:
             "--metrics",
             "--cache-type-k", "q8_0",
             "--cache-type-v", "q8_0",
+            "--jinja",
+            "--temp", "1.0",
+            "--top-p", "0.95",
+            "--top-k", "64",
+            "--min-p", "0.01",
+            "--repeat-penalty", "1.0",
         ]
         logging.info(f"Starting LlamaServer with command: {' '.join(str(a) for a in cmd)}")
         self._process = subprocess.Popen(cmd)
