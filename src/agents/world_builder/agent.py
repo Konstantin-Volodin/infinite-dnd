@@ -1,4 +1,4 @@
-"""World builder agent: extracts new named entities from recent events as CreateIntents."""
+"""World builder agent: extracts new named entities from recent events as Create tools."""
 
 from dataclasses import dataclass
 from typing import Literal
@@ -7,9 +7,9 @@ from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext, ToolOutput
 
 from src.engine.state import WorldState
-from src.agents.intents import CreateIntent
 from src.agents.utils import create_model
 from .context import world_builder_context, world_builder_system
+from .tools import Create
 
 
 @dataclass
@@ -30,10 +30,10 @@ class NewEntity(BaseModel):
 def enrich_output(
     _: RunContext[WorldBuilderDeps],
     entities: list[NewEntity],
-) -> list[CreateIntent]:
+) -> list[Create]:
     """register entities revealed by the recent events. empty list = nothing new."""
     return [
-        CreateIntent(
+        Create(
             type=e.type,
             name=e.name,
             description=e.description,
@@ -47,7 +47,7 @@ def enrich_output(
     ]
 
 
-agent: Agent[WorldBuilderDeps, list[CreateIntent]] = Agent(
+agent: Agent[WorldBuilderDeps, list[Create]] = Agent(
     model=create_model(),
     deps_type=WorldBuilderDeps,
     output_type=ToolOutput(enrich_output, name="enrich"),
@@ -76,12 +76,12 @@ if __name__ == "__main__":
         NewEntity(type="item", name="", description="nameless item — should be filtered"),
         NewEntity(type="quest", name="Find the Vault", description="locate the cold-hearth vault", owner="alice"),
     ]
-    intents = enrich_output(None, entities)  # type: ignore[arg-type]
-    assert len(intents) == 3  # empty-name filtered
-    assert all(isinstance(i, CreateIntent) for i in intents)
-    assert intents[0].type == "npc" and intents[0].role == "dockmaster"
-    assert intents[1].type == "location" and intents[1].location == "market-square"
-    assert intents[2].type == "quest" and intents[2].owner == "alice"
+    tools = enrich_output(None, entities)  # type: ignore[arg-type]
+    assert len(tools) == 3  # empty-name filtered
+    assert all(isinstance(t, Create) for t in tools)
+    assert tools[0].type == "npc" and tools[0].role == "dockmaster"
+    assert tools[1].type == "location" and tools[1].location == "market-square"
+    assert tools[2].type == "quest" and tools[2].owner == "alice"
 
     assert enrich_output(None, []) == []  # type: ignore[arg-type]
 

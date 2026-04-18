@@ -21,7 +21,7 @@ from src.agents.action_resolver.agent import (
     discover_exit as discover_exit_tool,
     resolve,
 )
-from src.agents.intents import ActionIntent, SpeakIntent, TravelIntent
+from src.agents.character.tools import Action, Speak, Travel
 from src.tests import LOG_DIR, stamp
 
 
@@ -153,7 +153,7 @@ def test_character_action_intent() -> bool:
         f'Call `action` once with description "carefully inspects the old fountain". No other tools.',
         CharacterDeps(char=char, state=state), "action",
     )
-    assert isinstance(intent, ActionIntent), f"expected ActionIntent, got {type(intent).__name__}"
+    assert isinstance(intent, Action), f"expected Action, got {type(intent).__name__}"
     assert intent.actor == char.id
     assert len(state.history) == before, "character agent must not mutate state"
 
@@ -174,7 +174,7 @@ def test_character_speak_intent() -> bool:
         f'Call `speak` once with message exactly "{msg}". No other tools.',
         CharacterDeps(char=char, state=state), "speak",
     )
-    assert isinstance(intent, SpeakIntent)
+    assert isinstance(intent, Speak)
     assert intent.actor == char.id and intent.message == msg
     assert len(state.history) == before, "character agent must not mutate state"
 
@@ -194,7 +194,7 @@ def test_character_travel_intent() -> bool:
         f'Call `travel` once to "{target}". No other tools.',
         CharacterDeps(char=char, state=state), "travel",
     )
-    assert isinstance(intent, TravelIntent)
+    assert isinstance(intent, Travel)
     assert intent.actor == char.id and intent.destination == target
     assert len(state.history) == before, "character agent must not mutate state"
     assert char.location != target, "character agent must not move the character"
@@ -206,7 +206,7 @@ def test_character_travel_intent() -> bool:
     return True
 
 
-# ── resolver sub-agent (free-form ActionIntent path) ────────────────────
+# ── resolver sub-agent (free-form Action path) ──────────────────────────
 
 def test_resolver_remember() -> bool:
     state = _build()

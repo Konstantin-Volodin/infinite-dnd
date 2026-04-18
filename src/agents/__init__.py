@@ -1,15 +1,18 @@
-"""Runtime LLM agents for the D&D session: character, DM, director, action resolver."""
+"""Runtime LLM agents. Proposers emit typed intents; the Resolver is the sole writer."""
 
 from .server import LlamaServer
 from .character.agent import agent as CharacterAgent
-from .director.agent import agent as DirectorAgent
-from .dungeon_master.agent import agent as DungeonMasterAgent
-from .action_resolver.agent import agent as ActionResolverAgent
+from .quest_reviewer.agent import agent as QuestReviewerAgent
+from .time_keeper.agent import agent as TimeKeeperAgent
+from .world_builder.agent import agent as WorldBuilderAgent
+from .action_resolver.agent import agent as ActionResolverAgent, resolve
 
 __all__ = [
     "LlamaServer",
     "CharacterAgent",
-    "DungeonMasterAgent",
-    "DirectorAgent",
+    "QuestReviewerAgent",
+    "TimeKeeperAgent",
+    "WorldBuilderAgent",
     "ActionResolverAgent",
+    "resolve",
 ]

@@ -8,19 +8,13 @@ from pydantic_ai.usage import UsageLimits
 from src.engine.state import StateManager, WorldState
 from src.engine.state.models import HistoryEvent
 from src.agents.character.agent import CharacterDeps, agent as character_agent
+from src.agents.character.tools import Action, CharacterTool, Speak, Travel, Wait
 from src.agents.quest_reviewer.agent import QuestReviewerDeps, agent as quest_reviewer_agent
+from src.agents.quest_reviewer.tools import Modify
 from src.agents.time_keeper.agent import TimeKeeperDeps, agent as time_keeper_agent
 from src.agents.world_builder.agent import WorldBuilderDeps, agent as world_builder_agent
+from src.agents.world_builder.tools import Create
 from src.agents.action_resolver.agent import resolve
-from src.agents.intents import (
-    ActionIntent,
-    CharacterIntent,
-    CreateIntent,
-    ModifyIntent,
-    SpeakIntent,
-    TravelIntent,
-    WaitIntent,
-)
 
 
 _AGENT_USAGE = UsageLimits(request_limit=12)
@@ -53,24 +47,24 @@ def _format_clock(total_minutes: int) -> str:
     return f"day {day}, {remainder // 60:02d}:{remainder % 60:02d}"
 
 
-def _describe_intent(intent: CharacterIntent) -> str:
+def _describe_tool(tool: CharacterTool) -> str:
     """One-line preview of the acting character's chosen step."""
-    if isinstance(intent, SpeakIntent):
-        head = f"speak → {intent.target}" if intent.target else "speak"
-        return f'{head}: "{intent.message}"'
-    if isinstance(intent, TravelIntent):
-        return f"travel → {intent.destination}"
-    if isinstance(intent, WaitIntent):
+    if isinstance(tool, Speak):
+        head = f"speak → {tool.target}" if tool.target else "speak"
+        return f'{head}: "{tool.message}"'
+    if isinstance(tool, Travel):
+        return f"travel → {tool.destination}"
+    if isinstance(tool, Wait):
         return "wait"
-    if isinstance(intent, ActionIntent):
-        suffix = f" ({intent.target})" if intent.target else ""
-        return f"action{suffix}: {intent.description}"
-    return repr(intent)
+    if isinstance(tool, Action):
+        suffix = f" ({tool.target})" if tool.target else ""
+        return f"action{suffix}: {tool.description}"
+    return repr(tool)
 
 
 # ─── Agent flows ──────────────────────────────────────────────
 
-async def flow_agent_turn(actor_id: str, state: WorldState) -> CharacterIntent | None:
+async def flow_agent_turn(actor_id: str, state: WorldState) -> CharacterTool | None:
     """Ask the acting character to pick one next step."""
     char = state.characters[actor_id]
     print(f"  [{actor_id}]", flush=True)
@@ -86,7 +80,7 @@ async def flow_agent_turn(actor_id: str, state: WorldState) -> CharacterIntent |
     return result.output
 
 
-async def flow_world_enrich(state: WorldState) -> list[CreateIntent]:
+async def flow_world_enrich(state: WorldState) -> list[Create]:
     """Materialize entities revealed by recent events (locations before NPCs/items)."""
     try:
         result = await world_builder_agent.run(
@@ -103,7 +97,7 @@ async def flow_world_enrich(state: WorldState) -> list[CreateIntent]:
     return sorted(intents, key=lambda i: _CREATE_ORDER.get(i.type, 3))
 
 
-async def flow_quest_review(state: WorldState) -> list[ModifyIntent]:
+async def flow_quest_review(state: WorldState) -> list[Modify]:
     """Advance quests against recent events. Structural — never narrates."""
     if not any(q.status.lower() not in {"completed", "failed"} for q in state.quests.values()):
         return []
@@ -159,7 +153,7 @@ async def tick(active_pc_id: str, state: WorldState, tick_index: int) -> None:
     intent = await flow_agent_turn(actor_id, state)
     if intent is None:
         return
-    print(f"    ↳ {_describe_intent(intent)}")
+    print(f"    ↳ {_describe_tool(intent)}")
 
     # 1. Resolve the turn and stamp elapsed time onto the resulting events.
     pre = len(state.history)

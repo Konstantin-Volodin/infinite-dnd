@@ -1,29 +1,20 @@
-"""Agent for impersonating characters."""
+"""Character agent: emits typed intents. Does not mutate state."""
 
-import logging
-from dataclasses import dataclass, replace, field
+from dataclasses import dataclass, replace
 
-from pydantic_ai import Agent, RunContext, ToolOutput
+from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
 from pydantic_ai.tools import ToolDefinition
 
-from src.engine.state import (
-    Character,
-    HistoryEvent,
-    WorldOperations,
-    WorldState,
-    characters_in_location,
-    connected_location_ids,
-)
-from src.agents.action_resolver.agent import ActionResolverDeps, agent as action_resolver_agent
+from src.engine.state import Character, WorldState, characters_in_location, connected_location_ids
 from src.agents.utils import create_model
 from .context import character_context, character_system
+from .tools import Action, CharacterTool, Speak, Travel, Wait
 
 
 @dataclass
 class CharacterDeps:
     char: Character
     state: WorldState
-    failed_travels: list[str] = field(default_factory=list)
 
 
 def _speak_targets(ctx: RunContext[CharacterDeps]) -> list[str]:
@@ -54,59 +45,39 @@ def _prepare_output_tools(
     return result
 
 
-async def action_output(
-    ctx: RunContext[CharacterDeps],
-    description: str,
-    target: str | None = None,
-) -> str:
-    """describe what you want to do and how you want to do it. this tool resolves consequences and returns the world response."""
-    prompt = f"Resolve this action: {description}"
-    if target:
-        prompt += f" (target: {target})"
-
-    logging.info(f"  [action_resolver] starting for {ctx.deps.char.id}: {description!r}")
-    result = await action_resolver_agent.run(
-        prompt,
-        deps=ActionResolverDeps(char=ctx.deps.char, state=ctx.deps.state, description=description, target=target),
-        usage=ctx.usage,
-    )
-    logging.info(f"  [action_resolver] finished: {result.output!r}")
-    return result.output
-
-
 def speak_output(
     ctx: RunContext[CharacterDeps],
     message: str,
     target: str | None = None,
-) -> str:
+) -> Speak:
     """say something. can be targeted dialogue or thinking out loud."""
     targets = _speak_targets(ctx)
     if target and target not in targets:
         hint = f"Valid targets: {', '.join(targets)}." if targets else "No one else is here."
-        return f"Cannot speak to {target!r}. {hint}"
-    return WorldOperations(ctx.deps.state).speak(ctx.deps.char.id, message, target)
+        raise ModelRetry(f"Cannot speak to {target!r}. {hint}")
+    return Speak(actor=ctx.deps.char.id, message=message, target=target)
 
 
 def travel_output(
     ctx: RunContext[CharacterDeps],
     location: str,
-) -> str:
-    """travel to a connected location."""
-    options = _travel_options(ctx)
-    if location not in options:
-        ctx.deps.failed_travels.append(location)
-        if options:
-            return f"Cannot travel to {location!r}. Valid: {', '.join(options)}."
-        return "No travel options right now. Use action or wait instead."
-    return WorldOperations(ctx.deps.state).move_character(ctx.deps.char.id, location)
+) -> Travel:
+    """travel to a connected location, or propose a new one for the DM to introduce."""
+    return Travel(actor=ctx.deps.char.id, destination=location)
 
 
-def wait_output(ctx: RunContext[CharacterDeps]) -> str:
+def wait_output(ctx: RunContext[CharacterDeps]) -> Wait:
     """do nothing for now and wait to see what happens next."""
-    char = ctx.deps.char
-    result = f"{char.id} waits."
-    ctx.deps.state.history.append(HistoryEvent(text=result, location=char.location, characters=[char.id]))
-    return result
+    return Wait(actor=ctx.deps.char.id)
+
+
+def action_output(
+    ctx: RunContext[CharacterDeps],
+    description: str,
+    target: str | None = None,
+) -> Action:
+    """take a concrete action — search, examine, attempt, interact, discover. describe what and how. use this when you can make progress, not just when speak/travel don't fit."""
+    return Action(actor=ctx.deps.char.id, description=description, target=target)
 
 
 CHARACTER_RESPONSE_OUTPUTS = [
@@ -114,7 +85,7 @@ CHARACTER_RESPONSE_OUTPUTS = [
     ToolOutput(wait_output, name="wait"),
 ]
 
-agent: Agent[CharacterDeps, str] = Agent(
+agent: Agent[CharacterDeps, CharacterTool] = Agent(
     model=create_model(),
     deps_type=CharacterDeps,
     output_type=[
