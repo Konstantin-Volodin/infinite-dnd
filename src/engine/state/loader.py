@@ -10,15 +10,18 @@ from src.engine.state.models import (
     CharacterStats,
     Quest,
 )
+from src.world import pick_scenario, read_manifest, scenario_dir
 
 class StateManager:
-    """Load, persist, and reset world state."""
+    """Load, persist, and reset world state for a chosen scenario."""
 
-    def __init__(self, setup_dir: str = "src/world", state_dir: str = "world-state"):
+    def __init__(self, scenario: str | None = None, state_dir: str = "world-state"):
         self.ROOT_DIR = Path(__file__).resolve().parents[3]
-        self.setup_dir = self.ROOT_DIR / Path(setup_dir)
-        self.state_dir = self.ROOT_DIR / Path(state_dir)
-        self.state_dir.mkdir(exist_ok=True)
+        self.scenario = scenario or pick_scenario()
+        self.manifest = read_manifest(self.scenario)
+        self.setup_dir = scenario_dir(self.scenario)
+        self.state_dir = self.ROOT_DIR / Path(state_dir) / self.scenario
+        self.state_dir.mkdir(parents=True, exist_ok=True)
 
     def read_json(self, path: str | Path):
         with open(path, "r", encoding="utf-8") as json_file:
@@ -67,8 +70,8 @@ class StateManager:
             )
 
         word_state = WorldState(
-            locations=locations, 
-            characters=characters, 
+            locations=locations,
+            characters=characters,
             quests=quests
         )
         return word_state
@@ -81,7 +84,7 @@ class StateManager:
             if not state_path.exists():
                 raise FileNotFoundError(f"Specified world state file {state_path} does not exist.")
             return WorldState(**self.read_json(state_path))
-        
+
         else:
             state = self.init_state()
             self.save_state(state)
@@ -96,56 +99,48 @@ class StateManager:
 
 if __name__ == "__main__":
     import logging
+    from src.world import list_scenarios
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
+    # exercise every scenario so a malformed JSON can't slip through
+    for scenario in list_scenarios():
+        logging.info(f"--- loading scenario: {scenario} ---")
+        manager = StateManager(scenario=scenario)
+        state = manager.init_state()
+
+        assert manager.scenario == scenario
+        assert manager.manifest["pc"] in state.characters, f"manifest pc '{manager.manifest['pc']}' not in characters for {scenario}"
+        assert isinstance(state, WorldState)
+
+        for char_id, char in state.characters.items():
+            assert isinstance(char, Character)
+            assert char.id == char_id
+            assert char.location in state.locations, f"{char_id} placed at unknown location {char.location}"
+
+        for loc_id, loc in state.locations.items():
+            assert isinstance(loc, Location)
+            assert loc.id == loc_id
+            for conn in loc.connections:
+                # Dangling connections are allowed: world_builder materializes them
+                # when events reference the named place.
+                if conn not in state.locations:
+                    logging.info(f"  {scenario}: {loc_id} → {conn} (deferred to enrichment)")
+
+        for quest_id, quest in state.quests.items():
+            assert isinstance(quest, Quest)
+            assert quest.id == quest_id
+            if quest.owner:
+                assert quest.owner in state.characters, f"quest {quest_id} owned by unknown character {quest.owner}"
+
+        logging.info(f"{scenario}: {len(state.characters)} chars, {len(state.locations)} locs, {len(state.quests)} quests OK")
+
+    # round-trip save/load on the default (random) scenario
     manager = StateManager()
     state = manager.load_state()
-
-    # check dirs
-    logging.info(f"Initial world state loaded.")
-    logging.info(f"root_dir: {manager.ROOT_DIR}")
-    logging.info(f"setup_dir: {manager.setup_dir}")
-    logging.info(f"state_dir: {manager.state_dir}")
-
-    # tests
-    assert isinstance(state, WorldState)
-    assert isinstance(state.characters, dict)
-    assert isinstance(state.locations, dict)
-    assert isinstance(state.quests, dict)
-    logging.info("WorldState structure test passed.")
-
-    # check characters
-    for char_id, char in state.characters.items():
-        assert isinstance(char, Character)
-        assert char.id == char_id
-        logging.info(f"Character {char_id} loaded.")
-        logging.info(f"{char}")
-    logging.info("All characters loaded successfully.")
-
-    # check locations
-    for loc_id, loc in state.locations.items():
-        assert isinstance(loc, Location)
-        assert loc.id == loc_id
-        logging.info(f"Location {loc_id} loaded.")
-        logging.info(f"{loc}")
-    logging.info("All locations loaded successfully.")
-
-    # check quests
-    for quest_id, quest in state.quests.items():
-        assert isinstance(quest, Quest)
-        assert quest.id == quest_id
-        logging.info(f"Quest {quest_id} loaded.")
-        logging.info(f"{quest}")
-    logging.info("All quests loaded successfully.")
+    state.time += 1
+    manager.save_state(state)
+    loaded = manager.load_state(world_state_file=f"world_state_{state.time}.json")
+    assert loaded == state
+    logging.info(f"save/load round-trip OK on '{manager.scenario}'")
 
     logging.info(f"{__file__} tests completed successfully.")
-
-    # test saving state
-    state.time += 1  # increment time to avoid overwriting initial state
-    manager.save_state(state)
-    logging.info(f"World state saved successfully at time {state.time}.")
-
-    # test loading saved state
-    loaded_state = manager.load_state(world_state_file=f"world_state_{state.time}.json")
-    assert loaded_state == state
-    logging.info("Saved world state loaded successfully and matches current state.")

@@ -18,6 +18,7 @@ class CharacterStats(BaseModel):
     hp: int = 5
     max_hp: int = 5
     level: int = 1
+    xp: int = 0
 
 
 class Location(BaseModel):
@@ -45,6 +46,7 @@ class HistoryEvent(BaseModel):
     text: str
     location: str
     characters: List[str] = []
+    minutes_elapsed: int = 0
 
 
 class Quest(BaseModel):
@@ -58,6 +60,7 @@ class Quest(BaseModel):
 
 class WorldState(BaseModel):
     time: int = 0
+    minutes_elapsed: int = 0
     locations: Dict[str, Location] = {}
     characters: Dict[str, Character] = {}
     quests: Dict[str, Quest] = {}

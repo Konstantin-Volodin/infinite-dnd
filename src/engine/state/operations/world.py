@@ -2,16 +2,11 @@
 World-scoped operations: quests, characters (spawn/delete), items (world-level), locations, time.
 """
 
-from src.engine.state.models import WorldState, HistoryEvent, Character, Location
+from src.engine.state.models import Character, Location, Quest
+from src.engine.state.operations._base import _OpsBase
 
 
-class WorldOps:
-    def __init__(self, state: WorldState):
-        self.state = state
-
-    def _log(self, text: str, location: str, characters: list[str] | None = None) -> None:
-        self.state.history.append(HistoryEvent(text=text, location=location, characters=characters or []))
-
+class WorldOps(_OpsBase):
     # ============ QUESTS ============
     def advance_quest(self, quest_id: str, new_status: str | None = None, step: str | None = None) -> str:
         quest = self.state.quests.get(quest_id)
@@ -19,10 +14,26 @@ class WorldOps:
 
         if new_status: quest.status = new_status
         if step: quest.steps.append(step)
-        result = f"Quest '{quest_id}' updated."
-        owner_loc = self.state.characters.get(quest.owner).location if quest.owner in self.state.characters else ""
-        self._log(result, owner_loc, [quest.owner] if quest.owner else [])
-        return result
+
+        # XP award to owner — step=10, completion=50. Silent if owner isn't a known character.
+        award_suffix = ""
+        if quest.owner and quest.owner in self.state.characters:
+            if step:
+                self.award_xp(quest.owner, 10, reason=f"quest '{quest_id}' progress")
+                award_suffix = f" (+10 XP to {quest.owner})"
+            if new_status == "completed":
+                self.award_xp(quest.owner, 50, reason=f"quest '{quest_id}' completed")
+                award_suffix = f" (+50 XP to {quest.owner})"
+        return f"Quest '{quest_id}' updated.{award_suffix}"
+
+    def add_quest(self, quest_id: str, title: str, description: str = "", owner: str | None = None) -> str:
+        if quest_id in self.state.quests: return f"Quest '{quest_id}' already exists."
+
+        owner_id = owner or ""
+        self.state.quests[quest_id] = Quest(id=quest_id, title=title, description=description, owner=owner_id)
+        owner_loc = self.state.characters[owner_id].location if owner_id in self.state.characters else ""
+        self._log(f"New quest: '{title}'" + (f" (owner: {owner_id})" if owner_id else ""), owner_loc, [owner_id] if owner_id else None)
+        return f"Quest '{quest_id}' added."
 
     # ============ CHARACTERS ============
     def spawn_npc(self, npc_id: str, role: str, location_id: str, backstory: str = "", goal: str = "") -> str:
@@ -119,7 +130,8 @@ class WorldOps:
 if __name__ == "__main__":
 
     import logging
-    from src.engine.state.models import WorldState, Location, Quest
+    from src.engine.state.models import WorldState, Location, Quest, Character
+    from src.engine.state.operations import WorldOperations
 
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -128,20 +140,43 @@ if __name__ == "__main__":
             "tavern": Location(id="tavern", connections=["forest"]),
             "forest": Location(id="forest", connections=["tavern"]),
         },
+        characters={
+            "hero": Character(id="hero", role="warrior", location="tavern"),
+        },
         quests={
             "q1": Quest(id="q1", title="Clear the Cave", description="Defeat the creatures", owner="hero"),
+            "q2": Quest(id="q2", title="Ownerless Task", description="no owner", owner=""),
         },
     )
-    ops = WorldOps(state)
+    ops = WorldOperations(state)
 
-    # quests
-    history_before = len(state.history)
-    ops.advance_quest("q1", step="Entered the cave")
+    # quests — step/completion award XP to owner; return string reflects award
+    msg = ops.advance_quest("q1", step="Entered the cave")
     assert "Entered the cave" in state.quests["q1"].steps
-    assert state.history[-1].text == "Quest 'q1' updated."
-    ops.advance_quest("q1", new_status="completed")
+    assert state.characters["hero"].stats.xp == 10
+    assert "+10 XP to hero" in msg
+    msg = ops.advance_quest("q1", new_status="completed")
     assert state.quests["q1"].status == "completed"
-    assert len(state.history) == history_before + 2
+    assert state.characters["hero"].stats.xp == 60
+    assert "+50 XP to hero" in msg
+    # ownerless quest: no XP, no suffix
+    msg = ops.advance_quest("q2", new_status="completed")
+    assert state.quests["q2"].status == "completed"
+    assert msg == "Quest 'q2' updated."
+
+    # add_quest — anchored to owner's location when known
+    history_before_add = len(state.history)
+    msg = ops.add_quest("q3", title="Find the Map", description="locate the buried chart", owner="hero")
+    assert msg == "Quest 'q3' added."
+    assert "q3" in state.quests and state.quests["q3"].owner == "hero"
+    assert state.history[-1].location == "tavern"
+    assert "owner: hero" in state.history[-1].text
+    # idempotent
+    assert "already exists" in ops.add_quest("q3", title="Find the Map")
+    assert len(state.history) == history_before_add + 1
+    # ownerless quest: empty location, no character tag
+    ops.add_quest("q4", title="Mystery", description="someone, somewhere")
+    assert state.quests["q4"].owner == ""
     logging.info("Quest tests passed.")
 
     # spawn / delete NPC

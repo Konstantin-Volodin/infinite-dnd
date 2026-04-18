@@ -1,143 +1,209 @@
-"""Game loop: a character acts, the DM reacts."""
+"""Game loop. Each tick: one actor takes a turn → resolve → stamp elapsed time → enrich world → review quests."""
 
-import random
+import asyncio
 
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
 
-from src.engine.rules import get_skill_modifier
-from src.engine.state import StateManager, WorldState, resolve_character
-from src.engine.runtime.messages import extract_tool_calls
-from src.agents.character.agent import CHARACTER_RESPONSE_OUTPUTS, CharacterDeps, agent as character_agent
-from src.agents.dungeon_master.agent import DungeonMasterDeps, agent as dm_agent
+from src.engine.state import StateManager, WorldState
+from src.engine.state.models import HistoryEvent
+from src.agents.character.agent import CharacterDeps, agent as character_agent
+from src.agents.quest_reviewer.agent import QuestReviewerDeps, agent as quest_reviewer_agent
+from src.agents.time_keeper.agent import TimeKeeperDeps, agent as time_keeper_agent
+from src.agents.world_builder.agent import WorldBuilderDeps, agent as world_builder_agent
+from src.agents.action_resolver.agent import resolve
+from src.agents.intents import (
+    ActionIntent,
+    CharacterIntent,
+    CreateIntent,
+    ModifyIntent,
+    SpeakIntent,
+    TravelIntent,
+    WaitIntent,
+)
 
-_DISCOVERY_DC = 12
-MAX_ACTIONS_PER_TURN = 5
-_DM_REQUEST_LIMIT = UsageLimits(request_limit=20)
-_CHAR_ACTION_LIMIT = UsageLimits(request_limit=12)
+
+_AGENT_USAGE = UsageLimits(request_limit=12)
+_QUEST_USAGE = UsageLimits(request_limit=6)
+_TIME_USAGE = UsageLimits(request_limit=6)
+_ENRICH_USAGE = UsageLimits(request_limit=8)
+
+# Locations must resolve before NPCs/items that anchor to them. Quests last (anchor to PCs).
+_CREATE_ORDER = {"location": 0, "npc": 1, "item": 2, "quest": 3}
 
 
-def _print_new(state: WorldState, since: int) -> None:
-    for event in state.history[since:]:
+# ─── Scheduler ────────────────────────────────────────────────
+
+def _scene_actors(state: WorldState, active_pc_id: str) -> list[str]:
+    """Characters present in the active PC's current location. PC first, then others by id."""
+    scene = state.characters[active_pc_id].location
+    present = [cid for cid, c in state.characters.items() if c.location == scene]
+    present.sort(key=lambda cid: (cid != active_pc_id, cid))
+    return present
+
+
+def _pick_next_actor(state: WorldState, active_pc_id: str, tick: int) -> str:
+    actors = _scene_actors(state, active_pc_id)
+    return actors[tick % len(actors)]
+
+
+def _format_clock(total_minutes: int) -> str:
+    day = total_minutes // 1440 + 1
+    remainder = total_minutes % 1440
+    return f"day {day}, {remainder // 60:02d}:{remainder % 60:02d}"
+
+
+def _describe_intent(intent: CharacterIntent) -> str:
+    """One-line preview of the acting character's chosen step."""
+    if isinstance(intent, SpeakIntent):
+        head = f"speak → {intent.target}" if intent.target else "speak"
+        return f'{head}: "{intent.message}"'
+    if isinstance(intent, TravelIntent):
+        return f"travel → {intent.destination}"
+    if isinstance(intent, WaitIntent):
+        return "wait"
+    if isinstance(intent, ActionIntent):
+        suffix = f" ({intent.target})" if intent.target else ""
+        return f"action{suffix}: {intent.description}"
+    return repr(intent)
+
+
+# ─── Agent flows ──────────────────────────────────────────────
+
+async def flow_agent_turn(actor_id: str, state: WorldState) -> CharacterIntent | None:
+    """Ask the acting character to pick one next step."""
+    char = state.characters[actor_id]
+    print(f"  [{actor_id}]", flush=True)
+    try:
+        result = await character_agent.run(
+            "Choose exactly ONE next step by calling action, speak, travel, or wait.",
+            deps=CharacterDeps(char=char, state=state),
+            usage_limits=_AGENT_USAGE,
+        )
+    except UsageLimitExceeded as exc:
+        print(f"  [limit] {actor_id}'s turn ended: {exc}", flush=True)
+        return None
+    return result.output
+
+
+async def flow_world_enrich(state: WorldState) -> list[CreateIntent]:
+    """Materialize entities revealed by recent events (locations before NPCs/items)."""
+    try:
+        result = await world_builder_agent.run(
+            "Register any new entities revealed by the recent events. Return an empty list if nothing new.",
+            deps=WorldBuilderDeps(state=state),
+            usage_limits=_ENRICH_USAGE,
+        )
+    except UsageLimitExceeded as exc:
+        print(f"  [limit] world enrichment ended: {exc}", flush=True)
+        return []
+    intents = result.output or []
+    if intents:
+        print(f"  [world] {len(intents)} new entities revealed")
+    return sorted(intents, key=lambda i: _CREATE_ORDER.get(i.type, 3))
+
+
+async def flow_quest_review(state: WorldState) -> list[ModifyIntent]:
+    """Advance quests against recent events. Structural — never narrates."""
+    if not any(q.status.lower() not in {"completed", "failed"} for q in state.quests.values()):
+        return []
+    try:
+        result = await quest_reviewer_agent.run(
+            "Review active quests against recent events. Call review with any progress, or an empty list.",
+            deps=QuestReviewerDeps(state=state),
+            usage_limits=_QUEST_USAGE,
+        )
+    except UsageLimitExceeded as exc:
+        print(f"  [limit] quest review ended: {exc}", flush=True)
+        return []
+    return result.output or []
+
+
+async def flow_time_review(event_texts: list[str]) -> list[int]:
+    """One minute-estimate per event, in order. Falls back to 1m per event on limit."""
+    if not event_texts:
+        return []
+    try:
+        result = await time_keeper_agent.run(
+            "Estimate minutes elapsed for each event. Return exactly one integer per event, in order.",
+            deps=TimeKeeperDeps(events=event_texts),
+            usage_limits=_TIME_USAGE,
+        )
+    except UsageLimitExceeded as exc:
+        print(f"  [limit] time review ended: {exc}", flush=True)
+        return [1] * len(event_texts)
+    return result.output or []
+
+
+# ─── Tick composition ────────────────────────────────────────
+
+async def _stamp_time(new_events: list[HistoryEvent], state: WorldState) -> None:
+    """Annotate each new event with estimated minutes and advance the world clock."""
+    if not new_events:
+        return
+    minutes = await flow_time_review([e.text for e in new_events])
+    if len(minutes) != len(new_events):
+        minutes = [1] * len(new_events)
+    for event, mins in zip(new_events, minutes):
+        event.minutes_elapsed = mins
+    state.minutes_elapsed += sum(minutes)
+
+    for event in new_events:
+        print(f"  {event.text}  (+{event.minutes_elapsed}m)")
+    print(f"  [clock: {_format_clock(state.minutes_elapsed)}]")
+
+
+async def tick(active_pc_id: str, state: WorldState, tick_index: int) -> None:
+    actor_id = _pick_next_actor(state, active_pc_id, tick_index)
+
+    intent = await flow_agent_turn(actor_id, state)
+    if intent is None:
+        return
+    print(f"    ↳ {_describe_intent(intent)}")
+
+    # 1. Resolve the turn and stamp elapsed time onto the resulting events.
+    pre = len(state.history)
+    await resolve(intent, state)
+    await _stamp_time(state.history[pre:], state)
+
+    # 2. Enrich the world. Revealed entities are retcons — logged but not time-stamped.
+    pre_enrich = len(state.history)
+    for create_intent in await flow_world_enrich(state):
+        await resolve(create_intent, state)
+    for event in state.history[pre_enrich:]:
+        print(f"  {event.text}  (revealed)")
+
+    # 3. Review quests. Step-level progress; may append XP events via advance_quest.
+    pre_quest = len(state.history)
+    for update in await flow_quest_review(state):
+        msg = await resolve(update, state)
+        print(f"  [quest] {update.target_id}: {msg}")
+    for event in state.history[pre_quest:]:
         print(f"  {event.text}")
 
 
-def _roll(skill: str, char) -> tuple[int, int]:
-    roll = random.randint(1, 20)
-    return roll + get_skill_modifier(char, skill), roll
+# ============================================================
+# Entry point
+# ============================================================
 
-
-def _dm_narrate(state: WorldState, location: str) -> None:
-    last_event = state.history[-1] if state.history else None
-    last_action = {"text": last_event.text} if last_event else None
-    print("  [DM]", flush=True)
-    before = len(state.history)
-    try:
-        dm_agent.run_sync(
-            (
-                "React to the last action with one world narration. "
-                "Do not write character dialogue. "
-                "Use narrate at most once, then call done."
-            ),
-            deps=DungeonMasterDeps(state=state, last_action=last_action, narrate_location=location),
-            usage_limits=_DM_REQUEST_LIMIT,
-        )
-    except UsageLimitExceeded as exc:
-        print(f"  [limit] DM narration ended early: {exc}", flush=True)
-    _print_new(state, before)
-
-
-def _dm_introduce_location(name: str, state: WorldState, anchor: str) -> None:
-    print(f"  [DM] introducing {name}…", flush=True)
-    before = len(state.history)
-    try:
-        dm_agent.run_sync(
-            (
-                f'Create a new location called "{name}" and connect it to {anchor}. '
-                "Use create at most once, narrate its discovery at most once, then call done. "
-                "Do not write character dialogue."
-            ),
-            deps=DungeonMasterDeps(state=state, narrate_location=anchor),
-            usage_limits=_DM_REQUEST_LIMIT,
-        )
-    except UsageLimitExceeded as exc:
-        print(f"  [limit] DM location introduction ended early: {exc}", flush=True)
-    _print_new(state, before)
-
-
-def run_turn(char_id: str, state: WorldState, session_history: list) -> list:
-    char = state.characters[char_id]
-    print(f"  [{char.id}]", flush=True)
-
-    for _ in range(MAX_ACTIONS_PER_TURN):
-        deps = CharacterDeps(char=char, state=state)
-        before = len(state.history)
-        try:
-            result = character_agent.run_sync(
-                (
-                    "Choose exactly ONE next step this run by calling action, speak, travel, or wait. "
-                    "That one tool call ends this run. "
-                    "The engine may call you again this turn with updated context, so focus only on the next immediate step. "
-                    "The action tool resolves its own consequences."
-                ),
-                deps=deps,
-                message_history=session_history or None,
-                usage_limits=_CHAR_ACTION_LIMIT,
-            )
-        except UsageLimitExceeded as exc:
-            print(f"  [limit] {char.id}'s turn ended early: {exc}", flush=True)
-            break
-
-        session_history.extend(result.new_messages())
-        _print_new(state, before)
-
-        tool_calls = extract_tool_calls(result.new_messages())
-        action_call = tool_calls[-1] if tool_calls else None
-        if not action_call:
-            break
-
-        tool_name, args = action_call
-        if tool_name == "wait":
-            break
-        if tool_name == "travel":
-            for dest in dict.fromkeys(deps.failed_travels):
-                total, roll = _roll("investigation", char)
-                if total >= _DISCOVERY_DC:
-                    print(f"  [roll] investigation {roll}+mod={total} vs DC {_DISCOVERY_DC} → success", flush=True)
-                    _dm_introduce_location(dest, state, char.location)
-                else:
-                    print(f"  [roll] investigation {roll}+mod={total} vs DC {_DISCOVERY_DC} → {dest} not found", flush=True)
-        elif tool_name == "speak" and args.get("target"):
-            target_char = resolve_character(state, args["target"])
-            if target_char and target_char.id != char.id:
-                print(f"  [{target_char.id}]", flush=True)
-                before_reply = len(state.history)
-                character_agent.run_sync(
-                    (
-                        f'{char.id} just spoke to you: "{args.get("message", "")}". '
-                        "Respond in character with speak or wait. Choose exactly one tool call to end this run."
-                    ),
-                    deps=CharacterDeps(char=target_char, state=state),
-                    output_type=CHARACTER_RESPONSE_OUTPUTS,
-                )
-                _print_new(state, before_reply)
-        elif tool_name == "speak":
-            _dm_narrate(state, char.location)
-        elif tool_name == "action":
-            continue
-        else:
-            _dm_narrate(state, char.location)
-
-    return session_history
-
-
-def run_game(character_id: str = "elara-swift", max_turns: int = 5) -> None:
-    manager = StateManager()
+async def _run_game(scenario: str | None, character_id: str | None, max_turns: int) -> None:
+    manager = StateManager(scenario=scenario)
     state = manager.init_state()
-    session_history: list = []
 
-    for turn in range(max_turns):
-        print(f"\n--- Turn {turn + 1} ---")
-        session_history = run_turn(character_id, state, session_history)
+    pc_id = character_id or manager.manifest["pc"]
+    if pc_id not in state.characters:
+        raise RuntimeError(f"PC '{pc_id}' not in scenario '{manager.scenario}'")
+
+    print(f"\n=== {manager.manifest.get('title', manager.scenario)} ===")
+    print(manager.manifest.get("hook", ""))
+    print(f"Playing as: {pc_id}\n")
+
+    for t in range(max_turns):
+        print(f"\n--- Tick {t + 1} ---")
+        await tick(pc_id, state, t)
         state.time += 1
         manager.save_state(state)
+
+
+def run_game(character_id: str | None = None, max_turns: int = 50, scenario: str | None = None) -> None:
+    asyncio.run(_run_game(scenario, character_id, max_turns))

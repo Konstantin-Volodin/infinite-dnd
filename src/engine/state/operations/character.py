@@ -2,16 +2,10 @@
 Character-scoped operations: movement, dialogue, items, stats, relationships, knowledge.
 """
 
-from src.engine.state.models import WorldState, HistoryEvent
+from src.engine.state.operations._base import _OpsBase
 
 
-class CharacterOps:
-    def __init__(self, state: WorldState):
-        self.state = state
-
-    def _log(self, text: str, location: str, characters: list[str] | None = None) -> None:
-        self.state.history.append(HistoryEvent(text=text, location=location, characters=characters or []))
-
+class CharacterOps(_OpsBase):
     # ============ MOVEMENT ============
     def move_character(self, character_id: str, destination_id: str) -> str:
         char = self.state.characters.get(character_id)
@@ -128,6 +122,17 @@ class CharacterOps:
         self._log(result, char.location, [character_id])
         return result
 
+    def award_xp(self, character_id: str, amount: int, reason: str = "") -> str:
+        char = self.state.characters.get(character_id)
+        if not char: return f"Cannot award XP — character '{character_id}' not found."
+
+        amount = max(0, amount)
+        char.stats.xp += amount
+        suffix = f" ({reason})" if reason else ""
+        result = f"{character_id} earns {amount} XP{suffix}."
+        self._log(result, char.location, [character_id])
+        return result
+
     # ============ CHARACTER UPDATE ============
     def update_character(self, character_id: str, backstory: str | None = None, personality: str | None = None, goal: str | None = None, role: str | None = None) -> str:
         char = self.state.characters.get(character_id)
@@ -232,6 +237,17 @@ if __name__ == "__main__":
     assert state.characters["hero"].stats.level == 2
     assert state.characters["hero"].stats.max_hp == 25
     assert state.characters["hero"].stats.hp == 25
+
+    # award_xp
+    history_before_xp = len(state.history)
+    ops.award_xp("hero", 25, reason="slaying goblins")
+    assert state.characters["hero"].stats.xp == 25
+    assert state.history[-1].text == "hero earns 25 XP (slaying goblins)."
+    ops.award_xp("hero", -10)  # clamped to 0, still logs
+    assert state.characters["hero"].stats.xp == 25
+    assert state.history[-1].text == "hero earns 0 XP."
+    assert len(state.history) == history_before_xp + 2
+    assert "Cannot award XP" in ops.award_xp("ghost", 10)
     logging.info("Stats tests passed.")
 
     # update character
