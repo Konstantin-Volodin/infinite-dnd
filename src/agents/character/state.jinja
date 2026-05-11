@@ -1,0 +1,102 @@
+*... recent information about you ...*
+
+## 🎯 current goal
+- **goal:** {{ char.goal or 'none' }}
+
+## 👥 contacts
+{% if char.relationships %}
+{% for char_ids, rel_type in char.relationships.items() %}
+- {{ char_ids }}: {{ rel_type }}
+{% endfor %}
+{% else %}
+- none
+{% endif %}
+
+## ❤️ condition
+- **{{ health_status }}** - {{ char.stats.hp }}/{{ char.stats.max_hp }} HP
+
+## 🎒 inventory
+{% if char.inventory %}
+{% for item in char.inventory %}
+- {{ item }}
+{% endfor %}
+{% else %}
+- nothing
+{% endif %}
+
+## 🧠 knowledge
+{% if knowledge %}
+{% for k in knowledge %}
+- {{ k }}
+{% endfor %}
+{% else %}
+- none
+{% endif %}
+
+## 📜 quests
+{% if quests %}
+{% for q in quests %}
+- **{{ q.title }}**: {{ q.description }}
+{% if q.steps %}
+Steps: {{ q.steps | join(', ') }}
+{% endif %}
+{% endfor %}
+{% else %}
+- none
+{% endif %}
+
+*... recent information about the world ...*
+
+## 💭 what just happened
+{% if recent_events %}
+{% for event in recent_events[:-1] %}
+- {{ event }}
+{% endfor %}
+*Just now:* {{ recent_events[-1] }}
+
+{% if someone_speaking_to_me %}
+
+> **Someone just spoke to me.** I should respond.
+{% endif %}
+{% else %}
+Everything is calm... for now.
+{% endif %}
+
+## 🏠 about my location
+{% if loc %}
+{% if others %}
+- **other people here**:  {{ others | join(', ') }}
+{% endif %}
+{% if loc.features %}
+- **location features:** {{ loc.features | join(', ') }}
+{% endif %}
+{% if loc.items %}
+- **items here:** {{ loc.items | join(', ') }}
+{% endif %}
+{% if loc.connections %}
+- **where i can go from here:** {{ loc.connections | join(', ') }}
+{% endif %}
+{% else %}
+- *bugged location*
+{% endif %}
+
+## ✅ tool call options
+{% if speak_targets %}
+- **valid `speak.target` ids right now:** {{ speak_targets | join(', ') }}
+{% else %}
+- **valid `speak.target` ids right now:** none, so leave `target` empty if I speak
+{% endif %}
+- for `travel.location`, use one of the connected places listed above under **about my location**
+- **use `action`** to search, inspect, interact with features/items, or attempt something concrete tied to my goal.
+- **use `action`** also to ask around or discover anything not listed above.
+- if I want to pause and let events unfold, I can use `wait`
+
+{% if warnings %}
+## 💡 reminders
+{% for w in warnings %}
+> {{ w }}
+{% endfor %}
+{% endif %}
+---
+
+now - what do I want to do?

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "manor-foyer",
+    "description": "A grand entrance hall, marble underfoot. Family portraits watch from the walls, their frames thick with dust.",
+    "connections": ["upper-library", "servants-quarters"],
+    "features": ["family portraits", "wrought-iron chandelier", "coat rack"]
+  },
+  {
+    "id": "upper-library",
+    "description": "Shelves climb to the ceiling. The smell of old paper. A reading table sits under a cold hearth at the far wall.",
+    "connections": ["manor-foyer"],
+    "features": ["cold hearth", "reading table", "leather-bound genealogy"],
+    "items": ["cracked ink-bottle"]
+  },
+  {
+    "id": "servants-quarters",
+    "description": "A low-ceilinged hallway lined with narrow doors. Somewhere behind one of them, a kettle whistles.",
+    "connections": ["manor-foyer"],
+    "features": ["narrow doors", "servants' roster pinned to a beam", "scullery door"]
+  }
+]
