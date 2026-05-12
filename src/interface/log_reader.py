@@ -82,6 +82,8 @@ def load_session(path: Path) -> dict[str, Any]:
         "summary": {
             "character_id": started["raw"].get("character_id") if started else None,
             "max_turns": started["raw"].get("max_turns") if started else None,
+            "scenario": started["raw"].get("scenario") if started else None,
+            "title": started["raw"].get("title") if started else None,
             "turns_completed": finished["raw"].get("turns_completed") if finished else (max(turns) if turns else 0),
             "started_at": entries[0].get("time") if entries else None,
             "finished_at": entries[-1].get("time") if entries else None,
@@ -198,11 +200,31 @@ def _build_runs(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _summarize_entry(entry: dict[str, Any], *, message_kind: str | None, tool_calls: list[str], tool_returns: list[str]) -> str:
     event = entry.get("event", "unknown")
     if event == "game_session_started":
-        return f"Session started for {entry.get('character_id', 'unknown')} with max {entry.get('max_turns', '?')} turns."
+        title = entry.get("title") or entry.get("scenario") or "session"
+        return f"{title} started for {entry.get('character_id', 'unknown')} with max {entry.get('max_turns', '?')} turns."
     if event == "game_session_finished":
         return f"Session finished after {entry.get('turns_completed', 0)} turns."
     if event == "turn_started":
         return f"Turn {entry.get('turn')} started."
+    if event == "character_intent":
+        return f"{entry.get('actor_id', 'character')} chose {entry.get('description', 'an action')}."
+    if event == "history_event":
+        suffix = ""
+        if entry.get("phase"):
+            suffix += f" [{entry.get('phase')}]"
+        if entry.get("minutes_elapsed") is not None:
+            suffix += f" (+{entry.get('minutes_elapsed')}m)"
+        return f"{entry.get('text', 'World event')}{suffix}"
+    if event == "clock_updated":
+        return f"Clock: {entry.get('clock', 'unknown')}."
+    if event == "world_enrichment":
+        return f"World builder revealed {entry.get('count', 0)} new entities."
+    if event == "quest_update":
+        return f"Quest {entry.get('target_id', 'unknown')}: {entry.get('result', 'updated')}"
+    if event == "state_saved":
+        return f"State saved at tick {entry.get('state_time', '?')} with {entry.get('history_events', '?')} history events."
+    if event == "agent_usage_limit":
+        return f"{entry.get('label', 'agent')} hit a usage limit: {entry.get('error', '')}"
     if event == "agent_run_started":
         return f"{entry.get('label', 'agent')} started."
     if event == "agent_run_finished":

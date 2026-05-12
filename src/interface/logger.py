@@ -11,13 +11,27 @@ DEFAULT_LOG_DIR = Path("logs")
 
 
 class Logger:
-    def __init__(self, *, character_id: str, max_turns: int, log_dir: Path = DEFAULT_LOG_DIR):
+    def __init__(
+        self,
+        *,
+        character_id: str,
+        max_turns: int,
+        scenario: str = "",
+        title: str = "",
+        log_dir: Path = DEFAULT_LOG_DIR,
+    ):
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(exist_ok=True)
         self.session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.turn = 0
         self._file = (self.log_dir / f"{self.session_id}.log").open("w", encoding="utf-8")
-        self._log("game_session_started", character_id=character_id, max_turns=max_turns)
+        self._log(
+            "game_session_started",
+            character_id=character_id,
+            max_turns=max_turns,
+            scenario=scenario,
+            title=title,
+        )
 
     def close(self) -> None:
         self._log("game_session_finished", turns_completed=self.turn)
@@ -26,6 +40,9 @@ class Logger:
     def log_turn(self, turn: int) -> None:
         self.turn = turn
         self._log("turn_started", turn=turn)
+
+    def log_event(self, event: str, **kwargs: Any) -> None:
+        self._log(event, turn=self.turn or None, **kwargs)
 
     @contextmanager
     def run(self, label: str) -> Iterator[None]:

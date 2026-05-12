@@ -14,6 +14,7 @@ from .tools import Modify
 @dataclass
 class QuestReviewerDeps:
     state: WorldState
+    events: list[str]
 
 
 class QuestUpdate(BaseModel):
@@ -49,7 +50,7 @@ def _identity(_: RunContext[QuestReviewerDeps]) -> str:
 
 @agent.instructions
 def _context(ctx: RunContext[QuestReviewerDeps]) -> str:
-    return quest_reviewer_context(ctx.deps.state)
+    return quest_reviewer_context(ctx.deps.state, ctx.deps.events)
 
 
 if __name__ == "__main__":

@@ -14,9 +14,9 @@
 - {{ event }}
 {% endfor %}
 {% else %}
-_No events yet._
+_No new world events this tick._
 {% endif %}
 
 ---
 
-Call `review` with the list of quest status changes justified by these events. If nothing has clearly advanced, call `review` with an empty list.
+Call `review` with only milestone-level quest changes justified by these new events. If the events repeat known information, show preparation, or merely mention a quest topic, call `review` with an empty list.

@@ -2,8 +2,36 @@
 World-scoped operations: quests, characters (spawn/delete), items (world-level), locations, time.
 """
 
+import re
+from difflib import SequenceMatcher
+
 from src.engine.state.models import Character, Location, Quest
 from src.engine.state.operations._base import _OpsBase
+
+
+def _normalize_quest_step(step: str) -> str:
+    text = step.lower()
+    text = re.sub(r"[^a-z0-9\s]+", " ", text)
+    words = [
+        word for word in text.split()
+        if word not in {"a", "an", "and", "the", "to", "of", "in", "on", "at", "for", "with"}
+    ]
+    return " ".join(words)
+
+
+def _is_duplicate_step(existing_steps: list[str], step: str) -> bool:
+    candidate = _normalize_quest_step(step)
+    if not candidate:
+        return True
+    for existing in existing_steps:
+        current = _normalize_quest_step(existing)
+        if candidate == current:
+            return True
+        if candidate in current or current in candidate:
+            return True
+        if SequenceMatcher(None, candidate, current).ratio() >= 0.82:
+            return True
+    return False
 
 
 class WorldOps(_OpsBase):
@@ -12,16 +40,30 @@ class WorldOps(_OpsBase):
         quest = self.state.quests.get(quest_id)
         if not quest: return f"Cannot advance quest — '{quest_id}' not found."
 
-        if new_status: quest.status = new_status
-        if step: quest.steps.append(step)
+        current_status = quest.status.lower()
+        requested_status = new_status.lower() if new_status else None
+        if current_status in {"completed", "failed"} and requested_status in {None, current_status}:
+            return f"Quest '{quest_id}' is already {quest.status}."
+
+        step_added = False
+        status_changed = bool(new_status and new_status.lower() != current_status)
+
+        if new_status:
+            quest.status = new_status
+        if step and not _is_duplicate_step(quest.steps, step):
+            quest.steps.append(step)
+            step_added = True
+
+        if not step_added and not status_changed:
+            return f"Quest '{quest_id}' unchanged."
 
         # XP award to owner — step=10, completion=50. Silent if owner isn't a known character.
         award_suffix = ""
         if quest.owner and quest.owner in self.state.characters:
-            if step:
+            if step_added:
                 self.award_xp(quest.owner, 10, reason=f"quest '{quest_id}' progress")
                 award_suffix = f" (+10 XP to {quest.owner})"
-            if new_status == "completed":
+            if status_changed and new_status and new_status.lower() == "completed":
                 self.award_xp(quest.owner, 50, reason=f"quest '{quest_id}' completed")
                 award_suffix = f" (+50 XP to {quest.owner})"
         return f"Quest '{quest_id}' updated.{award_suffix}"
@@ -155,10 +197,17 @@ if __name__ == "__main__":
     assert "Entered the cave" in state.quests["q1"].steps
     assert state.characters["hero"].stats.xp == 10
     assert "+10 XP to hero" in msg
+    msg = ops.advance_quest("q1", step="Hero entered the cave.")
+    assert msg == "Quest 'q1' unchanged."
+    assert len(state.quests["q1"].steps) == 1
+    assert state.characters["hero"].stats.xp == 10
     msg = ops.advance_quest("q1", new_status="completed")
     assert state.quests["q1"].status == "completed"
     assert state.characters["hero"].stats.xp == 60
     assert "+50 XP to hero" in msg
+    msg = ops.advance_quest("q1", step="Looked deeper into the cave")
+    assert msg == "Quest 'q1' is already completed."
+    assert state.characters["hero"].stats.xp == 60
     # ownerless quest: no XP, no suffix
     msg = ops.advance_quest("q2", new_status="completed")
     assert state.quests["q2"].status == "completed"
