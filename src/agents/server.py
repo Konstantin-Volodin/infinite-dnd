@@ -10,6 +10,16 @@ import urllib.request
 from dotenv import load_dotenv
 load_dotenv()
 
+
+def _is_enabled(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_local_url(url: str) -> bool:
+    host = urllib.parse.urlparse(url).hostname
+    return host in {"localhost", "127.0.0.1", "::1"}
+
+
 class LlamaServer:
     """manages a local llama-server subprocess."""
 
@@ -18,14 +28,20 @@ class LlamaServer:
         if not model:
             raise RuntimeError("LLM_MODEL must be set")
         base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
+        self._process = None
+        if not _is_enabled(os.getenv("LLM_AUTO_START", "true")) or not _is_local_url(base_url):
+            logging.info(f"Skipping local llama-server startup for LLM_BASE_URL={base_url}")
+            return
+
         port = urllib.parse.urlparse(base_url).port or 1234
+        startup_timeout = int(os.getenv("LLM_STARTUP_TIMEOUT", "300"))
         self._health_url = f"http://localhost:{port}/health"
         cmd = [
             "llama-server", "-hf", model, "--port", str(port),
             "--ctx-size", "8192",
             "--n-predict", "-1",
             "-ngl", "99",
-            "--n-cpu-moe", "10",
+            # "--n-cpu-moe", "10",
             "--batch-size", "1024",
             "--ubatch-size", "512",
             "--flash-attn", "on",
@@ -42,7 +58,7 @@ class LlamaServer:
         self._process = subprocess.Popen(cmd)
 
         # Loads of 26B models can take 60s+ from disk; first-time HF downloads take longer.
-        deadline = time.time() + 300
+        deadline = time.time() + startup_timeout
         while time.time() < deadline:
             if self._process.poll() is not None:
                 raise RuntimeError(f"llama-server exited during startup with code {self._process.returncode}")
@@ -52,11 +68,12 @@ class LlamaServer:
             except (urllib.error.URLError, urllib.error.HTTPError):
                 time.sleep(0.5)
         self._process.terminate()
-        raise RuntimeError(f"llama-server did not become healthy in 300s: {self._health_url}")
+        raise RuntimeError(f"llama-server did not become healthy in {startup_timeout}s: {self._health_url}")
 
     def stop(self):
-        self._process.terminate()
-        self._process.wait()
+        if self._process:
+            self._process.terminate()
+            self._process.wait()
 
     def __enter__(self): return self
     def __exit__(self, *_): self.stop()
