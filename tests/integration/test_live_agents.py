@@ -1,13 +1,20 @@
-"""Live tests — verify proposer agents emit correct intents and Resolver mutates state."""
+"""Live tests — verify proposer agents emit correct intents and Resolver mutates state.
+
+Requires a reachable LLM provider (local llama.cpp server, or ANTHROPIC_API_KEY when
+LLM_PROVIDER=anthropic). Skipped automatically otherwise. Run explicitly with:
+    uv run pytest -m integration tests/integration
+"""
 
 import asyncio
 import json
-import logging
 import os
-import urllib.request
 import urllib.error
+import urllib.request
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
+import pytest
 from pydantic_ai import Agent, RunContext, capture_run_messages
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import RunUsage, UsageLimits
@@ -22,10 +29,12 @@ from src.agents.action_resolver.agent import (
     resolve,
 )
 from src.agents.character.tools import Action, Speak, Travel
-from src.tests import LOG_DIR, stamp
 
+pytestmark = pytest.mark.integration
 
-# ── helpers ──────────────────────────────────────────────────────────────
+LOG_DIR = Path(__file__).resolve().parents[2] / "src" / "tests" / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+_stamp = datetime.now().strftime("%Y-%m-%d")
 
 _MODEL_SETTINGS: ModelSettings = {
     "temperature": 0.0,
@@ -34,11 +43,31 @@ _MODEL_SETTINGS: ModelSettings = {
     "thinking": False,
 }
 _USAGE_LIMITS = UsageLimits(request_limit=4, output_tokens_limit=256)
-_state_manager = StateManager()
 
 
-def _build() -> WorldState:
-    return _state_manager.init_state()
+def _provider_reachable() -> bool:
+    """Cheap reachability check — no LLM call, just a connectivity/config probe."""
+    if os.getenv("LLM_PROVIDER", "local") == "anthropic":
+        return bool(os.getenv("ANTHROPIC_API_KEY"))
+    url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1").removesuffix("/v1") + "/health"
+    try:
+        r = urllib.request.urlopen(url, timeout=5)
+        ok = r.status == 200
+        r.close()
+        return ok
+    except (urllib.error.URLError, urllib.error.HTTPError):
+        return False
+
+
+@pytest.fixture(autouse=True)
+def _skip_without_provider():
+    if not _provider_reachable():
+        pytest.skip("no live LLM provider reachable (local server down or ANTHROPIC_API_KEY unset)")
+
+
+@pytest.fixture
+def state() -> WorldState:
+    return StateManager().init_state()
 
 
 def _pick_char(state: WorldState) -> Character:
@@ -58,23 +87,14 @@ def _assert_tool(messages: list[Any], name: str) -> None:
         for m in messages for p in getattr(m, "parts", [])
         if getattr(p, "part_kind", None) == "tool-call"
     ]
-    if name not in calls:
-        raise AssertionError(f"expected {name!r}, saw {calls!r}")
+    assert name in calls, f"expected {name!r}, saw {calls!r}"
 
 
 def _run(
     agent: Any, prefix: str, prompt: str, deps: Any, tool: str, *, expect_done: bool = False,
 ) -> tuple[Any, list[Any]]:
-    logging.info(f"  [{prefix}:{tool}] sending prompt ({len(prompt)} chars)...")
     with capture_run_messages() as msgs:
         result = agent.run_sync(prompt, deps=deps, model_settings=_MODEL_SETTINGS, usage_limits=_USAGE_LIMITS)
-    calls = [
-        getattr(p, "tool_name", None)
-        for m in msgs for p in getattr(m, "parts", [])
-        if getattr(p, "part_kind", None) == "tool-call"
-    ]
-    logging.info(f"  [{prefix}:{tool}] done — {len(msgs)} messages, tools called: {calls}")
-
     _assert_tool(msgs, tool)
     if expect_done:
         _assert_tool(msgs, "done")
@@ -87,7 +107,7 @@ def _run(
         ]}
         for m in msgs
     ]
-    path = LOG_DIR / f"{stamp}-{prefix}-{tool}.md"
+    path = LOG_DIR / f"{_stamp}-{prefix}-{tool}.md"
     path.write_text(
         f"# {prefix}: {tool}\n\n## Prompt\n{prompt}\n\n## Output\n{result.output!r}\n\n"
         f"## Trace\n```json\n{json.dumps(trace, indent=2, default=str)}\n```",
@@ -98,30 +118,19 @@ def _run(
 
 # ── server ───────────────────────────────────────────────────────────────
 
-def test_server_health() -> bool:
-    url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1").removesuffix("/v1") + "/health"
-    try:
-        r = urllib.request.urlopen(url, timeout=5)
-        ok = r.status == 200
-        r.close()
-    except (urllib.error.URLError, urllib.error.HTTPError):
-        ok = False
-    logging.info(f"[{'PASS' if ok else 'FAIL'}] server health")
-    return ok
+def test_server_health():
+    assert _provider_reachable()
 
 
-def test_basic_completion() -> bool:
+def test_basic_completion():
     a = Agent(create_model(), system_prompt="reply with one word only.", output_type=str)
     resp = a.run_sync("Say 'hello'.", model_settings={"temperature": 0.0, "thinking": False}).output
-    ok = isinstance(resp, str) and len(resp.strip()) > 0
-    logging.info(f"[{'PASS' if ok else 'FAIL'}] basic completion — {resp!r}")
-    return ok
+    assert isinstance(resp, str) and len(resp.strip()) > 0
 
 
 # ── character (intent generator) ─────────────────────────────────────────
 
-def test_character_contextual_tools() -> bool:
-    state = _build()
+def test_character_contextual_tools(state):
     char = _pick_char(state)
     other = next(c for c in state.characters.values() if c.id != char.id)
     other.location = char.location
@@ -140,12 +149,8 @@ def test_character_contextual_tools() -> bool:
     for loc in expected_travel:
         assert loc in tools["travel"].description, f"travel description missing option {loc!r}"
 
-    logging.info(f"[PASS] character contextual tools — {char.id}")
-    return True
 
-
-def test_character_action_intent() -> bool:
-    state = _build()
+def test_character_action_intent(state):
     char = _pick_char(state)
     before = len(state.history)
     intent, _ = _run(
@@ -160,12 +165,9 @@ def test_character_action_intent() -> bool:
     # Resolver executes it
     asyncio.run(resolve(intent, state))
     assert len(state.history) > before, "resolve(action) should append history"
-    logging.info(f"[PASS] character action intent — {char.id}")
-    return True
 
 
-def test_character_speak_intent() -> bool:
-    state = _build()
+def test_character_speak_intent(state):
     char = _pick_char(state)
     before = len(state.history)
     msg = "I have a feeling something important is happening nearby."
@@ -180,12 +182,9 @@ def test_character_speak_intent() -> bool:
 
     asyncio.run(resolve(intent, state))
     assert state.history[-1].text == f'{char.id} says: "{msg}"'
-    logging.info(f"[PASS] character speak intent — {char.id}")
-    return True
 
 
-def test_character_travel_intent() -> bool:
-    state = _build()
+def test_character_travel_intent(state):
     char = _pick_char(state)
     target = _pick_travel_target(state, char)
     before = len(state.history)
@@ -202,14 +201,11 @@ def test_character_travel_intent() -> bool:
     asyncio.run(resolve(intent, state))
     assert char.location == target
     assert state.history[-1].text == f"{char.id} moved to '{target}'."
-    logging.info(f"[PASS] character travel intent — {char.id} -> {target}")
-    return True
 
 
 # ── resolver sub-agent (free-form Action path) ──────────────────────────
 
-def test_resolver_remember() -> bool:
-    state = _build()
+def test_resolver_remember(state):
     char = _pick_char(state)
     before = len(state.history)
     knowledge = "The old fountain has a loose stone ring around its basin."
@@ -223,12 +219,9 @@ def test_resolver_remember() -> bool:
     assert len(state.history) == before + 1
     assert state.history[-1].text == f"{char.id} learns: {knowledge}"
     assert "fountain" in output.lower(), f"done output should mention fountain: {output!r}"
-    logging.info(f"[PASS] resolver remember — {char.id}")
-    return True
 
 
-def test_resolver_discover_exit() -> bool:
-    state = _build()
+def test_resolver_discover_exit(state):
     char = _pick_char(state)
     ctx = RunContext(
         deps=ActionResolverDeps(char=char, state=state, description="asks about a hidden cellar"),
@@ -239,30 +232,3 @@ def test_resolver_discover_exit() -> bool:
     assert loc, "hidden-cellar should be created"
     assert char.location in loc.connections
     assert output == "Location 'hidden-cellar' added."
-    logging.info(f"[PASS] resolver discover_exit — {char.id}")
-    return True
-
-
-# ── runner ───────────────────────────────────────────────────────────────
-
-def run_all() -> bool:
-    if not test_server_health() or not test_basic_completion():
-        return False
-
-    tests = [
-        test_character_contextual_tools,
-        test_character_action_intent,
-        test_character_speak_intent,
-        test_character_travel_intent,
-        test_resolver_remember,
-        test_resolver_discover_exit,
-    ]
-    passed = 0
-    for t in tests:
-        try:
-            if t():
-                passed += 1
-        except Exception as e:
-            logging.error(f"[FAIL] {t.__name__}: {e}")
-    logging.info(f"Total: {passed}/{len(tests)} passed")
-    return passed == len(tests)

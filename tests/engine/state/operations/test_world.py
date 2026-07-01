@@ -1,0 +1,115 @@
+import pytest
+
+from src.engine.state.models import WorldState, Location, Quest, Character
+from src.engine.state.operations import WorldOperations
+
+
+@pytest.fixture
+def state() -> WorldState:
+    return WorldState(
+        locations={
+            "tavern": Location(id="tavern", connections=["forest"]),
+            "forest": Location(id="forest", connections=["tavern"]),
+        },
+        characters={
+            "hero": Character(id="hero", role="warrior", location="tavern"),
+        },
+        quests={
+            "q1": Quest(id="q1", title="Clear the Cave", description="Defeat the creatures", owner="hero"),
+            "q2": Quest(id="q2", title="Ownerless Task", description="no owner", owner=""),
+        },
+    )
+
+
+@pytest.fixture
+def ops(state) -> WorldOperations:
+    return WorldOperations(state)
+
+
+# ============ QUESTS ============
+
+def test_advance_quest_awards_xp(state, ops):
+    msg = ops.advance_quest("q1", step="Entered the cave")
+    assert "Entered the cave" in state.quests["q1"].steps
+    assert state.characters["hero"].stats.xp == 10
+    assert "+10 XP to hero" in msg
+    msg = ops.advance_quest("q1", new_status="completed")
+    assert state.quests["q1"].status == "completed"
+    assert state.characters["hero"].stats.xp == 60
+    assert "+50 XP to hero" in msg
+
+
+def test_advance_ownerless_quest_no_xp(state, ops):
+    msg = ops.advance_quest("q2", new_status="completed")
+    assert state.quests["q2"].status == "completed"
+    assert msg == "Quest 'q2' updated."
+
+
+def test_add_quest(state, ops):
+    history_before = len(state.history)
+    msg = ops.add_quest("q3", title="Find the Map", description="locate the buried chart", owner="hero")
+    assert msg == "Quest 'q3' added."
+    assert "q3" in state.quests and state.quests["q3"].owner == "hero"
+    assert state.history[-1].location == "tavern"
+    assert "owner: hero" in state.history[-1].text
+    # idempotent
+    assert "already exists" in ops.add_quest("q3", title="Find the Map")
+    assert len(state.history) == history_before + 1
+
+
+def test_add_ownerless_quest(state, ops):
+    ops.add_quest("q4", title="Mystery", description="someone, somewhere")
+    assert state.quests["q4"].owner == ""
+
+
+# ============ CHARACTERS ============
+
+def test_spawn_delete_character(state, ops):
+    ops.spawn_character("guard", "warrior", "tavern")
+    assert "guard" in state.characters
+    assert state.characters["guard"].location == "tavern"
+    ops.delete_npc("guard", "Left the town.")
+    assert "guard" not in state.characters
+    assert "Cannot spawn" in ops.spawn_character("guard", "warrior", "nowhere")  # bad location
+
+
+# ============ ITEMS ============
+
+def test_create_item(state, ops):
+    ops.create_item("torch", "forest")
+    assert "torch" in state.locations["forest"].items
+    assert "already exists" in ops.create_item("torch", "forest")
+
+
+# ============ LOCATIONS ============
+
+def test_add_modify_remove_location(state, ops):
+    ops.add_location("cave", description="damp cave", connections=["forest"])
+    assert "cave" in state.locations
+    assert "cave" in state.locations["forest"].connections
+    ops.modify_location("cave", description="very dark cave", add_feature="stalactites")
+    assert state.locations["cave"].description == "very dark cave"
+    assert "stalactites" in state.locations["cave"].features
+    ops.remove_location("cave")
+    assert "cave" not in state.locations
+    assert "cave" not in state.locations["forest"].connections
+
+
+def test_connect_disconnect_locations(state, ops):
+    assert "forest" in state.locations["tavern"].connections  # already connected via fixture
+    ops.disconnect_locations("tavern", "forest")
+    assert "forest" not in state.locations["tavern"].connections
+    assert "tavern" not in state.locations["forest"].connections
+    assert "not connected" in ops.disconnect_locations("tavern", "forest")
+    ops.connect_locations("tavern", "forest")
+    assert "forest" in state.locations["tavern"].connections
+    assert "tavern" in state.locations["forest"].connections
+    assert "already connected" in ops.connect_locations("tavern", "forest")
+
+
+# ============ TIME ============
+
+def test_tick_time(state, ops):
+    ops.tick_time("The sun sets.", location="tavern")
+    assert state.time == 1
+    assert state.history[-1].text == "The sun sets."

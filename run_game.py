@@ -7,9 +7,15 @@ from src.engine.runtime import run_game
 from src.engine.state import StateManager, slugify
 
 
-def _prompt_new_character(locations: list[str]) -> dict:
+def _prompt_new_character(locations: list[str], existing_ids: set[str]) -> dict:
     print("\n=== Create Your Character ===")
     name = input("Name: ").strip()
+    character_id = slugify(name)
+    while not character_id or character_id in existing_ids:
+        prompt = "Name cannot be empty. Name: " if not character_id else f"'{character_id}' is already taken. Choose a different name: "
+        name = input(prompt).strip()
+        character_id = slugify(name)
+
     role = input("Role: ").strip()
     backstory = input("Backstory: ").strip()
     personality = input("Personality: ").strip()
@@ -20,7 +26,7 @@ def _prompt_new_character(locations: list[str]) -> dict:
         location = input(f"Not a valid location. Choose from {', '.join(locations)}: ").strip()
 
     return {
-        "character_id": slugify(name),
+        "character_id": character_id,
         "role": role,
         "location_id": location,
         "backstory": backstory,
@@ -42,7 +48,8 @@ def main() -> None:
     if args.new_character:
         manager = StateManager(scenario=scenario)
         scenario = manager.scenario  # lock in the resolved scenario so the engine doesn't re-roll a random one
-        new_character = _prompt_new_character(sorted(manager.init_state().locations))
+        state = manager.init_state()
+        new_character = _prompt_new_character(sorted(state.locations), set(state.characters))
 
     # LlamaServer manages the local llama.cpp process; skip it when routing to a hosted provider.
     server = LlamaServer() if os.getenv("LLM_PROVIDER", "local") == "local" else nullcontext()

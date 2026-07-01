@@ -37,15 +37,3 @@ def _identity(_: RunContext[TimeKeeperDeps]) -> str:
 @agent.instructions
 def _context(ctx: RunContext[TimeKeeperDeps]) -> str:
     return time_keeper_context(ctx.deps.events)
-
-
-if __name__ == "__main__":
-    import logging
-
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
-
-    # Conversion is pure; clamping matters.
-    assert estimate_output(None, [0, 1, 30, 9999, -5]) == [0, 1, 30, 1440, 0]  # type: ignore[arg-type]
-    assert estimate_output(None, []) == []  # type: ignore[arg-type]
-
-    logging.info(f"{__file__} tests completed successfully.")

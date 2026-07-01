@@ -63,26 +63,3 @@ def _identity(_: RunContext[WorldBuilderDeps]) -> str:
 @agent.instructions
 def _context(ctx: RunContext[WorldBuilderDeps]) -> str:
     return world_builder_context(ctx.deps.state)
-
-
-if __name__ == "__main__":
-    import logging
-
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
-
-    entities = [
-        NewEntity(type="npc", name="Dockmaster Alan", description="a shady port official", location="docks", role="dockmaster"),
-        NewEntity(type="location", name="The Docks", description="busy port district", location="market-square"),
-        NewEntity(type="item", name="", description="nameless item — should be filtered"),
-        NewEntity(type="quest", name="Find the Vault", description="locate the cold-hearth vault", owner="alice"),
-    ]
-    tools = enrich_output(None, entities)  # type: ignore[arg-type]
-    assert len(tools) == 3  # empty-name filtered
-    assert all(isinstance(t, Create) for t in tools)
-    assert tools[0].type == "npc" and tools[0].role == "dockmaster"
-    assert tools[1].type == "location" and tools[1].location == "market-square"
-    assert tools[2].type == "quest" and tools[2].owner == "alice"
-
-    assert enrich_output(None, []) == []  # type: ignore[arg-type]
-
-    logging.info(f"{__file__} tests completed successfully.")

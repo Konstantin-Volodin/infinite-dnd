@@ -213,7 +213,10 @@ async def _run_game(scenario: str | None, character_id: str | None, max_turns: i
     state = manager.init_state()
 
     if new_character:
-        print(WorldOperations(state).spawn_character(**new_character))
+        result = WorldOperations(state).spawn_character(**new_character)
+        print(result)
+        if result.startswith("Cannot spawn"):
+            raise RuntimeError(result)
         pc_id = new_character["character_id"]
     else:
         pc_id = character_id or manager.manifest["pc"]
