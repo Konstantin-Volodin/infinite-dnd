@@ -89,7 +89,7 @@ def _resolve_create(tool: Create, state: WorldState) -> str:
     if tool.type == "npc":
         if not tool.location:
             return "Cannot create NPC — location is required."
-        return ops.spawn_npc(
+        return ops.spawn_character(
             slugify(tool.name),
             role=tool.role or "",
             location_id=tool.location,
@@ -278,7 +278,7 @@ def create_npc(
     location: str | None = None,
 ) -> str:
     """add a new NPC to the world. use when the action reveals or encounters a new character."""
-    return _ops(ctx).spawn_npc(
+    return _ops(ctx).spawn_character(
         slugify(name),
         role=role,
         location_id=location or ctx.deps.char.location,

@@ -4,6 +4,8 @@ Character-scoped operations: movement, dialogue, items, stats, relationships, kn
 
 from src.engine.state.operations._base import _OpsBase
 
+_XP_PER_LEVEL = 100
+
 
 class CharacterOps(_OpsBase):
     # ============ MOVEMENT ============
@@ -131,6 +133,9 @@ class CharacterOps(_OpsBase):
         suffix = f" ({reason})" if reason else ""
         result = f"{character_id} earns {amount} XP{suffix}."
         self._log(result, char.location, [character_id])
+
+        while char.stats.xp >= char.stats.level * _XP_PER_LEVEL:
+            result += " " + self.level_up(character_id)
         return result
 
     # ============ CHARACTER UPDATE ============
@@ -249,6 +254,13 @@ if __name__ == "__main__":
     assert len(state.history) == history_before_xp + 2
     assert "Cannot award XP" in ops.award_xp("ghost", 10)
     logging.info("Stats tests passed.")
+
+    # award_xp crossing a level threshold auto-levels (hero is level 2 from the level_up() call above)
+    msg = ops.award_xp("hero", 175, reason="defeating the ogre")  # 25 + 175 = 200 -> level 2 threshold (200) reached
+    assert state.characters["hero"].stats.level == 3
+    assert state.characters["hero"].stats.max_hp == 30
+    assert "leveled up to level 3" in msg
+    logging.info("Auto-level tests passed.")
 
     # update character
     ops.update_character("hero", goal="find the artifact", personality="brooding")

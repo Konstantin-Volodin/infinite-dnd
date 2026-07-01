@@ -36,13 +36,13 @@ class WorldOps(_OpsBase):
         return f"Quest '{quest_id}' added."
 
     # ============ CHARACTERS ============
-    def spawn_npc(self, npc_id: str, role: str, location_id: str, backstory: str = "", goal: str = "") -> str:
-        if npc_id in self.state.characters: return f"Cannot spawn '{npc_id}' — character already exists."
-        if location_id not in self.state.locations: return f"Cannot spawn '{npc_id}' — location '{location_id}' not found."
+    def spawn_character(self, character_id: str, role: str, location_id: str, backstory: str = "", goal: str = "", personality: str = "") -> str:
+        if character_id in self.state.characters: return f"Cannot spawn '{character_id}' — character already exists."
+        if location_id not in self.state.locations: return f"Cannot spawn '{character_id}' — location '{location_id}' not found."
 
-        self.state.characters[npc_id] = Character(id=npc_id, role=role, location=location_id, backstory=backstory, goal=goal)
-        result = f"{npc_id} appears at '{location_id}'."
-        self._log(result, location_id, [npc_id])
+        self.state.characters[character_id] = Character(id=character_id, role=role, location=location_id, backstory=backstory, goal=goal, personality=personality)
+        result = f"{character_id} appears at '{location_id}'."
+        self._log(result, location_id, [character_id])
         return result
 
     def delete_npc(self, npc_id: str, reason: str = "") -> str:
@@ -180,12 +180,12 @@ if __name__ == "__main__":
     logging.info("Quest tests passed.")
 
     # spawn / delete NPC
-    ops.spawn_npc("guard", "warrior", "tavern")
+    ops.spawn_character("guard", "warrior", "tavern")
     assert "guard" in state.characters
     assert state.characters["guard"].location == "tavern"
     ops.delete_npc("guard", "Left the town.")
     assert "guard" not in state.characters
-    assert "Cannot spawn" in ops.spawn_npc("guard", "warrior", "nowhere")  # bad location
+    assert "Cannot spawn" in ops.spawn_character("guard", "warrior", "nowhere")  # bad location
     logging.info("Spawn/delete NPC tests passed.")
 
     # create item

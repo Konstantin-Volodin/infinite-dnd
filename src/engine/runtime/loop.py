@@ -6,7 +6,7 @@ import sys
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
 
-from src.engine.state import StateManager, WorldState
+from src.engine.state import StateManager, WorldOperations, WorldState
 from src.engine.state.models import HistoryEvent
 from src.agents.character.agent import CharacterDeps, agent as character_agent
 from src.agents.character.tools import Action, CharacterTool, Speak, Travel, Wait
@@ -208,13 +208,17 @@ def _snapshot(state: WorldState) -> dict:
     }
 
 
-async def _run_game(scenario: str | None, character_id: str | None, max_turns: int) -> None:
+async def _run_game(scenario: str | None, character_id: str | None, max_turns: int, new_character: dict | None) -> None:
     manager = StateManager(scenario=scenario)
     state = manager.init_state()
 
-    pc_id = character_id or manager.manifest["pc"]
-    if pc_id not in state.characters:
-        raise RuntimeError(f"PC '{pc_id}' not in scenario '{manager.scenario}'")
+    if new_character:
+        print(WorldOperations(state).spawn_character(**new_character))
+        pc_id = new_character["character_id"]
+    else:
+        pc_id = character_id or manager.manifest["pc"]
+        if pc_id not in state.characters:
+            raise RuntimeError(f"PC '{pc_id}' not in scenario '{manager.scenario}'")
 
     print(f"\n=== {manager.manifest.get('title', manager.scenario)} ===")
     print(manager.manifest.get("hook", ""))
@@ -234,7 +238,7 @@ async def _run_game(scenario: str | None, character_id: str | None, max_turns: i
         logger.close()
 
 
-def run_game(character_id: str | None = None, max_turns: int = 50, scenario: str | None = None) -> None:
+def run_game(character_id: str | None = None, max_turns: int = 50, scenario: str | None = None, new_character: dict | None = None) -> None:
     # Narrative text (arrows, em-dashes) doesn't fit Windows' default console codepage.
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    asyncio.run(_run_game(scenario, character_id, max_turns))
+    asyncio.run(_run_game(scenario, character_id, max_turns, new_character))
