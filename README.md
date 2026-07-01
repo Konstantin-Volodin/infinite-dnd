@@ -7,6 +7,7 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 - NPC interaction & dialogue generation
 - World generation & exploration
 - Character creation & tracking
+- Gold/item economy & trading
 <!-- - Combat system integration -->
 
 ### 📋 Prerequisites

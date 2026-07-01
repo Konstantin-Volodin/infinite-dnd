@@ -10,6 +10,7 @@
 ## actor state
 - role: {{ char.role or 'unknown' }}
 - condition: {{ health_status }} ({{ char.stats.hp }}/{{ char.stats.max_hp }} HP)
+- gold: {{ char.stats.gold }}
 - goal: {{ char.goal or 'none' }}
 {% if char.inventory %}
 - inventory: {{ char.inventory | join(', ') }}

@@ -94,6 +94,25 @@ class CharacterOps(_OpsBase):
         self._log(result, char.location, [character_id, target_id])
         return result
 
+    def trade_item(self, buyer_id: str, seller_id: str, item: str, price: int) -> str:
+        buyer = self.state.characters.get(buyer_id)
+        if not buyer: return f"Cannot trade — character '{buyer_id}' not found."
+
+        seller = self.state.characters.get(seller_id)
+        if not seller: return f"Cannot trade — character '{seller_id}' not found."
+        if buyer.location != seller.location: return f"Cannot trade — '{buyer_id}' and '{seller_id}' are not in the same location."
+        if item not in seller.inventory: return f"Cannot trade — '{seller_id}' doesn't have '{item}'."
+        price = max(0, price)
+        if buyer.stats.gold < price: return f"Cannot trade — '{buyer_id}' doesn't have enough gold ({buyer.stats.gold} < {price})."
+
+        seller.inventory.remove(item)
+        buyer.inventory.append(item)
+        buyer.stats.gold -= price
+        seller.stats.gold += price
+        result = f"{buyer_id} buys '{item}' from {seller_id} for {price} gold."
+        self._log(result, buyer.location, [buyer_id, seller_id])
+        return result
+
     # ============ STATS ============
     def damage(self, character_id: str, amount: int) -> str:
         char = self.state.characters.get(character_id)
@@ -136,6 +155,21 @@ class CharacterOps(_OpsBase):
 
         while char.stats.xp >= char.stats.level * _XP_PER_LEVEL:
             result += " " + self.level_up(character_id)
+        return result
+
+    def give_gold(self, from_character_id: str, to_character_id: str, amount: int) -> str:
+        giver = self.state.characters.get(from_character_id)
+        if not giver: return f"Cannot give gold — character '{from_character_id}' not found."
+
+        receiver = self.state.characters.get(to_character_id)
+        if not receiver: return f"Cannot give gold — character '{to_character_id}' not found."
+        amount = max(0, amount)
+        if giver.stats.gold < amount: return f"Cannot give gold — '{from_character_id}' only has {giver.stats.gold}."
+
+        giver.stats.gold -= amount
+        receiver.stats.gold += amount
+        result = f"{from_character_id} gives {amount} gold to {to_character_id}."
+        self._log(result, giver.location, [from_character_id, to_character_id])
         return result
 
     # ============ CHARACTER UPDATE ============

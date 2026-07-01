@@ -6,6 +6,7 @@ Deterministic dispatch for structured intents; an internal LLM sub-agent
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic_ai import Agent, RunContext, ToolOutput
 from pydantic_ai.usage import RunUsage
@@ -266,6 +267,26 @@ def create_item(
 ) -> str:
     """place a new item in a location. use when the action reveals or produces a tangible object."""
     return _ops(ctx).create_item(item_name, location or ctx.deps.char.location)
+
+
+@_action_agent.tool
+def give_gold(ctx: RunContext[_ActionResolverDeps], amount: int, character_id: str) -> str:
+    """give some of my gold to another character — payment, bribe, tip. no item involved."""
+    return _ops(ctx).give_gold(ctx.deps.char.id, character_id, amount)
+
+
+@_action_agent.tool
+def trade_item(
+    ctx: RunContext[_ActionResolverDeps],
+    item_name: str,
+    price: int,
+    counterparty_id: str,
+    role: Literal["buyer", "seller"] = "buyer",
+) -> str:
+    """exchange an item for gold with another character here. role='buyer': I pay for their item. role='seller': they pay for mine."""
+    me = ctx.deps.char.id
+    buyer, seller = (me, counterparty_id) if role == "buyer" else (counterparty_id, me)
+    return _ops(ctx).trade_item(buyer, seller, item_name, price)
 
 
 @_action_agent.tool

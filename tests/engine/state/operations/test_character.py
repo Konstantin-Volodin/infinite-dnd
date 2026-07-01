@@ -93,6 +93,41 @@ def test_award_xp_auto_levels(state, ops):
     assert "leveled up to level 3" in msg
 
 
+def test_give_gold(state, ops):
+    state.characters["hero"].stats.gold = 10
+    ops.give_gold("hero", "merchant", 4)
+    assert state.characters["hero"].stats.gold == 6
+    assert state.characters["merchant"].stats.gold == 4
+    assert "Cannot give gold" in ops.give_gold("hero", "merchant", 100)  # not enough gold
+    assert state.characters["hero"].stats.gold == 6  # unchanged
+    assert "Cannot give gold" in ops.give_gold("ghost", "merchant", 1)  # unknown giver
+    assert "Cannot give gold" in ops.give_gold("hero", "ghost", 1)  # unknown receiver
+
+
+# ============ TRADE ============
+
+def test_trade_item(state, ops):
+    state.characters["hero"].stats.gold = 10
+    ops.trade_item("hero", "merchant", "potion", 4)
+    assert "potion" in state.characters["hero"].inventory
+    assert "potion" not in state.characters["merchant"].inventory
+    assert state.characters["hero"].stats.gold == 6
+    assert state.characters["merchant"].stats.gold == 4
+
+    # reverse direction — merchant buys back from hero
+    ops.trade_item("merchant", "hero", "potion", 4)
+    assert "potion" in state.characters["merchant"].inventory
+    assert "potion" not in state.characters["hero"].inventory
+    assert state.characters["hero"].stats.gold == 10
+    assert state.characters["merchant"].stats.gold == 0
+
+    assert "Cannot trade" in ops.trade_item("hero", "merchant", "wand", 1)  # seller doesn't have item
+    assert "Cannot trade" in ops.trade_item("hero", "merchant", "shield", 100)  # buyer can't afford
+
+    ops.move_character("hero", "forest")
+    assert "Cannot trade" in ops.trade_item("hero", "merchant", "shield", 1)  # different locations
+
+
 # ============ CHARACTER UPDATE ============
 
 def test_update_character(state, ops):

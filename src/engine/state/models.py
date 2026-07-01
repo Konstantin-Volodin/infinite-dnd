@@ -7,7 +7,7 @@ Data Models - Pydantic models for game state.
     - Quest: id, title, description, status, owner, steps.
     - WorldState: time, locations, characters, quests, history.
 
-Each model has in-file tests to ensure correct instantiation and behavior.
+See tests/engine/state/test_models.py for coverage.
 """
 
 from typing import List, Dict
@@ -19,6 +19,7 @@ class CharacterStats(BaseModel):
     max_hp: int = 5
     level: int = 1
     xp: int = 0
+    gold: int = 0
 
 
 class Location(BaseModel):
