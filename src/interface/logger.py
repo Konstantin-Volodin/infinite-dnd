@@ -45,6 +45,9 @@ class Logger:
                 data = str(msg)
             self._log("llm_message", label=label, turn=self.turn or None, message=data)
 
+    def log_event(self, event: str, **kwargs: Any) -> None:
+        self._log(event, turn=self.turn or None, **kwargs)
+
     def _log(self, event: str, **kwargs: Any) -> None:
         entry = {
             "time": datetime.now().isoformat(),

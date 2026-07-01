@@ -15,6 +15,7 @@ from src.agents.time_keeper.agent import TimeKeeperDeps, agent as time_keeper_ag
 from src.agents.world_builder.agent import WorldBuilderDeps, agent as world_builder_agent
 from src.agents.world_builder.tools import Create
 from src.agents.action_resolver.agent import resolve
+from src.interface.logger import Logger
 
 
 _AGENT_USAGE = UsageLimits(request_limit=12)
@@ -64,78 +65,90 @@ def _describe_tool(tool: CharacterTool) -> str:
 
 # ─── Agent flows ──────────────────────────────────────────────
 
-async def flow_agent_turn(actor_id: str, state: WorldState) -> CharacterTool | None:
+async def flow_agent_turn(actor_id: str, state: WorldState, logger: Logger) -> CharacterTool | None:
     """Ask the acting character to pick one next step."""
     char = state.characters[actor_id]
     print(f"  [{actor_id}]", flush=True)
+    label = f"character:{actor_id}"
     try:
-        result = await character_agent.run(
-            "Choose exactly ONE next step by calling action, speak, travel, or wait.",
-            deps=CharacterDeps(char=char, state=state),
-            usage_limits=_AGENT_USAGE,
-        )
+        with logger.run(label):
+            result = await character_agent.run(
+                "Choose exactly ONE next step by calling action, speak, travel, or wait.",
+                deps=CharacterDeps(char=char, state=state),
+                usage_limits=_AGENT_USAGE,
+            )
     except UsageLimitExceeded as exc:
         print(f"  [limit] {actor_id}'s turn ended: {exc}", flush=True)
         return None
+    logger.log_messages(label, result.all_messages())
     return result.output
 
 
-async def flow_world_enrich(state: WorldState) -> list[Create]:
+async def flow_world_enrich(state: WorldState, logger: Logger) -> list[Create]:
     """Materialize entities revealed by recent events (locations before NPCs/items)."""
+    label = "world_builder"
     try:
-        result = await world_builder_agent.run(
-            "Register any new entities revealed by the recent events. Return an empty list if nothing new.",
-            deps=WorldBuilderDeps(state=state),
-            usage_limits=_ENRICH_USAGE,
-        )
+        with logger.run(label):
+            result = await world_builder_agent.run(
+                "Register any new entities revealed by the recent events. Return an empty list if nothing new.",
+                deps=WorldBuilderDeps(state=state),
+                usage_limits=_ENRICH_USAGE,
+            )
     except UsageLimitExceeded as exc:
         print(f"  [limit] world enrichment ended: {exc}", flush=True)
         return []
+    logger.log_messages(label, result.all_messages())
     intents = result.output or []
     if intents:
         print(f"  [world] {len(intents)} new entities revealed")
     return sorted(intents, key=lambda i: _CREATE_ORDER.get(i.type, 3))
 
 
-async def flow_quest_review(state: WorldState) -> list[Modify]:
+async def flow_quest_review(state: WorldState, logger: Logger) -> list[Modify]:
     """Advance quests against recent events. Structural — never narrates."""
     if not any(q.status.lower() not in {"completed", "failed"} for q in state.quests.values()):
         return []
+    label = "quest_reviewer"
     try:
-        result = await quest_reviewer_agent.run(
-            "Review active quests against recent events. Call review with any progress, or an empty list.",
-            deps=QuestReviewerDeps(state=state),
-            usage_limits=_QUEST_USAGE,
-        )
+        with logger.run(label):
+            result = await quest_reviewer_agent.run(
+                "Review active quests against recent events. Call review with any progress, or an empty list.",
+                deps=QuestReviewerDeps(state=state),
+                usage_limits=_QUEST_USAGE,
+            )
     except UsageLimitExceeded as exc:
         print(f"  [limit] quest review ended: {exc}", flush=True)
         return []
+    logger.log_messages(label, result.all_messages())
     return result.output or []
 
 
-async def flow_time_review(event_texts: list[str]) -> list[int]:
+async def flow_time_review(event_texts: list[str], logger: Logger) -> list[int]:
     """One minute-estimate per event, in order. Falls back to 1m per event on limit."""
     if not event_texts:
         return []
+    label = "time_keeper"
     try:
-        result = await time_keeper_agent.run(
-            "Estimate minutes elapsed for each event. Return exactly one integer per event, in order.",
-            deps=TimeKeeperDeps(events=event_texts),
-            usage_limits=_TIME_USAGE,
-        )
+        with logger.run(label):
+            result = await time_keeper_agent.run(
+                "Estimate minutes elapsed for each event. Return exactly one integer per event, in order.",
+                deps=TimeKeeperDeps(events=event_texts),
+                usage_limits=_TIME_USAGE,
+            )
     except UsageLimitExceeded as exc:
         print(f"  [limit] time review ended: {exc}", flush=True)
         return [1] * len(event_texts)
+    logger.log_messages(label, result.all_messages())
     return result.output or []
 
 
 # ─── Tick composition ────────────────────────────────────────
 
-async def _stamp_time(new_events: list[HistoryEvent], state: WorldState) -> None:
+async def _stamp_time(new_events: list[HistoryEvent], state: WorldState, logger: Logger) -> None:
     """Annotate each new event with estimated minutes and advance the world clock."""
     if not new_events:
         return
-    minutes = await flow_time_review([e.text for e in new_events])
+    minutes = await flow_time_review([e.text for e in new_events], logger)
     if len(minutes) != len(new_events):
         minutes = [1] * len(new_events)
     for event, mins in zip(new_events, minutes):
@@ -147,30 +160,30 @@ async def _stamp_time(new_events: list[HistoryEvent], state: WorldState) -> None
     print(f"  [clock: {_format_clock(state.minutes_elapsed)}]")
 
 
-async def tick(active_pc_id: str, state: WorldState, tick_index: int) -> None:
+async def tick(active_pc_id: str, state: WorldState, tick_index: int, logger: Logger) -> None:
     actor_id = _pick_next_actor(state, active_pc_id, tick_index)
 
-    intent = await flow_agent_turn(actor_id, state)
+    intent = await flow_agent_turn(actor_id, state, logger)
     if intent is None:
         return
     print(f"    ↳ {_describe_tool(intent)}")
 
     # 1. Resolve the turn and stamp elapsed time onto the resulting events.
     pre = len(state.history)
-    await resolve(intent, state)
-    await _stamp_time(state.history[pre:], state)
+    await resolve(intent, state, logger=logger)
+    await _stamp_time(state.history[pre:], state, logger)
 
     # 2. Enrich the world. Revealed entities are retcons — logged but not time-stamped.
     pre_enrich = len(state.history)
-    for create_intent in await flow_world_enrich(state):
-        await resolve(create_intent, state)
+    for create_intent in await flow_world_enrich(state, logger):
+        await resolve(create_intent, state, logger=logger)
     for event in state.history[pre_enrich:]:
         print(f"  {event.text}  (revealed)")
 
     # 3. Review quests. Step-level progress; may append XP events via advance_quest.
     pre_quest = len(state.history)
-    for update in await flow_quest_review(state):
-        msg = await resolve(update, state)
+    for update in await flow_quest_review(state, logger):
+        msg = await resolve(update, state, logger=logger)
         print(f"  [quest] {update.target_id}: {msg}")
     for event in state.history[pre_quest:]:
         print(f"  {event.text}")
@@ -179,6 +192,20 @@ async def tick(active_pc_id: str, state: WorldState, tick_index: int) -> None:
 # ============================================================
 # Entry point
 # ============================================================
+
+def _snapshot(state: WorldState) -> dict:
+    """World/quest/xp counters for scorecard.py — logged before and after every tick."""
+    quests = state.quests.values()
+    return {
+        "quests_active": sum(1 for q in quests if q.status.lower() not in {"completed", "failed"}),
+        "quests_completed": sum(1 for q in quests if q.status.lower() == "completed"),
+        "quests_failed": sum(1 for q in quests if q.status.lower() == "failed"),
+        "locations": len(state.locations),
+        "characters": len(state.characters),
+        "total_xp": sum(c.stats.xp for c in state.characters.values()),
+        "minutes_elapsed": state.minutes_elapsed,
+    }
+
 
 async def _run_game(scenario: str | None, character_id: str | None, max_turns: int) -> None:
     manager = StateManager(scenario=scenario)
@@ -192,11 +219,18 @@ async def _run_game(scenario: str | None, character_id: str | None, max_turns: i
     print(manager.manifest.get("hook", ""))
     print(f"Playing as: {pc_id}\n")
 
-    for t in range(max_turns):
-        print(f"\n--- Tick {t + 1} ---")
-        await tick(pc_id, state, t)
-        state.time += 1
-        manager.save_state(state)
+    logger = Logger(character_id=pc_id, max_turns=max_turns)
+    try:
+        logger.log_event("world_snapshot", **_snapshot(state))
+        for t in range(max_turns):
+            print(f"\n--- Tick {t + 1} ---")
+            logger.log_turn(t + 1)
+            await tick(pc_id, state, t, logger)
+            logger.log_event("world_snapshot", **_snapshot(state))
+            state.time += 1
+            manager.save_state(state)
+    finally:
+        logger.close()
 
 
 def run_game(character_id: str | None = None, max_turns: int = 50, scenario: str | None = None) -> None:

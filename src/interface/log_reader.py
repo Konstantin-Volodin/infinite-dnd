@@ -150,9 +150,15 @@ def _normalize_entry(entry: dict[str, Any], line_number: int) -> dict[str, Any]:
         "message_kind": message_kind,
         "tool_calls": tool_calls,
         "tool_returns": tool_returns,
+        "usage": _usage_dict(message_text) if message_text else None,
         "raw": entry,
         "raw_pretty": _format_raw_payload(entry),
     }
+
+
+def _usage_dict(message_text: str) -> dict[str, int] | None:
+    pairs = _extract_message_usage(message_text)
+    return {key: int(value) for key, value in pairs} if pairs else None
 
 
 def _build_runs(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -173,6 +179,7 @@ def _build_runs(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "message_count": 0,
                 "tool_calls": [],
                 "message_kinds": [],
+                "tokens": {},
             }
             runs.append(run)
             open_runs.setdefault(label, []).append(run)
@@ -185,6 +192,10 @@ def _build_runs(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
             message_kind = entry.get("message_kind")
             if message_kind:
                 run["message_kinds"] = _unique([*run["message_kinds"], message_kind])
+            usage = entry.get("usage")
+            if usage:
+                for key, value in usage.items():
+                    run["tokens"][key] = run["tokens"].get(key, 0) + value
             continue
 
         if event == "agent_run_finished" and label and label in open_runs and open_runs[label]:

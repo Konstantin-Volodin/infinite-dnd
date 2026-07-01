@@ -21,6 +21,7 @@ from src.agents.character.tools import Action, CharacterTool, Speak, Travel, Wai
 from src.agents.quest_reviewer.tools import Modify
 from src.agents.utils import create_model
 from src.agents.world_builder.tools import Create
+from src.interface.logger import Logger
 from .context import action_resolver_context, action_resolver_system
 
 
@@ -31,8 +32,16 @@ AnyTool = CharacterTool | Create | Modify
 # Public entry
 # ============================================================
 
-async def resolve(tool: AnyTool, state: WorldState, usage: RunUsage | None = None) -> str:
+async def resolve(tool: AnyTool, state: WorldState, usage: RunUsage | None = None, logger: Logger | None = None) -> str:
     """Execute a tool call against world state. Single writer surface."""
+    result = await _dispatch(tool, state, usage, logger)
+    if logger:
+        subject = getattr(tool, "actor", None) or getattr(tool, "target_id", None) or getattr(tool, "name", None)
+        logger.log_event("resolved", tool=type(tool).__name__, subject=subject, result=result)
+    return result
+
+
+async def _dispatch(tool: AnyTool, state: WorldState, usage: RunUsage | None, logger: Logger | None) -> str:
     if isinstance(tool, Speak):
         return _resolve_speak(tool, state)
     if isinstance(tool, Travel):
@@ -44,7 +53,7 @@ async def resolve(tool: AnyTool, state: WorldState, usage: RunUsage | None = Non
     if isinstance(tool, Modify):
         return _resolve_modify(tool, state)
     if isinstance(tool, Action):
-        return await _resolve_action(tool, state, usage)
+        return await _resolve_action(tool, state, usage, logger)
     raise TypeError(f"Unknown tool: {tool!r}")
 
 
@@ -110,7 +119,7 @@ def _resolve_modify(tool: Modify, state: WorldState) -> str:
     return f"Unknown modify action: {tool.action!r}."
 
 
-async def _resolve_action(tool: Action, state: WorldState, usage: RunUsage | None) -> str:
+async def _resolve_action(tool: Action, state: WorldState, usage: RunUsage | None, logger: Logger | None) -> str:
     char = state.characters.get(tool.actor)
     if not char:
         return f"Cannot resolve action — character {tool.actor!r} not found."
@@ -118,7 +127,12 @@ async def _resolve_action(tool: Action, state: WorldState, usage: RunUsage | Non
     if tool.target:
         prompt += f" (target: {tool.target})"
     deps = _ActionResolverDeps(char=char, state=state, description=tool.description, target=tool.target)
-    result = await _action_agent.run(prompt, deps=deps, usage=usage)
+    if logger:
+        with logger.run("action_resolver"):
+            result = await _action_agent.run(prompt, deps=deps, usage=usage)
+        logger.log_messages("action_resolver", result.all_messages())
+    else:
+        result = await _action_agent.run(prompt, deps=deps, usage=usage)
     return result.output
 
 
