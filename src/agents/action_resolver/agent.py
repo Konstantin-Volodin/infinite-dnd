@@ -130,7 +130,7 @@ async def _resolve_action(tool: Action, state: WorldState, usage: RunUsage | Non
     if logger:
         with logger.run("action_resolver"):
             result = await _action_agent.run(prompt, deps=deps, usage=usage)
-        logger.log_messages("action_resolver", result.all_messages())
+            logger.log_messages("action_resolver", result.all_messages())
     else:
         result = await _action_agent.run(prompt, deps=deps, usage=usage)
     return result.output

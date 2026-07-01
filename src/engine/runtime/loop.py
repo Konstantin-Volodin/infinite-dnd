@@ -1,6 +1,7 @@
 """Game loop. Each tick: one actor takes a turn → resolve → stamp elapsed time → enrich world → review quests."""
 
 import asyncio
+import sys
 
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
@@ -77,10 +78,10 @@ async def flow_agent_turn(actor_id: str, state: WorldState, logger: Logger) -> C
                 deps=CharacterDeps(char=char, state=state),
                 usage_limits=_AGENT_USAGE,
             )
+            logger.log_messages(label, result.all_messages())
     except UsageLimitExceeded as exc:
         print(f"  [limit] {actor_id}'s turn ended: {exc}", flush=True)
         return None
-    logger.log_messages(label, result.all_messages())
     return result.output
 
 
@@ -94,10 +95,10 @@ async def flow_world_enrich(state: WorldState, logger: Logger) -> list[Create]:
                 deps=WorldBuilderDeps(state=state),
                 usage_limits=_ENRICH_USAGE,
             )
+            logger.log_messages(label, result.all_messages())
     except UsageLimitExceeded as exc:
         print(f"  [limit] world enrichment ended: {exc}", flush=True)
         return []
-    logger.log_messages(label, result.all_messages())
     intents = result.output or []
     if intents:
         print(f"  [world] {len(intents)} new entities revealed")
@@ -116,10 +117,10 @@ async def flow_quest_review(state: WorldState, logger: Logger) -> list[Modify]:
                 deps=QuestReviewerDeps(state=state),
                 usage_limits=_QUEST_USAGE,
             )
+            logger.log_messages(label, result.all_messages())
     except UsageLimitExceeded as exc:
         print(f"  [limit] quest review ended: {exc}", flush=True)
         return []
-    logger.log_messages(label, result.all_messages())
     return result.output or []
 
 
@@ -135,10 +136,10 @@ async def flow_time_review(event_texts: list[str], logger: Logger) -> list[int]:
                 deps=TimeKeeperDeps(events=event_texts),
                 usage_limits=_TIME_USAGE,
             )
+            logger.log_messages(label, result.all_messages())
     except UsageLimitExceeded as exc:
         print(f"  [limit] time review ended: {exc}", flush=True)
         return [1] * len(event_texts)
-    logger.log_messages(label, result.all_messages())
     return result.output or []
 
 
@@ -234,4 +235,6 @@ async def _run_game(scenario: str | None, character_id: str | None, max_turns: i
 
 
 def run_game(character_id: str | None = None, max_turns: int = 50, scenario: str | None = None) -> None:
+    # Narrative text (arrows, em-dashes) doesn't fit Windows' default console codepage.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     asyncio.run(_run_game(scenario, character_id, max_turns))

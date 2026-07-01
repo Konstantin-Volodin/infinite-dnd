@@ -18,7 +18,7 @@ def create_model() -> Model:
     """
     if os.getenv("LLM_PROVIDER", "local") == "anthropic":
         return AnthropicModel(
-            os.getenv("LLM_MODEL", "claude-haiku-4-5"),
+            os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5"),
             provider=AnthropicProvider(),
         )
     return OpenAIChatModel(
