@@ -23,11 +23,15 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def main() -> None:
+    import os
+    from contextlib import nullcontext
     from src.agents.server import LlamaServer
     from .context import dump_all
     from .tools import run_all
 
     dump_all()
-    with LlamaServer():
+    # LlamaServer manages the local llama.cpp process; skip it when routing to a hosted provider.
+    server = LlamaServer() if os.getenv("LLM_PROVIDER", "local") == "local" else nullcontext()
+    with server:
         ok = run_all()
     sys.exit(0 if ok else 1)

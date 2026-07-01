@@ -1,4 +1,6 @@
 import argparse
+import os
+from contextlib import nullcontext
 
 from src.agents.server import LlamaServer
 from src.engine.runtime import run_game
@@ -11,7 +13,9 @@ def main() -> None:
     parser.add_argument("--turns", type=int, default=50, help="Max turns to run.")
     args = parser.parse_args()
 
-    with LlamaServer():
+    # LlamaServer manages the local llama.cpp process; skip it when routing to a hosted provider.
+    server = LlamaServer() if os.getenv("LLM_PROVIDER", "local") == "local" else nullcontext()
+    with server:
         run_game(character_id=args.character, max_turns=args.turns, scenario=args.scenario)
 
 
