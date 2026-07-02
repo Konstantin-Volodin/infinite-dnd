@@ -18,7 +18,7 @@ from src.engine.state import (
     WorldState,
     slugify,
 )
-from src.agents.character.tools import Action, CharacterTool, Speak, Travel, Wait
+from src.agents.character.tools import Action, Attack, CharacterTool, Speak, Travel, Wait
 from src.agents.quest_reviewer.tools import Modify
 from src.agents.utils import create_model
 from src.agents.world_builder.tools import Create
@@ -49,6 +49,8 @@ async def _dispatch(tool: AnyTool, state: WorldState, usage: RunUsage | None, lo
         return _resolve_travel(tool, state)
     if isinstance(tool, Wait):
         return _resolve_wait(tool, state)
+    if isinstance(tool, Attack):
+        return _resolve_attack(tool, state)
     if isinstance(tool, Create):
         return _resolve_create(tool, state)
     if isinstance(tool, Modify):
@@ -76,6 +78,10 @@ def _resolve_wait(tool: Wait, state: WorldState) -> str:
     text = f"{tool.actor} waits."
     state.history.append(HistoryEvent(text=text, location=location, characters=[tool.actor]))
     return text
+
+
+def _resolve_attack(tool: Attack, state: WorldState) -> str:
+    return WorldOperations(state).attack(tool.actor, tool.target)
 
 
 def _resolve_create(tool: Create, state: WorldState) -> str:

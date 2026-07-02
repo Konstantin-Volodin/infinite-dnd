@@ -1,7 +1,10 @@
 """
-Character-scoped operations: movement, dialogue, items, stats, relationships, knowledge.
+Character-scoped operations: movement, dialogue, items, stats, relationships, knowledge, combat.
 """
 
+import random
+
+from src.engine.rules import attack_damage, kill_xp
 from src.engine.state.operations._base import _OpsBase
 
 _XP_PER_LEVEL = 100
@@ -111,6 +114,28 @@ class CharacterOps(_OpsBase):
         seller.stats.gold += price
         result = f"{buyer_id} buys '{item}' from {seller_id} for {price} gold."
         self._log(result, buyer.location, [buyer_id, seller_id])
+        return result
+
+    # ============ COMBAT ============
+    def attack(self, attacker_id: str, target_id: str, rng: random.Random | None = None) -> str:
+        attacker = self.state.characters.get(attacker_id)
+        if not attacker: return f"Cannot attack — character '{attacker_id}' not found."
+
+        target = self.state.characters.get(target_id)
+        if not target: return f"Cannot attack — character '{target_id}' not found."
+        if attacker_id == target_id: return f"Cannot attack — '{attacker_id}' can't attack themselves."
+        if attacker.location != target.location: return f"Cannot attack — '{attacker_id}' and '{target_id}' are not in the same location."
+        if attacker.stats.hp <= 0: return f"Cannot attack — '{attacker_id}' is dead."
+        if target.stats.hp <= 0: return f"Cannot attack — '{target_id}' is already dead."
+
+        dmg = attack_damage(attacker, rng)
+        target.stats.hp = max(0, target.stats.hp - dmg)
+        result = f"{attacker_id} attacks {target_id} for {dmg} damage. {target_id} HP: {target.stats.hp}/{target.stats.max_hp}."
+        self._log(result, attacker.location, [attacker_id, target_id])
+
+        if target.stats.hp == 0:
+            self._log(f"{target_id} falls dead.", attacker.location, [attacker_id, target_id])
+            result += " " + self.award_xp(attacker_id, kill_xp(target), reason=f"defeating {target_id}")
         return result
 
     # ============ STATS ============

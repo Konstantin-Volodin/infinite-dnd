@@ -38,10 +38,14 @@ def character_context(char: Character, state: WorldState) -> str:
         is_someone_else = not last.startswith(char.id)
         someone_speaking_to_me = is_dialogue and is_someone_else
 
-    # Others present
+    # Others present, with visible condition (role, health if not healthy)
     present_characters = characters_in_location(state, char.location, exclude_character_id=char.id)
-    others = [f"{c.id} ({c.role})" if c.role else c.id for c in present_characters]
-    speak_targets = [c.id for c in present_characters]
+    others = []
+    for c in present_characters:
+        status = get_health_status(c)
+        tags = [t for t in (c.role, status if status != "healthy" else "") if t]
+        others.append(f"{c.id} ({', '.join(tags)})" if tags else c.id)
+    speak_targets = [c.id for c in present_characters if c.stats.hp > 0]
     # Warnings
     warnings: list[str] = []
     if sum(1 for e in recent_events[-5:] if '"' in e or "says" in e.lower()) >= 4:

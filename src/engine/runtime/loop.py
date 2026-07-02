@@ -9,7 +9,7 @@ from pydantic_ai.usage import UsageLimits
 from src.engine.state import StateManager, WorldOperations, WorldState
 from src.engine.state.models import HistoryEvent
 from src.agents.character.agent import CharacterDeps, agent as character_agent
-from src.agents.character.tools import Action, CharacterTool, Speak, Travel, Wait
+from src.agents.character.tools import Action, Attack, CharacterTool, Speak, Travel, Wait
 from src.agents.quest_reviewer.agent import QuestReviewerDeps, agent as quest_reviewer_agent
 from src.agents.quest_reviewer.tools import Modify
 from src.agents.time_keeper.agent import TimeKeeperDeps, agent as time_keeper_agent
@@ -31,9 +31,9 @@ _CREATE_ORDER = {"location": 0, "npc": 1, "item": 2, "quest": 3}
 # ─── Scheduler ────────────────────────────────────────────────
 
 def _scene_actors(state: WorldState, active_pc_id: str) -> list[str]:
-    """Characters present in the active PC's current location. PC first, then others by id."""
+    """Living characters present in the active PC's current location. PC first, then others by id."""
     scene = state.characters[active_pc_id].location
-    present = [cid for cid, c in state.characters.items() if c.location == scene]
+    present = [cid for cid, c in state.characters.items() if c.location == scene and c.stats.hp > 0]
     present.sort(key=lambda cid: (cid != active_pc_id, cid))
     return present
 
@@ -58,6 +58,8 @@ def _describe_tool(tool: CharacterTool) -> str:
         return f"travel → {tool.destination}"
     if isinstance(tool, Wait):
         return "wait"
+    if isinstance(tool, Attack):
+        return f"attack → {tool.target}"
     if isinstance(tool, Action):
         suffix = f" ({tool.target})" if tool.target else ""
         return f"action{suffix}: {tool.description}"
@@ -74,7 +76,7 @@ async def flow_agent_turn(actor_id: str, state: WorldState, logger: Logger) -> C
     try:
         with logger.run(label):
             result = await character_agent.run(
-                "Choose exactly ONE next step by calling action, speak, travel, or wait.",
+                "Choose exactly ONE next step by calling action, speak, travel, attack, or wait.",
                 deps=CharacterDeps(char=char, state=state),
                 usage_limits=_AGENT_USAGE,
             )
@@ -231,6 +233,10 @@ async def _run_game(scenario: str | None, character_id: str | None, max_turns: i
     try:
         logger.log_event("world_snapshot", **_snapshot(state))
         for t in range(max_turns):
+            if state.characters[pc_id].stats.hp <= 0:
+                print(f"\n=== {pc_id} has died. The campaign ends. ===")
+                logger.log_event("pc_death", pc=pc_id)
+                break
             print(f"\n--- Tick {t + 1} ---")
             logger.log_turn(t + 1)
             await tick(pc_id, state, t, logger)

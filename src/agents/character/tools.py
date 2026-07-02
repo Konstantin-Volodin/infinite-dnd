@@ -34,4 +34,10 @@ class Action(BaseModel):
     target: str | None = None
 
 
-CharacterTool = Union[Speak, Travel, Wait, Action]
+class Attack(BaseModel):
+    kind: Literal["attack"] = "attack"
+    actor: str
+    target: str
+
+
+CharacterTool = Union[Speak, Travel, Wait, Action, Attack]

@@ -53,6 +53,42 @@ def test_give_loot_item(state, ops):
     assert "Cannot loot" in ops.loot_item("hero", "merchant", "shield")  # alive
 
 
+# ============ COMBAT ============
+
+class _FixedRng:
+    """Stub rng — always rolls the maximum, so damage is deterministic."""
+    def randint(self, a: int, b: int) -> int:
+        return b
+
+
+def test_attack_damages_target(state, ops):
+    result = ops.attack("hero", "merchant", rng=_FixedRng())
+    assert "hero attacks merchant for 4 damage" in result  # d4 max roll, level 1
+    assert state.characters["merchant"].stats.hp == 1
+
+
+def test_attack_kill_awards_xp(state, ops):
+    ops.damage("merchant", 4)  # 1 HP left — next max roll kills
+    result = ops.attack("hero", "merchant", rng=_FixedRng())
+    assert state.characters["merchant"].stats.hp == 0
+    assert "falls dead" in state.history[-2].text
+    assert "defeating merchant" in result
+    assert state.characters["hero"].stats.xp == 25
+
+
+def test_attack_validation(state, ops):
+    assert "not found" in ops.attack("hero", "ghost")
+    assert "can't attack themselves" in ops.attack("hero", "hero")
+    ops.move_character("hero", "forest")
+    assert "not in the same location" in ops.attack("hero", "merchant")
+    ops.move_character("hero", "tavern")
+    ops.damage("merchant", 100)
+    assert "already dead" in ops.attack("hero", "merchant")
+    ops.damage("hero", 100)
+    ops.heal("merchant", 100)
+    assert "is dead" in ops.attack("hero", "merchant")
+
+
 # ============ STATS ============
 
 def test_damage_heal(state, ops):

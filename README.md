@@ -8,7 +8,7 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 - World generation & exploration
 - Character creation & tracking
 - Gold/item economy & trading
-<!-- - Combat system integration -->
+- Combat, death & kill XP
 
 ### 📋 Prerequisites
 **python environment**
