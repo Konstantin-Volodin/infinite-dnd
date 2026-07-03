@@ -20,22 +20,20 @@ _HTML = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Infinite DnD Log Viewer</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Spectral:wght@500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
     :root {
-      --bg: #16141a;
-      --panel: rgba(28, 25, 36, 0.85);
-      --paper: #ece7e0;
-      --muted: #a89fb0;
-      --faint: #6f6779;
-      --gold: #e8b94f;
-      --jade: #7fa08c;
-      --crimson: #b56159;
-      --amber: #c17f3a;
-      --line: rgba(232, 185, 79, 0.14);
-      --radius: 3px;
+      --bg: #0a0a0c;
+      --panel: #131316;
+      --border: rgba(255, 255, 255, 0.07);
+      --text: #e8e8ec;
+      --muted: #8b8b96;
+      --faint: #57575f;
+      --accent: #7c6cf6;
+      --ember: #ff7a45;
+      --green: #34d399;
+      --amber: #f5b942;
       --mono: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
-      --serif: "Spectral", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
       --sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
     }
 
@@ -44,15 +42,16 @@ _HTML = """<!DOCTYPE html>
     html, body { height: 100%; }
 
     body {
-      color: var(--paper);
+      color: var(--text);
       font-family: var(--sans);
+      font-size: 13px;
       background: var(--bg);
       -webkit-font-smoothing: antialiased;
     }
 
     button, input, select { font: inherit; color: inherit; }
-    button { cursor: pointer; }
-    :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+    button { cursor: pointer; background: none; border: none; text-align: left; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 
     .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
 
@@ -61,255 +60,205 @@ _HTML = """<!DOCTYPE html>
     .topbar {
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 14px 20px;
+      gap: 14px;
+      padding: 12px 18px;
       background: var(--panel);
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid var(--border);
     }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: var(--serif);
-      font-weight: 600;
-      font-size: 15px;
-      white-space: nowrap;
-    }
-
-    .brand-mark {
-      width: 20px;
-      height: 20px;
-      border-radius: 4px;
-      background: linear-gradient(135deg, var(--gold), var(--amber));
-      flex-shrink: 0;
-    }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+    .brand-mark { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, var(--accent), var(--ember)); flex-shrink: 0; }
 
     .search {
       flex: 1;
-      max-width: 420px;
+      max-width: 380px;
       display: flex;
       align-items: center;
       gap: 8px;
-      background: rgba(0, 0, 0, 0.18);
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 8px 12px;
-      color: var(--muted);
-      font-size: 13px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: var(--faint);
     }
 
-    .search input { background: none; border: none; outline: none; color: var(--paper); width: 100%; }
+    .search input { background: none; border: none; outline: none; color: var(--text); width: 100%; }
     .search input::placeholder { color: var(--faint); }
 
-    .turn-select {
-      padding: 8px 10px;
-      border-radius: 4px;
-      border: 1px solid var(--line);
-      background: rgba(0, 0, 0, 0.18);
-      color: var(--paper);
-      font-size: 13px;
+    .seg {
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
     }
 
-    .session-meta { margin-left: auto; text-align: right; font-size: 12.5px; color: var(--muted); min-width: 0; }
-    .session-meta .title { font-family: var(--serif); font-size: 14px; color: var(--paper); }
+    .seg button {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      white-space: nowrap;
+    }
 
-    /* ── Body grid ──────────────────────────────────────── */
+    .seg button:hover { color: var(--text); }
+    .seg button.active { background: var(--accent); color: #fff; }
 
-    .bodygrid { display: grid; grid-template-columns: 250px minmax(0, 1fr) 400px; min-height: 0; }
+    .session-meta { margin-left: auto; text-align: right; font-size: 12px; color: var(--muted); min-width: 0; }
+    .session-meta .title { font-weight: 600; font-size: 13px; color: var(--text); }
+
+    /* ── Body ───────────────────────────────────────────── */
+
+    .bodygrid { display: grid; grid-template-columns: 240px minmax(0, 1fr) 390px; min-height: 0; }
 
     .rail {
-      border-right: 1px solid var(--line);
-      padding: 18px 14px;
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
       overflow-y: auto;
-      background: rgba(0, 0, 0, 0.12);
+      background: rgba(255, 255, 255, 0.015);
     }
 
     .rail h3 {
-      font-family: var(--serif);
-      font-style: italic;
-      font-weight: 500;
-      font-size: 12px;
-      letter-spacing: 0.02em;
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
       color: var(--faint);
-      margin-bottom: 10px;
+      margin: 0 6px 8px;
     }
 
-    .rail-divider { height: 1px; background: var(--line); margin: 16px 0; }
+    .rail-divider { height: 1px; background: var(--border); margin: 14px 0; }
 
-    .session-row {
-      display: block;
-      width: 100%;
-      text-align: left;
-      padding: 9px 10px;
-      border-radius: var(--radius);
-      background: none;
-      border: none;
-      color: var(--muted);
-      margin-bottom: 2px;
-    }
-
-    .session-row:hover { background: rgba(255, 255, 255, 0.05); color: var(--paper); }
-
-    .session-row.active {
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--paper);
-      box-shadow: inset 2px 0 0 0 var(--gold);
-    }
-
-    .session-row .name { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
-    .session-row .sub { display: block; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+    .session-row { display: block; width: 100%; padding: 8px 10px; border-radius: 8px; color: var(--muted); margin-bottom: 2px; }
+    .session-row:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+    .session-row.active { background: rgba(124, 108, 246, 0.13); color: var(--text); }
+    .session-row .name { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 2px; }
+    .session-row .sub { display: block; font-size: 11px; color: var(--faint); }
+    .session-row.active .sub { color: var(--muted); }
 
     .filter-row {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 8px;
       width: 100%;
-      padding: 7px 8px;
-      border-radius: var(--radius);
-      background: none;
-      border: none;
-      text-align: left;
-      font-size: 12.5px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
       color: var(--muted);
       margin-bottom: 1px;
-      font-family: var(--mono);
     }
 
-    .filter-row:hover { background: rgba(255, 255, 255, 0.05); color: var(--paper); }
+    .filter-row:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+    .filter-row.active { background: rgba(124, 108, 246, 0.13); color: var(--text); }
 
-    .filter-row.active {
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--paper);
-      box-shadow: inset 2px 0 0 0 var(--gold);
-    }
-
-    .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--faint); }
-    .dot.gold { background: var(--gold); }
-    .dot.jade { background: var(--jade); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--faint); }
+    .dot.violet { background: var(--accent); }
+    .dot.ember { background: var(--ember); }
+    .dot.green { background: var(--green); }
     .dot.amber { background: var(--amber); }
-    .dot.crimson { background: var(--crimson); }
 
-    .count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+    .count { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
 
-    /* ── Log rows ───────────────────────────────────────── */
+    /* ── Timeline ───────────────────────────────────────── */
 
-    .log-panel {
-      overflow-y: auto;
-      min-width: 0;
-      background-image: repeating-linear-gradient(
-        to bottom,
-        transparent,
-        transparent 40px,
-        rgba(232, 185, 79, 0.035) 41px
-      );
+    .log-panel { overflow-y: auto; min-width: 0; }
+
+    .turn-header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 8px 18px;
+      background: rgba(10, 10, 12, 0.92);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--border);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text);
     }
+
+    .turn-header .clock { font-family: var(--mono); font-weight: 400; color: var(--faint); }
 
     .log-row {
       display: grid;
-      grid-template-columns: 66px 118px 42px 148px minmax(0, 1fr);
+      grid-template-columns: 58px 92px minmax(0, 1fr);
       gap: 12px;
-      align-items: center;
-      padding: 8px 18px;
-      font-family: var(--mono);
-      font-size: 12.5px;
-      border-bottom: 1px solid var(--line);
+      align-items: baseline;
+      padding: 6px 18px;
       cursor: pointer;
       position: relative;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     }
 
     .log-row:hover { background: rgba(255, 255, 255, 0.03); }
-    .log-row.selected { background: rgba(255, 255, 255, 0.045); }
+    .log-row.selected { background: rgba(124, 108, 246, 0.08); }
+    .log-row.selected::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent); }
 
-    .log-row.selected::before {
-      content: "";
-      position: absolute;
-      left: 0; top: 0; bottom: 0;
-      width: 2px;
-      background: var(--gold);
-    }
+    .log-time { font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
 
-    .log-time { color: var(--faint); }
-    .log-turn { color: var(--faint); }
-    .log-label { color: var(--gold); opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .log-msg { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .log-row.selected .log-msg { color: var(--paper); }
-
-    .badge {
+    .chip {
       display: inline-flex;
       align-items: center;
-      font-family: var(--sans);
       font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
+      letter-spacing: 0.04em;
       padding: 2px 7px;
-      border-radius: 2px;
+      border-radius: 5px;
       width: fit-content;
       color: var(--muted);
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(255, 255, 255, 0.05);
       white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .badge.gold { color: var(--gold); background: rgba(232, 185, 79, 0.14); }
-    .badge.jade { color: var(--jade); background: rgba(127, 160, 140, 0.14); }
-    .badge.amber { color: var(--amber); background: rgba(193, 127, 58, 0.14); }
-    .badge.crimson { color: var(--crimson); background: rgba(181, 97, 89, 0.14); }
+    .chip.violet { color: #b3a8ff; background: rgba(124, 108, 246, 0.14); }
+    .chip.ember { color: var(--ember); background: rgba(255, 122, 69, 0.13); }
+    .chip.green { color: var(--green); background: rgba(52, 211, 153, 0.12); }
+    .chip.amber { color: var(--amber); background: rgba(245, 185, 66, 0.12); }
 
-    .empty { padding: 28px; text-align: center; color: var(--muted); font-size: 13px; }
+    .log-msg { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .log-msg .who { color: var(--text); font-weight: 500; }
+    .log-row.story .log-msg { color: var(--text); }
+    .log-row.dim .log-msg { color: var(--faint); }
+    .log-row.selected .log-msg { color: var(--text); }
+
+    .stat-chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+    .stat-chips span { font-family: var(--mono); font-size: 10.5px; color: var(--faint); background: rgba(255, 255, 255, 0.04); padding: 1px 7px; border-radius: 5px; }
+
+    .empty { padding: 26px; text-align: center; color: var(--faint); }
 
     /* ── Inspector ──────────────────────────────────────── */
 
-    .inspector {
-      border-left: 1px solid var(--line);
-      background: var(--panel);
-      padding: 22px;
-      overflow-y: auto;
-    }
+    .inspector { border-left: 1px solid var(--border); background: var(--panel); padding: 20px; overflow-y: auto; }
 
     .inspector h4 {
-      font-family: var(--serif);
-      font-style: italic;
-      font-weight: 500;
-      font-size: 13px;
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
       color: var(--faint);
       margin-bottom: 14px;
     }
 
-    .insp-field { margin-bottom: 14px; }
+    .insp-field { margin-bottom: 13px; }
+    .insp-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); margin-bottom: 3px; }
+    .insp-value { font-size: 12.5px; color: var(--text); line-height: 1.55; word-break: break-word; }
+    .insp-value.mono { font-family: var(--mono); font-size: 12px; }
 
-    .insp-label {
-      font-size: 11px;
-      color: var(--faint);
-      margin-bottom: 3px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .insp-value {
-      font-family: var(--mono);
-      font-size: 12.5px;
-      color: var(--paper);
-      line-height: 1.55;
-      word-break: break-word;
-    }
-
-    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
-
-    .pill {
-      font-family: var(--mono);
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 2px;
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--muted);
-    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 5px; }
+    .pill { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 5px; background: rgba(124, 108, 246, 0.14); color: #b3a8ff; }
 
     .payload {
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 14px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 13px;
       font-family: var(--mono);
       font-size: 11.5px;
       line-height: 1.65;
@@ -319,12 +268,15 @@ _HTML = """<!DOCTYPE html>
       overflow-x: auto;
     }
 
+    .payload .k { color: #b3a8ff; }
+    .payload .h { color: var(--text); font-weight: 600; }
+
     ::-webkit-scrollbar { width: 9px; height: 9px; }
     ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 5px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.18); }
 
     @media (max-width: 1100px) {
-      .bodygrid { grid-template-columns: 220px minmax(0, 1fr); }
+      .bodygrid { grid-template-columns: 210px minmax(0, 1fr); }
       .inspector { display: none; }
     }
   </style>
@@ -332,9 +284,13 @@ _HTML = """<!DOCTYPE html>
 <body>
   <div class="app">
     <div class="topbar">
-      <div class="brand"><span class="brand-mark"></span>Infinite DnD · Session Logs</div>
+      <div class="brand"><span class="brand-mark"></span>Infinite DnD</div>
       <div class="search">🔍 <input id="search" placeholder="Search events, tools, dialogue..."></div>
-      <select id="turn-filter" class="turn-select"></select>
+      <div class="seg" id="detail-seg">
+        <button data-detail="story" class="active">Story</button>
+        <button data-detail="runs">Runs</button>
+        <button data-detail="all">All</button>
+      </div>
       <div class="session-meta">
         <div class="title" id="session-title">Waiting for logs</div>
         <div id="session-sub"></div>
@@ -360,24 +316,29 @@ _HTML = """<!DOCTYPE html>
 
   <script>
     const EVENT_COLOR = {
-      game_session_started: "gold",
-      game_session_finished: "gold",
-      pc_death: "crimson",
-      turn_started: "jade",
-      resolved: "jade",
-      agent_run_started: "amber",
-      agent_run_finished: "amber",
-      llm_message: "crimson",
-      parse_error: "crimson",
+      game_session_started: "violet",
+      game_session_finished: "violet",
+      pc_death: "ember",
+      resolved: "green",
+      world_snapshot: "amber",
+      agent_run_started: "",
+      agent_run_finished: "",
+      llm_message: "",
+      parse_error: "ember",
     };
+
+    const STORY_EVENTS = new Set([
+      "game_session_started", "game_session_finished", "pc_death",
+      "resolved", "world_snapshot", "parse_error",
+    ]);
 
     const state = {
       files: [],
       session: null,
       search: "",
+      detail: "story",
       eventFilter: null,
       labelFilter: null,
-      turnFilter: "all",
       selectedLine: null,
     };
 
@@ -388,7 +349,7 @@ _HTML = """<!DOCTYPE html>
       logPanel: document.getElementById("log-panel"),
       inspector: document.getElementById("inspector"),
       search: document.getElementById("search"),
-      turnFilter: document.getElementById("turn-filter"),
+      detailSeg: document.getElementById("detail-seg"),
       sessionTitle: document.getElementById("session-title"),
       sessionSub: document.getElementById("session-sub"),
     };
@@ -413,10 +374,6 @@ _HTML = """<!DOCTYPE html>
       return `${Number(value).toFixed(1)}s`;
     }
 
-    function eventColor(event) {
-      return EVENT_COLOR[event] || "";
-    }
-
     async function fetchJson(path) {
       const response = await fetch(path, { cache: "no-store" });
       if (!response.ok) throw new Error(`Request failed: ${response.status}`);
@@ -437,7 +394,6 @@ _HTML = """<!DOCTYPE html>
       state.session = await fetchJson(`/api/logs/${encodeURIComponent(name)}`);
       state.eventFilter = null;
       state.labelFilter = null;
-      state.turnFilter = "all";
       state.selectedLine = null;
       renderAll();
     }
@@ -462,8 +418,7 @@ _HTML = """<!DOCTYPE html>
         return `
           <button class="session-row ${active ? "active" : ""}" data-file="${escapeHtml(file.name)}" title="${escapeHtml(file.name)}">
             <span class="name">${escapeHtml(title)}</span>
-            <span class="sub">${escapeHtml(sub)}</span>
-            <span class="sub">${escapeHtml(formatDateTime(file.modified_time))}</span>
+            <span class="sub">${escapeHtml(sub)} · ${escapeHtml(formatDateTime(file.modified_time))}</span>
           </button>
         `;
       }).join("");
@@ -477,21 +432,17 @@ _HTML = """<!DOCTYPE html>
       dom.sessionTitle.textContent = summary.character_id ? `${title} · ${summary.character_id}` : title;
       dom.sessionSub.textContent =
         `${summary.turns_completed ?? 0}/${summary.max_turns ?? "?"} turns · ` +
-        `${session.stats.event_count} events · ${session.stats.run_count} runs · ${formatDuration(summary.duration_s)}`;
-
-      dom.turnFilter.innerHTML = ["all", ...session.turns]
-        .map((value) => `<option value="${escapeHtml(value)}">${value === "all" ? "All turns" : `Turn ${escapeHtml(value)}`}</option>`)
-        .join("");
-      dom.turnFilter.value = state.turnFilter;
+        `${session.stats.run_count} runs · ${formatDuration(summary.duration_s)}`;
     }
 
     function renderRailFilters() {
       const session = state.session;
       if (!session) return;
 
-      dom.eventList.innerHTML = session.event_types.map((event) => `
+      const events = session.event_types.filter((event) => event !== "turn_started");
+      dom.eventList.innerHTML = events.map((event) => `
         <button class="filter-row ${state.eventFilter === event ? "active" : ""}" data-event="${escapeHtml(event)}">
-          <span class="dot ${eventColor(event)}"></span>${escapeHtml(event)}
+          <span class="dot ${EVENT_COLOR[event] || ""}"></span>${escapeHtml(event.replaceAll("_", " "))}
           <span class="count">${escapeHtml(session.event_counts[event])}</span>
         </button>
       `).join("");
@@ -504,20 +455,26 @@ _HTML = """<!DOCTYPE html>
       dom.labelList.innerHTML = labels.length
         ? labels.map((label) => `
             <button class="filter-row ${state.labelFilter === label ? "active" : ""}" data-label="${escapeHtml(label)}">
-              <span class="dot gold"></span>${escapeHtml(label)}
+              <span class="dot violet"></span>${escapeHtml(label)}
               <span class="count">${escapeHtml(labelCounts[label] || 0)}</span>
             </button>
           `).join("")
         : '<div class="empty">No agent runs recorded.</div>';
     }
 
+    function detailAllows(entry) {
+      if (state.detail === "all") return true;
+      if (state.detail === "runs") return entry.event !== "llm_message";
+      return STORY_EVENTS.has(entry.event);
+    }
+
     function filteredEntries() {
       if (!state.session) return [];
       const search = state.search.trim().toLowerCase();
       return state.session.entries.filter((entry) => {
-        if (state.eventFilter && entry.event !== state.eventFilter) return false;
+        if (entry.event === "turn_started") return false;
+        if (state.eventFilter ? entry.event !== state.eventFilter : !detailAllows(entry)) return false;
         if (state.labelFilter && entry.label !== state.labelFilter) return false;
-        if (state.turnFilter !== "all" && String(entry.turn ?? "") !== state.turnFilter) return false;
         if (!search) return true;
         const haystack = [entry.summary, entry.excerpt, entry.label, entry.event, entry.raw_pretty]
           .filter(Boolean)
@@ -527,21 +484,76 @@ _HTML = """<!DOCTYPE html>
       });
     }
 
+    function rowContent(entry) {
+      const raw = entry.raw || {};
+      if (entry.event === "resolved" && raw.result) {
+        const who = raw.subject ? `<span class="who">${escapeHtml(raw.subject)}</span> ` : "";
+        return `${who}${escapeHtml(raw.result)}`;
+      }
+      if (entry.event === "world_snapshot") {
+        const stats = [
+          ["locations", raw.locations], ["characters", raw.characters],
+          ["quests done", raw.quests_completed], ["xp", raw.total_xp], ["game min", raw.minutes_elapsed],
+        ].filter(([, value]) => value !== undefined);
+        return `<span class="stat-chips">${stats.map(([key, value]) => `<span>${escapeHtml(value)} ${escapeHtml(key)}</span>`).join("")}</span>`;
+      }
+      if (entry.event === "llm_message") {
+        const tools = [...(entry.tool_calls || []), ...(entry.tool_returns || [])];
+        if (tools.length) return `→ ${escapeHtml(tools.join(", "))}${entry.excerpt ? ` · ${escapeHtml(entry.excerpt)}` : ""}`;
+        return escapeHtml(entry.excerpt || entry.summary);
+      }
+      return escapeHtml(entry.summary);
+    }
+
+    function rowChip(entry) {
+      if (entry.event === "llm_message") {
+        const kind = { model_request: "request", model_response: "response", tool_return: "tool ret" }[entry.message_kind] || "llm";
+        return `<span class="chip">${escapeHtml(kind)}</span>`;
+      }
+      if (entry.event === "agent_run_started" || entry.event === "agent_run_finished") {
+        const suffix = entry.event === "agent_run_finished" ? " ✓" : " …";
+        return `<span class="chip violet">${escapeHtml((entry.label || "run") + suffix)}</span>`;
+      }
+      const label = { game_session_started: "session", game_session_finished: "session", world_snapshot: "world", pc_death: "death", resolved: (entry.raw || {}).tool || "resolved", parse_error: "error" }[entry.event] || entry.event.replaceAll("_", " ");
+      return `<span class="chip ${EVENT_COLOR[entry.event] || ""}">${escapeHtml(label.toLowerCase())}</span>`;
+    }
+
+    function rowClass(entry) {
+      if (entry.event === "resolved" || entry.event === "pc_death") return "story";
+      if (entry.event === "llm_message" || entry.event === "agent_run_started" || entry.event === "agent_run_finished") return "dim";
+      return "";
+    }
+
     function renderRows() {
       const entries = filteredEntries();
       if (!entries.length) {
         dom.logPanel.innerHTML = '<div class="empty">No events match the current filters.</div>';
         return;
       }
-      dom.logPanel.innerHTML = entries.map((entry) => `
-        <div class="log-row ${state.selectedLine === entry.line ? "selected" : ""}" data-line="${entry.line}">
-          <span class="log-time">${escapeHtml(entry.display_time)}</span>
-          <span class="badge ${eventColor(entry.event)}">${escapeHtml(entry.message_kind || entry.event)}</span>
-          <span class="log-turn">${entry.turn !== null && entry.turn !== undefined ? "T" + escapeHtml(entry.turn) : ""}</span>
-          <span class="log-label">${escapeHtml(entry.label || "")}</span>
-          <span class="log-msg">${escapeHtml(entry.summary)}</span>
-        </div>
-      `).join("");
+
+      const chunks = [];
+      let currentTurn;
+      for (const entry of entries) {
+        if (entry.turn !== currentTurn) {
+          currentTurn = entry.turn;
+          const title = currentTurn === null || currentTurn === undefined ? "Session" : `Turn ${currentTurn}`;
+          chunks.push(`<div class="turn-header">${escapeHtml(title)}<span class="clock">${escapeHtml(entry.display_time)}</span></div>`);
+        }
+        chunks.push(`
+          <div class="log-row ${rowClass(entry)} ${state.selectedLine === entry.line ? "selected" : ""}" data-line="${entry.line}">
+            <span class="log-time">${escapeHtml(entry.display_time)}</span>
+            ${rowChip(entry)}
+            <span class="log-msg">${rowContent(entry)}</span>
+          </div>
+        `);
+      }
+      dom.logPanel.innerHTML = chunks.join("");
+    }
+
+    function highlightPayload(text) {
+      return escapeHtml(text)
+        .replace(/^(ModelRequest|ModelResponse)(.*)$/m, '<span class="h">$1</span>$2')
+        .replace(/^(\\s*)([\\w.-]+):/gm, '$1<span class="k">$2</span>:');
     }
 
     function renderInspector() {
@@ -558,18 +570,18 @@ _HTML = """<!DOCTYPE html>
 
       const tools = [...(entry.tool_calls || []), ...(entry.tool_returns || [])];
       const usage = entry.usage
-        ? Object.entries(entry.usage).map(([key, value]) => `${key.replace("_tokens", "")} ${value}`).join(" · ")
+        ? Object.entries(entry.usage).map(([key, value]) => `${key.replace("_tokens", "")} ${value.toLocaleString()}`).join(" · ")
         : null;
 
       dom.inspector.innerHTML = `
         <h4>Event Detail</h4>
         <div class="insp-field"><div class="insp-label">Summary</div><div class="insp-value">${escapeHtml(entry.summary)}</div></div>
-        <div class="insp-field"><div class="insp-label">Event</div><div class="insp-value">${escapeHtml(entry.message_kind || entry.event)}</div></div>
-        ${entry.label ? `<div class="insp-field"><div class="insp-label">Agent</div><div class="insp-value">${escapeHtml(entry.label)}</div></div>` : ""}
-        <div class="insp-field"><div class="insp-label">Time</div><div class="insp-value">${escapeHtml(entry.display_time)} · turn ${escapeHtml(entry.turn ?? "-")} · line ${escapeHtml(entry.line)}</div></div>
+        <div class="insp-field"><div class="insp-label">Event</div><div class="insp-value mono">${escapeHtml(entry.message_kind || entry.event)}</div></div>
+        ${entry.label ? `<div class="insp-field"><div class="insp-label">Agent</div><div class="insp-value mono">${escapeHtml(entry.label)}</div></div>` : ""}
+        <div class="insp-field"><div class="insp-label">Time</div><div class="insp-value mono">${escapeHtml(entry.display_time)} · turn ${escapeHtml(entry.turn ?? "-")} · line ${escapeHtml(entry.line)}</div></div>
         ${tools.length ? `<div class="insp-field"><div class="insp-label">Tools</div><div class="pill-row">${tools.map((tool) => `<span class="pill">${escapeHtml(tool)}</span>`).join("")}</div></div>` : ""}
-        ${usage ? `<div class="insp-field"><div class="insp-label">Tokens</div><div class="insp-value">${escapeHtml(usage)}</div></div>` : ""}
-        <div class="insp-field"><div class="insp-label">Payload</div><div class="payload">${escapeHtml(entry.raw_pretty || JSON.stringify(entry.raw, null, 2))}</div></div>
+        ${usage ? `<div class="insp-field"><div class="insp-label">Tokens</div><div class="insp-value mono">${escapeHtml(usage)}</div></div>` : ""}
+        <div class="insp-field"><div class="insp-label">Payload</div><div class="payload">${highlightPayload(entry.raw_pretty || JSON.stringify(entry.raw, null, 2))}</div></div>
       `;
     }
 
@@ -583,13 +595,13 @@ _HTML = """<!DOCTYPE html>
       dom.inspector.innerHTML = `
         <h4>Session Overview</h4>
         <div class="insp-field"><div class="insp-label">Campaign</div><div class="insp-value">${escapeHtml(summary.scenario_title || "unknown")}</div></div>
-        <div class="insp-field"><div class="insp-label">Character</div><div class="insp-value">${escapeHtml(summary.character_id || "unknown")}</div></div>
+        <div class="insp-field"><div class="insp-label">Character</div><div class="insp-value mono">${escapeHtml(summary.character_id || "unknown")}</div></div>
         <div class="insp-field"><div class="insp-label">Started</div><div class="insp-value">${escapeHtml(formatDateTime(summary.started_at))}</div></div>
         <div class="insp-field"><div class="insp-label">Duration</div><div class="insp-value">${escapeHtml(formatDuration(summary.duration_s))} · ${escapeHtml(summary.turns_completed ?? 0)}/${escapeHtml(summary.max_turns ?? "?")} turns</div></div>
         <div class="insp-field"><div class="insp-label">Traffic</div><div class="insp-value">${escapeHtml(session.stats.run_count)} agent runs · ${escapeHtml(session.stats.llm_message_count)} LLM messages</div></div>
-        <div class="insp-field"><div class="insp-label">Tokens</div><div class="insp-value">${escapeHtml(tokens.input_tokens.toLocaleString())} in · ${escapeHtml(tokens.output_tokens.toLocaleString())} out</div></div>
+        <div class="insp-field"><div class="insp-label">Tokens</div><div class="insp-value mono">${escapeHtml(tokens.input_tokens.toLocaleString())} in · ${escapeHtml(tokens.output_tokens.toLocaleString())} out</div></div>
         ${session.stats.error_count ? `<div class="insp-field"><div class="insp-label">Parse errors</div><div class="insp-value">${escapeHtml(session.stats.error_count)}</div></div>` : ""}
-        <div class="insp-field"><div class="insp-label">File</div><div class="insp-value">${escapeHtml(session.path)}</div></div>
+        <div class="insp-field"><div class="insp-label">File</div><div class="insp-value mono">${escapeHtml(session.path)}</div></div>
         <div class="empty">Select a log row to inspect its payload.</div>
       `;
     }
@@ -615,6 +627,14 @@ _HTML = """<!DOCTYPE html>
       renderRows();
     });
 
+    dom.detailSeg.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-detail]");
+      if (!button) return;
+      state.detail = button.dataset.detail;
+      dom.detailSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === button));
+      renderRows();
+    });
+
     dom.logPanel.addEventListener("click", (event) => {
       const row = event.target.closest("[data-line]");
       if (!row) return;
@@ -625,11 +645,6 @@ _HTML = """<!DOCTYPE html>
 
     dom.search.addEventListener("input", (event) => {
       state.search = event.target.value;
-      renderRows();
-    });
-
-    dom.turnFilter.addEventListener("change", (event) => {
-      state.turnFilter = event.target.value;
       renderRows();
     });
 
