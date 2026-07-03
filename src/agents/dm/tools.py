@@ -1,4 +1,4 @@
-"""Typed tool-call schema for the world builder agent."""
+"""Typed tool-call schema for the DM agent and the resolver that executes it."""
 
 from typing import Literal
 
@@ -14,3 +14,12 @@ class Create(BaseModel):
     role: str | None = None
     goal: str | None = None
     owner: str | None = None
+
+
+class Modify(BaseModel):
+    kind: Literal["modify"] = "modify"
+    action: Literal["update_quest", "remove_npc", "update_location"]
+    target_id: str
+    status: str | None = None
+    step: str | None = None
+    reason: str | None = None

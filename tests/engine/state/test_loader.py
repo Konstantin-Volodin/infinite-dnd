@@ -22,7 +22,7 @@ def test_init_state_for_scenario(scenario):
     for loc_id, loc in state.locations.items():
         assert isinstance(loc, Location)
         assert loc.id == loc_id
-        # Dangling connections are allowed: world_builder materializes them
+        # Dangling connections are allowed: the DM agent materializes them
         # when events reference the named place.
 
     for quest_id, quest in state.quests.items():
@@ -40,3 +40,12 @@ def test_save_load_round_trip():
     manager.save_state(state)
     loaded = manager.load_state(world_state_file=f"world_state_{state.time}.json")
     assert loaded == state
+
+
+def test_latest_snapshot_name_uses_numeric_order(tmp_path):
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    assert manager.latest_snapshot_name() is None
+    for tick in (2, 10, 3):
+        (manager.state_dir / f"world_state_{tick}.json").write_text("{}", encoding="utf-8")
+    (manager.state_dir / "world_state_bad.json").write_text("{}", encoding="utf-8")
+    assert manager.latest_snapshot_name() == "world_state_10.json"

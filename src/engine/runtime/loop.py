@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+from collections.abc import Awaitable, Callable
 
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
@@ -10,19 +11,13 @@ from src.engine.state import StateManager, WorldOperations, WorldState
 from src.engine.state.models import HistoryEvent
 from src.agents.character.agent import CharacterDeps, agent as character_agent
 from src.agents.character.tools import Action, Attack, CharacterTool, Speak, Travel, Wait
-from src.agents.quest_reviewer.agent import QuestReviewerDeps, agent as quest_reviewer_agent
-from src.agents.quest_reviewer.tools import Modify
-from src.agents.time_keeper.agent import TimeKeeperDeps, agent as time_keeper_agent
-from src.agents.world_builder.agent import WorldBuilderDeps, agent as world_builder_agent
-from src.agents.world_builder.tools import Create
+from src.agents.dm.agent import DMDeps, DMResult, agent as dm_agent
 from src.agents.action_resolver.agent import resolve
 from src.interface.session_log import Logger
 
 
 _AGENT_USAGE = UsageLimits(request_limit=12)
-_QUEST_USAGE = UsageLimits(request_limit=6)
-_TIME_USAGE = UsageLimits(request_limit=6)
-_ENRICH_USAGE = UsageLimits(request_limit=8)
+_DM_USAGE = UsageLimits(request_limit=16)
 
 # Locations must resolve before NPCs/items that anchor to them. Quests last (anchor to PCs).
 _CREATE_ORDER = {"location": 0, "npc": 1, "item": 2, "quest": 3}
@@ -68,10 +63,19 @@ def _describe_tool(tool: CharacterTool) -> str:
 
 # ─── Agent flows ──────────────────────────────────────────────
 
-async def flow_agent_turn(actor_id: str, state: WorldState, logger: Logger) -> CharacterTool | None:
+async def flow_agent_turn(
+    actor_id: str,
+    state: WorldState,
+    logger: Logger,
+    pc_controller: Callable[[str, WorldState], Awaitable[CharacterTool]] | None = None,
+) -> CharacterTool | None:
     """Ask the acting character to pick one next step."""
     char = state.characters[actor_id]
     print(f"  [{actor_id}]", flush=True)
+    if pc_controller is not None:
+        intent = await pc_controller(actor_id, state)
+        logger.log_event("player_action", actor=actor_id, tool=intent.kind, action=intent.model_dump(mode="json"))
+        return intent
     label = f"character:{actor_id}"
     try:
         with logger.run(label):
@@ -87,105 +91,76 @@ async def flow_agent_turn(actor_id: str, state: WorldState, logger: Logger) -> C
     return result.output
 
 
-async def flow_world_enrich(state: WorldState, logger: Logger) -> list[Create]:
-    """Materialize entities revealed by recent events (locations before NPCs/items)."""
-    label = "world_builder"
+async def flow_dm(state: WorldState, new_events: list[HistoryEvent], logger: Logger) -> DMResult:
+    """One LLM call: enrich the world, review quests, and estimate time for this tick's new events."""
+    if not new_events:
+        return DMResult(creates=[], modifies=[], minutes=[])
+    new_texts = [e.text for e in new_events]
+    tail = state.history[: -len(new_events)]  # new_events is non-empty here (checked above)
+    context_events = [e.text for e in tail[-10:]]
+    label = "dm"
     try:
         with logger.run(label):
-            result = await world_builder_agent.run(
-                "Register any new entities revealed by the recent events. Return an empty list if nothing new.",
-                deps=WorldBuilderDeps(state=state),
-                usage_limits=_ENRICH_USAGE,
+            result = await dm_agent.run(
+                "Register any new entities, report quest progress, and estimate minutes elapsed for each new event.",
+                deps=DMDeps(state=state, context_events=context_events, new_events=new_texts),
+                usage_limits=_DM_USAGE,
             )
             logger.log_messages(label, result.all_messages())
     except UsageLimitExceeded as exc:
-        print(f"  [limit] world enrichment ended: {exc}", flush=True)
-        return []
-    intents = result.output or []
-    if intents:
-        print(f"  [world] {len(intents)} new entities revealed")
-    return sorted(intents, key=lambda i: _CREATE_ORDER.get(i.type, 3))
-
-
-async def flow_quest_review(state: WorldState, logger: Logger) -> list[Modify]:
-    """Advance quests against recent events. Structural — never narrates."""
-    if not any(q.status.lower() not in {"completed", "failed"} for q in state.quests.values()):
-        return []
-    label = "quest_reviewer"
-    try:
-        with logger.run(label):
-            result = await quest_reviewer_agent.run(
-                "Review active quests against recent events. Call review with any progress, or an empty list.",
-                deps=QuestReviewerDeps(state=state),
-                usage_limits=_QUEST_USAGE,
-            )
-            logger.log_messages(label, result.all_messages())
-    except UsageLimitExceeded as exc:
-        print(f"  [limit] quest review ended: {exc}", flush=True)
-        return []
-    return result.output or []
-
-
-async def flow_time_review(event_texts: list[str], logger: Logger) -> list[int]:
-    """One minute-estimate per event, in order. Falls back to 1m per event on limit."""
-    if not event_texts:
-        return []
-    label = "time_keeper"
-    try:
-        with logger.run(label):
-            result = await time_keeper_agent.run(
-                "Estimate minutes elapsed for each event. Return exactly one integer per event, in order.",
-                deps=TimeKeeperDeps(events=event_texts),
-                usage_limits=_TIME_USAGE,
-            )
-            logger.log_messages(label, result.all_messages())
-    except UsageLimitExceeded as exc:
-        print(f"  [limit] time review ended: {exc}", flush=True)
-        return [1] * len(event_texts)
-    return result.output or []
+        print(f"  [limit] dm review ended: {exc}", flush=True)
+        return DMResult(creates=[], modifies=[], minutes=[1] * len(new_events))
+    dm_result = result.output
+    if not dm_result.minutes or len(dm_result.minutes) != len(new_events):
+        dm_result.minutes = [1] * len(new_events)
+    dm_result.creates = sorted(dm_result.creates, key=lambda i: _CREATE_ORDER.get(i.type, 3))
+    return dm_result
 
 
 # ─── Tick composition ────────────────────────────────────────
 
-async def _stamp_time(new_events: list[HistoryEvent], state: WorldState, logger: Logger) -> None:
-    """Annotate each new event with estimated minutes and advance the world clock."""
-    if not new_events:
-        return
-    minutes = await flow_time_review([e.text for e in new_events], logger)
-    if len(minutes) != len(new_events):
-        minutes = [1] * len(new_events)
-    for event, mins in zip(new_events, minutes):
-        event.minutes_elapsed = mins
-    state.minutes_elapsed += sum(minutes)
-
-    for event in new_events:
-        print(f"  {event.text}  (+{event.minutes_elapsed}m)")
-    print(f"  [clock: {_format_clock(state.minutes_elapsed)}]")
-
-
-async def tick(active_pc_id: str, state: WorldState, tick_index: int, logger: Logger) -> None:
+async def tick(
+    active_pc_id: str,
+    state: WorldState,
+    tick_index: int,
+    logger: Logger,
+    pc_controller: Callable[[str, WorldState], Awaitable[CharacterTool]] | None = None,
+) -> None:
     actor_id = _pick_next_actor(state, active_pc_id, tick_index)
 
-    intent = await flow_agent_turn(actor_id, state, logger)
+    controller = pc_controller if actor_id == active_pc_id else None
+    intent = await flow_agent_turn(actor_id, state, logger, controller)
     if intent is None:
         return
     print(f"    ↳ {_describe_tool(intent)}")
 
-    # 1. Resolve the turn and stamp elapsed time onto the resulting events.
+    # 1. Resolve the turn.
     pre = len(state.history)
     await resolve(intent, state, logger=logger)
-    await _stamp_time(state.history[pre:], state, logger)
+    new_events = state.history[pre:]
 
-    # 2. Enrich the world. Revealed entities are retcons — logged but not time-stamped.
+    # 2. One DM call: time estimates, new entities, and quest progress.
+    dm = await flow_dm(state, new_events, logger)
+
+    # 2a. Stamp elapsed time onto the resulting events and advance the clock.
+    for event, mins in zip(new_events, dm.minutes):
+        event.minutes_elapsed = mins
+    state.minutes_elapsed += sum(dm.minutes)
+    for event in new_events:
+        print(f"  {event.text}  (+{event.minutes_elapsed}m)")
+    if new_events:
+        print(f"  [clock: {_format_clock(state.minutes_elapsed)}]")
+
+    # 2b. Enrich the world. Revealed entities are retcons — logged but not time-stamped.
     pre_enrich = len(state.history)
-    for create_intent in await flow_world_enrich(state, logger):
+    for create_intent in dm.creates:
         await resolve(create_intent, state, logger=logger)
     for event in state.history[pre_enrich:]:
         print(f"  {event.text}  (revealed)")
 
-    # 3. Review quests. Step-level progress; may append XP events via advance_quest.
+    # 2c. Review quests. Step-level progress; may append XP events via advance_quest.
     pre_quest = len(state.history)
-    for update in await flow_quest_review(state, logger):
+    for update in dm.modifies:
         msg = await resolve(update, state, logger=logger)
         print(f"  [quest] {update.target_id}: {msg}")
     for event in state.history[pre_quest:]:
@@ -210,9 +185,20 @@ def _snapshot(state: WorldState) -> dict:
     }
 
 
-async def _run_game(scenario: str | None, character_id: str | None, max_turns: int, new_character: dict | None) -> None:
+async def _run_game(
+    scenario: str | None,
+    character_id: str | None,
+    max_turns: int,
+    new_character: dict | None,
+    *,
+    resume: bool = False,
+    stop_check: Callable[[], bool] | None = None,
+    pc_controller: Callable[[str, WorldState], Awaitable[CharacterTool]] | None = None,
+    progress_callback: Callable[[WorldState], None] | None = None,
+) -> None:
     manager = StateManager(scenario=scenario)
-    state = manager.init_state()
+    latest = manager.latest_snapshot_name() if resume else None
+    state = manager.load_state(latest) if latest else manager.init_state()
 
     if new_character:
         result = WorldOperations(state).spawn_character(**new_character)
@@ -236,18 +222,26 @@ async def _run_game(scenario: str | None, character_id: str | None, max_turns: i
         scenario_title=manager.manifest.get("title", manager.scenario),
     )
     try:
+        manager.save_state(state)
+        if progress_callback:
+            progress_callback(state)
         logger.log_event("world_snapshot", **_snapshot(state))
         for t in range(max_turns):
+            if stop_check and stop_check():
+                logger.log_event("run_stopped")
+                break
             if state.characters[pc_id].stats.hp <= 0:
                 print(f"\n=== {pc_id} has died. The campaign ends. ===")
                 logger.log_event("pc_death", pc=pc_id)
                 break
-            print(f"\n--- Tick {t + 1} ---")
+            print(f"\n--- Tick {state.time + 1} ---")
             logger.log_turn(t + 1)
-            await tick(pc_id, state, t, logger)
+            await tick(pc_id, state, state.time, logger, pc_controller)
             logger.log_event("world_snapshot", **_snapshot(state))
             state.time += 1
             manager.save_state(state)
+            if progress_callback:
+                progress_callback(state)
     finally:
         logger.close()
 

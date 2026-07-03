@@ -47,9 +47,7 @@ src/                        - source code
 ├── agents/                 - LLM agent implementations
 │   ├── action_resolver/        - sole writer; resolves intents against state
 │   ├── character/              - PC/NPC turn: emits a CharacterTool
-│   ├── quest_reviewer/         - post-tick quest progress (Modify)
-│   ├── time_keeper/            - per-event minute estimates
-│   └── world_builder/          - post-tick entity enrichment (Create)
+│   └── dm/                     - post-tick entity enrichment, quest progress, and timing in one call
 ├── engine/                 - game engine components
 │   ├── rules.py                - game rules and derived stats
 │   ├── utils.py                - shared engine helpers
