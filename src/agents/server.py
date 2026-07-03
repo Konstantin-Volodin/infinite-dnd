@@ -15,28 +15,35 @@ class LlamaServer:
 
     def __init__(self):
         model = os.getenv("LLM_MODEL")
-        if not model:
-            raise RuntimeError("LLM_MODEL must be set")
+        model_path = os.getenv("LLM_MODEL_PATH")
+        if not model and not model_path:
+            raise RuntimeError("LLM_MODEL or LLM_MODEL_PATH must be set")
         base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
         port = urllib.parse.urlparse(base_url).port or 1234
         self._health_url = f"http://localhost:{port}/health"
+
+        server_bin = os.getenv("LLM_SERVER_BIN", "llama-server")
+        # -m loads a local file directly (no network); -hf resolves/downloads by repo id.
+        model_arg = ["-m", model_path] if model_path else ["-hf", model]
         cmd = [
-            "llama-server", "-hf", model, "--port", str(port),
-            "--ctx-size", "8192",
-            "--n-predict", "-1",
-            "-ngl", "99",
-            "--n-cpu-moe", "10",
-            "--batch-size", "1024",
-            "--ubatch-size", "512",
-            "--flash-attn", "on",
+            server_bin, *model_arg, "--port", str(port),
+            "--ctx-size", os.getenv("LLM_CTX_SIZE", "8192"),
+            "--n-predict", os.getenv("LLM_N_PREDICT", "-1"),
+            "--parallel", os.getenv("LLM_PARALLEL", "1"),
+            "-ngl", os.getenv("LLM_NGL", "99"),
+            "--n-cpu-moe", os.getenv("LLM_N_CPU_MOE", "10"),
+            "--batch-size", os.getenv("LLM_BATCH_SIZE", "1024"),
+            "--ubatch-size", os.getenv("LLM_UBATCH_SIZE", "512"),
+            "--flash-attn", os.getenv("LLM_FLASH_ATTN", "on"),
+            "--reasoning", os.getenv("LLM_REASONING", "auto"),
             "--metrics",
             "--jinja",
-            "--temp", "1.0",
-            "--top-p", "0.95",
-            "--top-k", "64",
-            "--min-p", "0.01",
+            "--temp", os.getenv("LLM_TEMP", "1.0"),
+            "--top-p", os.getenv("LLM_TOP_P", "0.95"),
+            "--top-k", os.getenv("LLM_TOP_K", "64"),
+            "--min-p", os.getenv("LLM_MIN_P", "0.01"),
             "--log-disable",
-            "--repeat-penalty", "1.0",
+            "--repeat-penalty", os.getenv("LLM_REPEAT_PENALTY", "1.0"),
         ]
         logging.info(f"Starting LlamaServer with command: {' '.join(str(a) for a in cmd)}")
         self._process = subprocess.Popen(cmd)
