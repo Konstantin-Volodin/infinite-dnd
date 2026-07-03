@@ -22,7 +22,7 @@ from src.agents.character.tools import Action, Attack, CharacterTool, Speak, Tra
 from src.agents.quest_reviewer.tools import Modify
 from src.agents.utils import create_model
 from src.agents.world_builder.tools import Create
-from src.interface.logger import Logger
+from src.interface.session_log import Logger
 from .context import action_resolver_context, action_resolver_system
 
 

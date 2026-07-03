@@ -5,8 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from src.interface.log_reader import discover_log_files, load_session
-from src.interface.logger import DEFAULT_LOG_DIR
+from src.interface.session_log import DEFAULT_LOG_DIR, discover_log_files, load_session
 
 
 def _score(session: dict) -> dict:

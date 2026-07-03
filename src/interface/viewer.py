@@ -11,8 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from src.interface.log_reader import list_logs, load_session
-from src.interface.logger import DEFAULT_LOG_DIR
+from src.interface.session_log import DEFAULT_LOG_DIR, list_logs, load_session
 
 _HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -21,492 +20,377 @@ _HTML = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Infinite DnD Log Viewer</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Spectral:wght@500;600&display=swap');
+
     :root {
-      --bg: #120f0b;
-      --panel: rgba(32, 24, 17, 0.82);
-      --panel-strong: rgba(48, 36, 24, 0.94);
-      --paper: #f4ead8;
-      --ink: #201710;
-      --muted: #cfbea7;
-      --gold: #d6a95f;
-      --gold-soft: rgba(214, 169, 95, 0.18);
-      --jade: #6f9a8d;
-      --crimson: #a34b3f;
-      --line: rgba(255, 232, 199, 0.12);
-      --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-      --radius: 20px;
-      --mono: "Cascadia Code", "Consolas", monospace;
-      --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-      --sans: "Segoe UI Variable", "Trebuchet MS", sans-serif;
+      --bg: #16141a;
+      --panel: rgba(28, 25, 36, 0.85);
+      --paper: #ece7e0;
+      --muted: #a89fb0;
+      --faint: #6f6779;
+      --gold: #e8b94f;
+      --jade: #7fa08c;
+      --crimson: #b56159;
+      --amber: #c17f3a;
+      --line: rgba(232, 185, 79, 0.14);
+      --radius: 3px;
+      --mono: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+      --serif: "Spectral", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      --sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
 
     body {
-      margin: 0;
-      min-height: 100vh;
       color: var(--paper);
       font-family: var(--sans);
-      background:
-        radial-gradient(circle at top left, rgba(111, 154, 141, 0.18), transparent 32%),
-        radial-gradient(circle at top right, rgba(163, 75, 63, 0.2), transparent 28%),
-        linear-gradient(160deg, #1b1510 0%, #0f0c09 55%, #140f0d 100%);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
     }
 
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size: 22px 22px;
-      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), transparent 78%);
-    }
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
 
-    .shell {
-      display: grid;
-      grid-template-columns: 320px minmax(0, 1fr);
-      min-height: 100vh;
-    }
+    .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
 
-    .sidebar {
-      padding: 28px;
-      border-right: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(30, 23, 17, 0.94), rgba(19, 15, 11, 0.92));
-      backdrop-filter: blur(18px);
+    /* ── Topbar ─────────────────────────────────────────── */
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
     }
 
     .brand {
-      margin-bottom: 28px;
-    }
-
-    .eyebrow {
-      margin: 0 0 8px;
-      font-size: 0.72rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--gold);
-    }
-
-    h1, h2, h3 {
-      margin: 0;
-      font-family: var(--serif);
-      font-weight: 600;
-      letter-spacing: 0.01em;
-    }
-
-    .brand p,
-    .sidebar-copy,
-    .meta-row,
-    .small {
-      color: var(--muted);
-    }
-
-    .file-list {
-      display: grid;
+      display: flex;
+      align-items: center;
       gap: 10px;
-    }
-
-    .file-button {
-      width: 100%;
-      padding: 14px 16px;
-      border: 1px solid transparent;
-      border-radius: 16px;
-      color: inherit;
-      background: rgba(255, 245, 230, 0.04);
-      text-align: left;
-      cursor: pointer;
-      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
-    }
-
-    .file-button:hover,
-    .file-button:focus-visible {
-      transform: translateY(-1px);
-      border-color: rgba(214, 169, 95, 0.38);
-      background: rgba(214, 169, 95, 0.08);
-      outline: none;
-    }
-
-    .file-button.active {
-      border-color: rgba(214, 169, 95, 0.52);
-      background: linear-gradient(180deg, rgba(214, 169, 95, 0.14), rgba(214, 169, 95, 0.08));
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
-    }
-
-    .file-name {
-      display: block;
-      margin-bottom: 4px;
-      font-weight: 600;
-    }
-
-    .file-meta {
-      font-size: 0.84rem;
-      color: var(--muted);
-    }
-
-    .main {
-      padding: 28px;
-    }
-
-    .hero,
-    .panel,
-    .stat,
-    .event-card,
-    .run-card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-    }
-
-    .hero {
-      display: grid;
-      gap: 20px;
-      padding: 24px;
-      margin-bottom: 20px;
-      background:
-        linear-gradient(135deg, rgba(214, 169, 95, 0.12), transparent 46%),
-        linear-gradient(180deg, rgba(48, 36, 24, 0.98), rgba(27, 21, 15, 0.94));
-    }
-
-    .hero-title {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: end;
-      flex-wrap: wrap;
-    }
-
-    .hero-copy p {
-      margin: 10px 0 0;
-      color: var(--muted);
-      max-width: 65ch;
-    }
-
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .field {
-      display: grid;
-      gap: 6px;
-      font-size: 0.84rem;
-      color: var(--muted);
-    }
-
-    .field input,
-    .field select {
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.08);
-      color: var(--paper);
-      background: rgba(12, 10, 8, 0.78);
-      font: inherit;
-    }
-
-    .field input:focus,
-    .field select:focus {
-      outline: 2px solid rgba(214, 169, 95, 0.35);
-      border-color: rgba(214, 169, 95, 0.45);
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
-      margin-bottom: 20px;
-    }
-
-    .stat {
-      padding: 18px;
-      background: linear-gradient(180deg, rgba(40, 31, 22, 0.92), rgba(26, 20, 15, 0.9));
-    }
-
-    .stat-label {
-      display: block;
-      font-size: 0.76rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-
-    .stat-value {
       font-family: var(--serif);
-      font-size: 1.8rem;
+      font-weight: 600;
+      font-size: 15px;
+      white-space: nowrap;
     }
 
-    .run-strip {
-      margin-bottom: 20px;
-      padding: 18px;
+    .brand-mark {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, var(--gold), var(--amber));
+      flex-shrink: 0;
     }
 
-    .run-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-    }
-
-    .run-card {
-      padding: 16px;
-      background: rgba(255, 245, 230, 0.04);
-      cursor: pointer;
-      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
-    }
-
-    .run-card:hover,
-    .run-card:focus-visible {
-      transform: translateY(-1px);
-      border-color: rgba(111, 154, 141, 0.45);
-      background: rgba(111, 154, 141, 0.08);
-      outline: none;
-    }
-
-    .run-card.active {
-      border-color: rgba(111, 154, 141, 0.55);
-      background: linear-gradient(180deg, rgba(111, 154, 141, 0.16), rgba(111, 154, 141, 0.08));
-    }
-
-    .run-title {
-      font-weight: 700;
-      margin-bottom: 10px;
-      word-break: break-word;
-    }
-
-    .pill-row {
+    .search {
+      flex: 1;
+      max-width: 420px;
       display: flex;
-      flex-wrap: wrap;
+      align-items: center;
       gap: 8px;
-      margin-top: 10px;
+      background: rgba(0, 0, 0, 0.18);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 13px;
     }
 
-    .pill,
+    .search input { background: none; border: none; outline: none; color: var(--paper); width: 100%; }
+    .search input::placeholder { color: var(--faint); }
+
+    .turn-select {
+      padding: 8px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, 0.18);
+      color: var(--paper);
+      font-size: 13px;
+    }
+
+    .session-meta { margin-left: auto; text-align: right; font-size: 12.5px; color: var(--muted); min-width: 0; }
+    .session-meta .title { font-family: var(--serif); font-size: 14px; color: var(--paper); }
+
+    /* ── Body grid ──────────────────────────────────────── */
+
+    .bodygrid { display: grid; grid-template-columns: 250px minmax(0, 1fr) 400px; min-height: 0; }
+
+    .rail {
+      border-right: 1px solid var(--line);
+      padding: 18px 14px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    .rail h3 {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      color: var(--faint);
+      margin-bottom: 10px;
+    }
+
+    .rail-divider { height: 1px; background: var(--line); margin: 16px 0; }
+
+    .session-row {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 9px 10px;
+      border-radius: var(--radius);
+      background: none;
+      border: none;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .session-row:hover { background: rgba(255, 255, 255, 0.05); color: var(--paper); }
+
+    .session-row.active {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--paper);
+      box-shadow: inset 2px 0 0 0 var(--gold);
+    }
+
+    .session-row .name { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    .session-row .sub { display: block; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      padding: 7px 8px;
+      border-radius: var(--radius);
+      background: none;
+      border: none;
+      text-align: left;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 1px;
+      font-family: var(--mono);
+    }
+
+    .filter-row:hover { background: rgba(255, 255, 255, 0.05); color: var(--paper); }
+
+    .filter-row.active {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--paper);
+      box-shadow: inset 2px 0 0 0 var(--gold);
+    }
+
+    .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--faint); }
+    .dot.gold { background: var(--gold); }
+    .dot.jade { background: var(--jade); }
+    .dot.amber { background: var(--amber); }
+    .dot.crimson { background: var(--crimson); }
+
+    .count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+
+    /* ── Log rows ───────────────────────────────────────── */
+
+    .log-panel {
+      overflow-y: auto;
+      min-width: 0;
+      background-image: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 40px,
+        rgba(232, 185, 79, 0.035) 41px
+      );
+    }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: 66px 118px 42px 148px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      padding: 8px 18px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .log-row:hover { background: rgba(255, 255, 255, 0.03); }
+    .log-row.selected { background: rgba(255, 255, 255, 0.045); }
+
+    .log-row.selected::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--gold);
+    }
+
+    .log-time { color: var(--faint); }
+    .log-turn { color: var(--faint); }
+    .log-label { color: var(--gold); opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-msg { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-row.selected .log-msg { color: var(--paper); }
+
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 0.76rem;
-      letter-spacing: 0.06em;
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
-      background: rgba(255, 245, 230, 0.08);
-      color: var(--paper);
+      padding: 2px 7px;
+      border-radius: 2px;
+      width: fit-content;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.04);
+      white-space: nowrap;
     }
 
-    .badge.event-game_session_started,
-    .badge.event-game_session_finished {
-      background: rgba(214, 169, 95, 0.16);
-      color: #f7d9a2;
+    .badge.gold { color: var(--gold); background: rgba(232, 185, 79, 0.14); }
+    .badge.jade { color: var(--jade); background: rgba(127, 160, 140, 0.14); }
+    .badge.amber { color: var(--amber); background: rgba(193, 127, 58, 0.14); }
+    .badge.crimson { color: var(--crimson); background: rgba(181, 97, 89, 0.14); }
+
+    .empty { padding: 28px; text-align: center; color: var(--muted); font-size: 13px; }
+
+    /* ── Inspector ──────────────────────────────────────── */
+
+    .inspector {
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      padding: 22px;
+      overflow-y: auto;
     }
 
-    .badge.event-turn_started {
-      background: rgba(111, 154, 141, 0.18);
-      color: #bddad2;
+    .inspector h4 {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--faint);
+      margin-bottom: 14px;
     }
 
-    .badge.event-agent_run_started,
-    .badge.event-agent_run_finished {
-      background: rgba(93, 111, 178, 0.18);
-      color: #cad4ff;
+    .insp-field { margin-bottom: 14px; }
+
+    .insp-label {
+      font-size: 11px;
+      color: var(--faint);
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
-    .badge.event-llm_message {
-      background: rgba(163, 75, 63, 0.18);
-      color: #f2c0b8;
-    }
-
-    .timeline {
-      display: grid;
-      gap: 14px;
-    }
-
-    .event-card {
-      padding: 18px 18px 14px;
-      background: linear-gradient(180deg, rgba(33, 25, 18, 0.96), rgba(20, 16, 12, 0.92));
-    }
-
-    .event-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      align-items: start;
-      margin-bottom: 12px;
-    }
-
-    .event-main {
-      display: grid;
-      gap: 10px;
-    }
-
-    .event-summary {
-      font-size: 1rem;
-      line-height: 1.5;
-    }
-
-    .meta-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      font-size: 0.88rem;
-    }
-
-    details {
-      margin-top: 12px;
-      border-top: 1px solid var(--line);
-      padding-top: 12px;
-    }
-
-    summary {
-      cursor: pointer;
-      color: var(--gold);
-    }
-
-    pre {
-      margin: 12px 0 0;
-      padding: 14px;
-      border-radius: 16px;
-      background: rgba(8, 8, 8, 0.6);
-      border: 1px solid rgba(255,255,255,0.06);
-      color: #f1e6d7;
-      overflow-x: auto;
+    .insp-value {
       font-family: var(--mono);
-      font-size: 0.85rem;
-      line-height: 1.45;
-      white-space: pre-wrap;
+      font-size: 12.5px;
+      color: var(--paper);
+      line-height: 1.55;
       word-break: break-word;
     }
 
-    .empty {
-      padding: 28px;
-      text-align: center;
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.04);
       color: var(--muted);
-      border: 1px dashed rgba(255,255,255,0.14);
-      border-radius: var(--radius);
-      background: rgba(255,255,255,0.03);
     }
+
+    .payload {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      line-height: 1.65;
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: auto;
+    }
+
+    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.18); }
 
     @media (max-width: 1100px) {
-      .shell {
-        grid-template-columns: 1fr;
-      }
-
-      .sidebar {
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-      }
-
-      .controls,
-      .stats {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-
-    @media (max-width: 720px) {
-      .main,
-      .sidebar {
-        padding: 18px;
-      }
-
-      .controls,
-      .stats {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-title,
-      .event-top {
-        flex-direction: column;
-      }
+      .bodygrid { grid-template-columns: 220px minmax(0, 1fr); }
+      .inspector { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <p class="eyebrow">Infinite DnD</p>
-        <h1>Log Viewer</h1>
-        <p class="sidebar-copy">Inspect turns, agent runs, and raw LLM traffic from any recorded session.</p>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand"><span class="brand-mark"></span>Infinite DnD · Session Logs</div>
+      <div class="search">🔍 <input id="search" placeholder="Search events, tools, dialogue..."></div>
+      <select id="turn-filter" class="turn-select"></select>
+      <div class="session-meta">
+        <div class="title" id="session-title">Waiting for logs</div>
+        <div id="session-sub"></div>
       </div>
-      <div id="file-list" class="file-list"></div>
-    </aside>
-    <main class="main">
-      <section class="hero">
-        <div class="hero-title">
-          <div class="hero-copy">
-            <p class="eyebrow">Session Ledger</p>
-            <h2 id="session-title">Waiting for logs</h2>
-            <p id="session-meta">Select a log file to inspect the timeline.</p>
-          </div>
-          <div class="small" id="session-path"></div>
-        </div>
-        <div class="controls">
-          <label class="field">
-            Search
-            <input id="search" type="search" placeholder="Filter by text, tool, or label">
-          </label>
-          <label class="field">
-            Event
-            <select id="event-filter"></select>
-          </label>
-          <label class="field">
-            Turn
-            <select id="turn-filter"></select>
-          </label>
-          <label class="field">
-            Run
-            <select id="run-filter"></select>
-          </label>
-        </div>
-      </section>
+    </div>
 
-      <section id="stats" class="stats"></section>
+    <div class="bodygrid">
+      <div class="rail">
+        <h3>Sessions</h3>
+        <div id="file-list"></div>
+        <div class="rail-divider"></div>
+        <h3>Events</h3>
+        <div id="event-list"></div>
+        <div class="rail-divider"></div>
+        <h3>Agents</h3>
+        <div id="label-list"></div>
+      </div>
 
-      <section class="panel run-strip">
-        <div class="hero-title">
-          <div>
-            <p class="eyebrow">Agent Runs</p>
-            <h3>Conversation Slices</h3>
-          </div>
-          <div class="small">Click a run to isolate its traffic.</div>
-        </div>
-        <div id="runs" class="run-grid"></div>
-      </section>
-
-      <section id="timeline" class="timeline"></section>
-    </main>
+      <div class="log-panel" id="log-panel"></div>
+      <div class="inspector" id="inspector"></div>
+    </div>
   </div>
 
   <script>
+    const EVENT_COLOR = {
+      game_session_started: "gold",
+      game_session_finished: "gold",
+      pc_death: "crimson",
+      turn_started: "jade",
+      resolved: "jade",
+      agent_run_started: "amber",
+      agent_run_finished: "amber",
+      llm_message: "crimson",
+      parse_error: "crimson",
+    };
+
     const state = {
       files: [],
       session: null,
       search: "",
-      eventFilter: "all",
+      eventFilter: null,
+      labelFilter: null,
       turnFilter: "all",
-      runFilter: "all"
+      selectedLine: null,
     };
 
     const dom = {
       fileList: document.getElementById("file-list"),
-      sessionTitle: document.getElementById("session-title"),
-      sessionMeta: document.getElementById("session-meta"),
-      sessionPath: document.getElementById("session-path"),
+      eventList: document.getElementById("event-list"),
+      labelList: document.getElementById("label-list"),
+      logPanel: document.getElementById("log-panel"),
+      inspector: document.getElementById("inspector"),
       search: document.getElementById("search"),
-      eventFilter: document.getElementById("event-filter"),
       turnFilter: document.getElementById("turn-filter"),
-      runFilter: document.getElementById("run-filter"),
-      stats: document.getElementById("stats"),
-      runs: document.getElementById("runs"),
-      timeline: document.getElementById("timeline")
+      sessionTitle: document.getElementById("session-title"),
+      sessionSub: document.getElementById("session-sub"),
     };
 
     function escapeHtml(value) {
@@ -519,25 +403,23 @@ _HTML = """<!DOCTYPE html>
     }
 
     function formatDateTime(value) {
-      if (!value) {
-        return "unknown";
-      }
+      if (!value) return "unknown";
       const date = new Date(value);
       return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
     }
 
     function formatDuration(value) {
-      if (value === null || value === undefined) {
-        return "--";
-      }
-      return `${Number(value).toFixed(3)}s`;
+      if (value === null || value === undefined) return "--";
+      return `${Number(value).toFixed(1)}s`;
+    }
+
+    function eventColor(event) {
+      return EVENT_COLOR[event] || "";
     }
 
     async function fetchJson(path) {
       const response = await fetch(path, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Request failed: ${response.status}`);
       return response.json();
     }
 
@@ -545,7 +427,7 @@ _HTML = """<!DOCTYPE html>
       state.files = await fetchJson("/api/files");
       renderFiles();
       if (!state.files.length) {
-        dom.timeline.innerHTML = '<div class="empty">No log files were found in the selected directory.</div>';
+        dom.logPanel.innerHTML = '<div class="empty">No log files were found in the selected directory.</div>';
         return;
       }
       await loadSession(state.files[0].name);
@@ -553,14 +435,19 @@ _HTML = """<!DOCTYPE html>
 
     async function loadSession(name) {
       state.session = await fetchJson(`/api/logs/${encodeURIComponent(name)}`);
-      state.eventFilter = "all";
+      state.eventFilter = null;
+      state.labelFilter = null;
       state.turnFilter = "all";
-      state.runFilter = "all";
+      state.selectedLine = null;
+      renderAll();
+    }
+
+    function renderAll() {
       renderFiles();
-      renderFilters();
-      renderSummary();
-      renderRuns();
-      renderTimeline();
+      renderTopbar();
+      renderRailFilters();
+      renderRows();
+      renderInspector();
     }
 
     function renderFiles() {
@@ -568,121 +455,71 @@ _HTML = """<!DOCTYPE html>
         dom.fileList.innerHTML = '<div class="empty">No logs found.</div>';
         return;
       }
-
       dom.fileList.innerHTML = state.files.map((file) => {
         const active = state.session && state.session.file === file.name;
+        const title = file.scenario_title || "Unknown campaign";
+        const sub = `${file.character_id || "?"} · ${file.turns_completed ?? "?"}/${file.max_turns ?? "?"} turns`;
         return `
-          <button class="file-button ${active ? "active" : ""}" data-file="${escapeHtml(file.name)}">
-            <span class="file-name">${escapeHtml(file.name)}</span>
-            <span class="file-meta">${formatDateTime(file.modified_time)} · ${(file.size_bytes / 1024).toFixed(1)} KB</span>
+          <button class="session-row ${active ? "active" : ""}" data-file="${escapeHtml(file.name)}" title="${escapeHtml(file.name)}">
+            <span class="name">${escapeHtml(title)}</span>
+            <span class="sub">${escapeHtml(sub)}</span>
+            <span class="sub">${escapeHtml(formatDateTime(file.modified_time))}</span>
           </button>
         `;
       }).join("");
-
-      dom.fileList.querySelectorAll(".file-button").forEach((button) => {
-        button.addEventListener("click", () => loadSession(button.dataset.file));
-      });
     }
 
-    function renderFilters() {
-      if (!state.session) {
-        return;
-      }
-
-      dom.eventFilter.innerHTML = ["all", ...state.session.event_types]
-        .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value === "all" ? "All events" : value)}</option>`)
-        .join("");
-
-      dom.turnFilter.innerHTML = ["all", ...state.session.turns]
-        .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value === "all" ? "All turns" : `Turn ${value}`)}</option>`)
-        .join("");
-
-      const runLabels = state.session.runs.map((run) => run.label);
-      dom.runFilter.innerHTML = ["all", ...runLabels]
-        .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value === "all" ? "All runs" : value)}</option>`)
-        .join("");
-
-      dom.eventFilter.value = state.eventFilter;
-      dom.turnFilter.value = state.turnFilter;
-      dom.runFilter.value = state.runFilter;
-    }
-
-    function renderSummary() {
+    function renderTopbar() {
       const session = state.session;
+      if (!session) return;
       const summary = session.summary;
-      const stats = session.stats;
-      dom.sessionTitle.textContent = summary.character_id ? `${summary.character_id} · ${session.file}` : session.file;
-      dom.sessionMeta.textContent = `${formatDateTime(summary.started_at)} to ${formatDateTime(summary.finished_at)} · ${summary.turns_completed} turns completed`;
-      dom.sessionPath.textContent = session.path;
+      const title = summary.scenario_title || session.file;
+      dom.sessionTitle.textContent = summary.character_id ? `${title} · ${summary.character_id}` : title;
+      dom.sessionSub.textContent =
+        `${summary.turns_completed ?? 0}/${summary.max_turns ?? "?"} turns · ` +
+        `${session.stats.event_count} events · ${session.stats.run_count} runs · ${formatDuration(summary.duration_s)}`;
 
-      const cards = [
-        { label: "Turns", value: summary.turns_completed ?? 0, note: `Budget ${summary.max_turns ?? "--"}` },
-        { label: "Agent Runs", value: stats.run_count, note: `${stats.llm_message_count} LLM messages` },
-        { label: "Timeline", value: stats.event_count, note: `${session.event_types.length} event types` },
-        { label: "Duration", value: formatDuration(summary.duration_s), note: `${stats.error_count} parse errors` }
-      ];
-
-      dom.stats.innerHTML = cards.map((card) => `
-        <article class="stat">
-          <span class="stat-label">${escapeHtml(card.label)}</span>
-          <div class="stat-value">${escapeHtml(card.value)}</div>
-          <div class="small">${escapeHtml(card.note)}</div>
-        </article>
-      `).join("");
+      dom.turnFilter.innerHTML = ["all", ...session.turns]
+        .map((value) => `<option value="${escapeHtml(value)}">${value === "all" ? "All turns" : `Turn ${escapeHtml(value)}`}</option>`)
+        .join("");
+      dom.turnFilter.value = state.turnFilter;
     }
 
-    function renderRuns() {
-      if (!state.session.runs.length) {
-        dom.runs.innerHTML = '<div class="empty">No agent run spans were found in this log.</div>';
-        return;
-      }
+    function renderRailFilters() {
+      const session = state.session;
+      if (!session) return;
 
-      dom.runs.innerHTML = state.session.runs.map((run) => {
-        const active = state.runFilter === run.label;
-        const tools = run.tool_calls.length ? run.tool_calls.map((tool) => `<span class="pill">${escapeHtml(tool)}</span>`).join("") : '<span class="pill">No tools</span>';
-        return `
-          <button class="run-card ${active ? "active" : ""}" data-run="${escapeHtml(run.label)}">
-            <div class="run-title">${escapeHtml(run.label)}</div>
-            <div class="meta-row">
-              <span>Turn ${escapeHtml(run.turn ?? "-")}</span>
-              <span>${escapeHtml(formatDuration(run.elapsed_s))}</span>
-              <span>${escapeHtml(run.message_count)} messages</span>
-            </div>
-            <div class="pill-row">${tools}</div>
-          </button>
-        `;
-      }).join("");
+      dom.eventList.innerHTML = session.event_types.map((event) => `
+        <button class="filter-row ${state.eventFilter === event ? "active" : ""}" data-event="${escapeHtml(event)}">
+          <span class="dot ${eventColor(event)}"></span>${escapeHtml(event)}
+          <span class="count">${escapeHtml(session.event_counts[event])}</span>
+        </button>
+      `).join("");
 
-      dom.runs.querySelectorAll(".run-card").forEach((button) => {
-        button.addEventListener("click", () => {
-          state.runFilter = state.runFilter === button.dataset.run ? "all" : button.dataset.run;
-          dom.runFilter.value = state.runFilter;
-          renderRuns();
-          renderTimeline();
-        });
+      const labels = [...new Set(session.runs.map((run) => run.label))];
+      const labelCounts = {};
+      session.entries.forEach((entry) => {
+        if (entry.label) labelCounts[entry.label] = (labelCounts[entry.label] || 0) + 1;
       });
+      dom.labelList.innerHTML = labels.length
+        ? labels.map((label) => `
+            <button class="filter-row ${state.labelFilter === label ? "active" : ""}" data-label="${escapeHtml(label)}">
+              <span class="dot gold"></span>${escapeHtml(label)}
+              <span class="count">${escapeHtml(labelCounts[label] || 0)}</span>
+            </button>
+          `).join("")
+        : '<div class="empty">No agent runs recorded.</div>';
     }
 
     function filteredEntries() {
-      if (!state.session) {
-        return [];
-      }
-
+      if (!state.session) return [];
       const search = state.search.trim().toLowerCase();
       return state.session.entries.filter((entry) => {
-        if (state.eventFilter !== "all" && entry.event !== state.eventFilter) {
-          return false;
-        }
-        if (state.turnFilter !== "all" && String(entry.turn ?? "") !== state.turnFilter) {
-          return false;
-        }
-        if (state.runFilter !== "all" && entry.label !== state.runFilter) {
-          return false;
-        }
-        if (!search) {
-          return true;
-        }
-        const haystack = [entry.summary, entry.excerpt, entry.label, entry.event, entry.raw_pretty, JSON.stringify(entry.raw)]
+        if (state.eventFilter && entry.event !== state.eventFilter) return false;
+        if (state.labelFilter && entry.label !== state.labelFilter) return false;
+        if (state.turnFilter !== "all" && String(entry.turn ?? "") !== state.turnFilter) return false;
+        if (!search) return true;
+        const haystack = [entry.summary, entry.excerpt, entry.label, entry.event, entry.raw_pretty]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -690,68 +527,114 @@ _HTML = """<!DOCTYPE html>
       });
     }
 
-    function renderTimeline() {
+    function renderRows() {
       const entries = filteredEntries();
       if (!entries.length) {
-        dom.timeline.innerHTML = '<div class="empty">No events match the current filters.</div>';
+        dom.logPanel.innerHTML = '<div class="empty">No events match the current filters.</div>';
+        return;
+      }
+      dom.logPanel.innerHTML = entries.map((entry) => `
+        <div class="log-row ${state.selectedLine === entry.line ? "selected" : ""}" data-line="${entry.line}">
+          <span class="log-time">${escapeHtml(entry.display_time)}</span>
+          <span class="badge ${eventColor(entry.event)}">${escapeHtml(entry.message_kind || entry.event)}</span>
+          <span class="log-turn">${entry.turn !== null && entry.turn !== undefined ? "T" + escapeHtml(entry.turn) : ""}</span>
+          <span class="log-label">${escapeHtml(entry.label || "")}</span>
+          <span class="log-msg">${escapeHtml(entry.summary)}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderInspector() {
+      const session = state.session;
+      if (!session) {
+        dom.inspector.innerHTML = "";
+        return;
+      }
+      const entry = session.entries.find((candidate) => candidate.line === state.selectedLine);
+      if (!entry) {
+        renderSessionInspector(session);
         return;
       }
 
-      dom.timeline.innerHTML = entries.map((entry) => {
-        const turnPill = entry.turn !== null && entry.turn !== undefined ? `<span class="pill">Turn ${escapeHtml(entry.turn)}</span>` : "";
-        const runPill = entry.label ? `<span class="pill">${escapeHtml(entry.label)}</span>` : "";
-        const toolPills = [...(entry.tool_calls || []), ...(entry.tool_returns || [])]
-          .map((tool) => `<span class="pill">${escapeHtml(tool)}</span>`)
-          .join("");
-        const raw = escapeHtml(entry.raw_pretty || JSON.stringify(entry.raw, null, 2));
+      const tools = [...(entry.tool_calls || []), ...(entry.tool_returns || [])];
+      const usage = entry.usage
+        ? Object.entries(entry.usage).map(([key, value]) => `${key.replace("_tokens", "")} ${value}`).join(" · ")
+        : null;
 
-        return `
-          <article class="event-card">
-            <div class="event-top">
-              <div class="pill-row">
-                <span class="badge event-${escapeHtml(entry.event)}">${escapeHtml(entry.event)}</span>
-                ${turnPill}
-                ${runPill}
-                ${toolPills}
-              </div>
-              <div class="small">${escapeHtml(entry.display_time)} · line ${escapeHtml(entry.line)}</div>
-            </div>
-            <div class="event-main">
-              <div class="event-summary">${escapeHtml(entry.summary)}</div>
-              ${entry.excerpt ? `<div class="small">${escapeHtml(entry.excerpt)}</div>` : ""}
-            </div>
-            <details>
-              <summary>Raw event payload</summary>
-              <pre>${raw}</pre>
-            </details>
-          </article>
-        `;
-      }).join("");
+      dom.inspector.innerHTML = `
+        <h4>Event Detail</h4>
+        <div class="insp-field"><div class="insp-label">Summary</div><div class="insp-value">${escapeHtml(entry.summary)}</div></div>
+        <div class="insp-field"><div class="insp-label">Event</div><div class="insp-value">${escapeHtml(entry.message_kind || entry.event)}</div></div>
+        ${entry.label ? `<div class="insp-field"><div class="insp-label">Agent</div><div class="insp-value">${escapeHtml(entry.label)}</div></div>` : ""}
+        <div class="insp-field"><div class="insp-label">Time</div><div class="insp-value">${escapeHtml(entry.display_time)} · turn ${escapeHtml(entry.turn ?? "-")} · line ${escapeHtml(entry.line)}</div></div>
+        ${tools.length ? `<div class="insp-field"><div class="insp-label">Tools</div><div class="pill-row">${tools.map((tool) => `<span class="pill">${escapeHtml(tool)}</span>`).join("")}</div></div>` : ""}
+        ${usage ? `<div class="insp-field"><div class="insp-label">Tokens</div><div class="insp-value">${escapeHtml(usage)}</div></div>` : ""}
+        <div class="insp-field"><div class="insp-label">Payload</div><div class="payload">${escapeHtml(entry.raw_pretty || JSON.stringify(entry.raw, null, 2))}</div></div>
+      `;
     }
+
+    function renderSessionInspector(session) {
+      const summary = session.summary;
+      const tokens = { input_tokens: 0, output_tokens: 0 };
+      session.runs.forEach((run) => {
+        Object.keys(tokens).forEach((key) => { tokens[key] += run.tokens?.[key] || 0; });
+      });
+
+      dom.inspector.innerHTML = `
+        <h4>Session Overview</h4>
+        <div class="insp-field"><div class="insp-label">Campaign</div><div class="insp-value">${escapeHtml(summary.scenario_title || "unknown")}</div></div>
+        <div class="insp-field"><div class="insp-label">Character</div><div class="insp-value">${escapeHtml(summary.character_id || "unknown")}</div></div>
+        <div class="insp-field"><div class="insp-label">Started</div><div class="insp-value">${escapeHtml(formatDateTime(summary.started_at))}</div></div>
+        <div class="insp-field"><div class="insp-label">Duration</div><div class="insp-value">${escapeHtml(formatDuration(summary.duration_s))} · ${escapeHtml(summary.turns_completed ?? 0)}/${escapeHtml(summary.max_turns ?? "?")} turns</div></div>
+        <div class="insp-field"><div class="insp-label">Traffic</div><div class="insp-value">${escapeHtml(session.stats.run_count)} agent runs · ${escapeHtml(session.stats.llm_message_count)} LLM messages</div></div>
+        <div class="insp-field"><div class="insp-label">Tokens</div><div class="insp-value">${escapeHtml(tokens.input_tokens.toLocaleString())} in · ${escapeHtml(tokens.output_tokens.toLocaleString())} out</div></div>
+        ${session.stats.error_count ? `<div class="insp-field"><div class="insp-label">Parse errors</div><div class="insp-value">${escapeHtml(session.stats.error_count)}</div></div>` : ""}
+        <div class="insp-field"><div class="insp-label">File</div><div class="insp-value">${escapeHtml(session.path)}</div></div>
+        <div class="empty">Select a log row to inspect its payload.</div>
+      `;
+    }
+
+    dom.fileList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-file]");
+      if (button) loadSession(button.dataset.file);
+    });
+
+    dom.eventList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-event]");
+      if (!button) return;
+      state.eventFilter = state.eventFilter === button.dataset.event ? null : button.dataset.event;
+      renderRailFilters();
+      renderRows();
+    });
+
+    dom.labelList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-label]");
+      if (!button) return;
+      state.labelFilter = state.labelFilter === button.dataset.label ? null : button.dataset.label;
+      renderRailFilters();
+      renderRows();
+    });
+
+    dom.logPanel.addEventListener("click", (event) => {
+      const row = event.target.closest("[data-line]");
+      if (!row) return;
+      state.selectedLine = state.selectedLine === Number(row.dataset.line) ? null : Number(row.dataset.line);
+      renderRows();
+      renderInspector();
+    });
 
     dom.search.addEventListener("input", (event) => {
       state.search = event.target.value;
-      renderTimeline();
-    });
-
-    dom.eventFilter.addEventListener("change", (event) => {
-      state.eventFilter = event.target.value;
-      renderTimeline();
+      renderRows();
     });
 
     dom.turnFilter.addEventListener("change", (event) => {
       state.turnFilter = event.target.value;
-      renderTimeline();
-    });
-
-    dom.runFilter.addEventListener("change", (event) => {
-      state.runFilter = event.target.value;
-      renderRuns();
-      renderTimeline();
+      renderRows();
     });
 
     loadFiles().catch((error) => {
-      dom.timeline.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      dom.logPanel.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
     });
   </script>
 </body>

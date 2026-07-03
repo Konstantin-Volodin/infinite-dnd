@@ -16,7 +16,7 @@ from src.agents.time_keeper.agent import TimeKeeperDeps, agent as time_keeper_ag
 from src.agents.world_builder.agent import WorldBuilderDeps, agent as world_builder_agent
 from src.agents.world_builder.tools import Create
 from src.agents.action_resolver.agent import resolve
-from src.interface.logger import Logger
+from src.interface.session_log import Logger
 
 
 _AGENT_USAGE = UsageLimits(request_limit=12)
@@ -229,7 +229,12 @@ async def _run_game(scenario: str | None, character_id: str | None, max_turns: i
     print(manager.manifest.get("hook", ""))
     print(f"Playing as: {pc_id}\n")
 
-    logger = Logger(character_id=pc_id, max_turns=max_turns)
+    logger = Logger(
+        character_id=pc_id,
+        max_turns=max_turns,
+        scenario=manager.scenario,
+        scenario_title=manager.manifest.get("title", manager.scenario),
+    )
     try:
         logger.log_event("world_snapshot", **_snapshot(state))
         for t in range(max_turns):
