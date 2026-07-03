@@ -24,7 +24,7 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 ### ⚡ Running stuff
 - `infinite-dnd` - runs the game
 - `infinite-dnd --new-character` - runs the game with an interactively-created PC
-- `infinite-dnd-logs` - runs the log viewer
+- `infinite-dnd-state` - runs the app (World + Logs tabs)
 - `infinite-dnd-scorecard` - compares campaign runs
 - `infinite-dnd-dump-context` - dumps each agent's exact prompt/tools/context for inspection
 

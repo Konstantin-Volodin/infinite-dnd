@@ -29,10 +29,10 @@ _HTML = """<!DOCTYPE html>
       --text: #e8e8ec;
       --muted: #8b8b96;
       --faint: #57575f;
-      --accent: #7c6cf6;
-      --ember: #ff7a45;
-      --green: #34d399;
-      --amber: #f5b942;
+      --accent: #e6b450;
+      --ember: #e0704d;
+      --green: #8ec973;
+      --amber: #e6b450;
       --mono: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
       --sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
     }
@@ -59,15 +59,22 @@ _HTML = """<!DOCTYPE html>
 
     .topbar {
       display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 12px 18px;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px 18px 14px;
       background: var(--panel);
       border-bottom: 1px solid var(--border);
     }
 
-    .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 14px; white-space: nowrap; }
     .brand-mark { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, var(--accent), var(--ember)); flex-shrink: 0; }
+
+    .topbar-main { display: flex; align-items: center; gap: 14px; }
+
+    .tabs { display: flex; gap: 2px; padding: 3px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 8px; }
+    .tabs a { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-decoration: none; white-space: nowrap; }
+    .tabs a:hover { color: var(--text); }
+    .tabs a.active { background: var(--accent); color: #1a1408; }
 
     .search {
       flex: 1;
@@ -104,7 +111,7 @@ _HTML = """<!DOCTYPE html>
     }
 
     .seg button:hover { color: var(--text); }
-    .seg button.active { background: var(--accent); color: #fff; }
+    .seg button.active { background: var(--accent); color: #1a1408; }
 
     .session-meta { margin-left: auto; text-align: right; font-size: 12px; color: var(--muted); min-width: 0; }
     .session-meta .title { font-weight: 600; font-size: 13px; color: var(--text); }
@@ -133,7 +140,7 @@ _HTML = """<!DOCTYPE html>
 
     .session-row { display: block; width: 100%; padding: 8px 10px; border-radius: 8px; color: var(--muted); margin-bottom: 2px; }
     .session-row:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
-    .session-row.active { background: rgba(124, 108, 246, 0.13); color: var(--text); }
+    .session-row.active { background: rgba(230, 180, 80, 0.13); color: var(--text); }
     .session-row .name { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 2px; }
     .session-row .sub { display: block; font-size: 11px; color: var(--faint); }
     .session-row.active .sub { color: var(--muted); }
@@ -151,7 +158,7 @@ _HTML = """<!DOCTYPE html>
     }
 
     .filter-row:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
-    .filter-row.active { background: rgba(124, 108, 246, 0.13); color: var(--text); }
+    .filter-row.active { background: rgba(230, 180, 80, 0.13); color: var(--text); }
 
     .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--faint); }
     .dot.violet { background: var(--accent); }
@@ -195,15 +202,15 @@ _HTML = """<!DOCTYPE html>
     }
 
     .log-row:hover { background: rgba(255, 255, 255, 0.03); }
-    .log-row.selected { background: rgba(124, 108, 246, 0.08); }
+    .log-row.selected { background: rgba(230, 180, 80, 0.08); }
     .log-row.selected::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent); }
 
-    .log-time { font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+    .log-time { font-family: var(--mono); font-size: 11px; color: var(--faint); }
 
     .chip {
       display: inline-flex;
       align-items: center;
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: 600;
       letter-spacing: 0.04em;
       padding: 2px 7px;
@@ -217,10 +224,10 @@ _HTML = """<!DOCTYPE html>
       text-overflow: ellipsis;
     }
 
-    .chip.violet { color: #b3a8ff; background: rgba(124, 108, 246, 0.14); }
-    .chip.ember { color: var(--ember); background: rgba(255, 122, 69, 0.13); }
-    .chip.green { color: var(--green); background: rgba(52, 211, 153, 0.12); }
-    .chip.amber { color: var(--amber); background: rgba(245, 185, 66, 0.12); }
+    .chip.violet { color: #eac878; background: rgba(230, 180, 80, 0.14); }
+    .chip.ember { color: var(--ember); background: rgba(224, 112, 77, 0.13); }
+    .chip.green { color: var(--green); background: rgba(142, 201, 115, 0.12); }
+    .chip.amber { color: var(--amber); background: rgba(230, 180, 80, 0.12); }
 
     .log-msg { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .log-msg .who { color: var(--text); font-weight: 500; }
@@ -252,7 +259,7 @@ _HTML = """<!DOCTYPE html>
     .insp-value.mono { font-family: var(--mono); font-size: 12px; }
 
     .pill-row { display: flex; flex-wrap: wrap; gap: 5px; }
-    .pill { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 5px; background: rgba(124, 108, 246, 0.14); color: #b3a8ff; }
+    .pill { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 5px; background: rgba(230, 180, 80, 0.14); color: #eac878; }
 
     .payload {
       background: rgba(0, 0, 0, 0.35);
@@ -268,7 +275,7 @@ _HTML = """<!DOCTYPE html>
       overflow-x: auto;
     }
 
-    .payload .k { color: #b3a8ff; }
+    .payload .k { color: #eac878; }
     .payload .h { color: var(--text); font-weight: 600; }
 
     ::-webkit-scrollbar { width: 9px; height: 9px; }
@@ -284,16 +291,18 @@ _HTML = """<!DOCTYPE html>
 <body>
   <div class="app">
     <div class="topbar">
-      <div class="brand"><span class="brand-mark"></span>Infinite DnD</div>
-      <div class="search">🔍 <input id="search" placeholder="Search events, tools, dialogue..."></div>
-      <div class="seg" id="detail-seg">
-        <button data-detail="story" class="active">Story</button>
-        <button data-detail="runs">Runs</button>
-        <button data-detail="all">All</button>
-      </div>
-      <div class="session-meta">
-        <div class="title" id="session-title">Waiting for logs</div>
-        <div id="session-sub"></div>
+      <div class="brand"><span class="brand-mark"></span>infinite-dnd</div>
+      <div class="topbar-main">
+        <div class="search">🔍 <input id="search" placeholder="Search logs..."></div>
+        <div class="seg" id="detail-seg">
+          <button data-detail="story" class="active">Story</button>
+          <button data-detail="runs">Runs</button>
+          <button data-detail="all">All</button>
+        </div>
+        <div class="session-meta">
+          <div class="title" id="session-title">Waiting for logs</div>
+          <div id="session-sub"></div>
+        </div>
       </div>
     </div>
 
@@ -321,6 +330,7 @@ _HTML = """<!DOCTYPE html>
       pc_death: "ember",
       resolved: "green",
       world_snapshot: "amber",
+      player_action: "amber",
       agent_run_started: "",
       agent_run_finished: "",
       llm_message: "",
@@ -329,7 +339,7 @@ _HTML = """<!DOCTYPE html>
 
     const STORY_EVENTS = new Set([
       "game_session_started", "game_session_finished", "pc_death",
-      "resolved", "world_snapshot", "parse_error",
+      "resolved", "world_snapshot", "player_action", "parse_error",
     ]);
 
     const state = {
@@ -514,7 +524,7 @@ _HTML = """<!DOCTYPE html>
         const suffix = entry.event === "agent_run_finished" ? " ✓" : " …";
         return `<span class="chip violet">${escapeHtml((entry.label || "run") + suffix)}</span>`;
       }
-      const label = { game_session_started: "session", game_session_finished: "session", world_snapshot: "world", pc_death: "death", resolved: (entry.raw || {}).tool || "resolved", parse_error: "error" }[entry.event] || entry.event.replaceAll("_", " ");
+      const label = { game_session_started: "session", game_session_finished: "session", world_snapshot: "world", player_action: "player", pc_death: "death", resolved: (entry.raw || {}).tool || "resolved", parse_error: "error" }[entry.event] || entry.event.replaceAll("_", " ");
       return `<span class="chip ${EVENT_COLOR[entry.event] || ""}">${escapeHtml(label.toLowerCase())}</span>`;
     }
 
