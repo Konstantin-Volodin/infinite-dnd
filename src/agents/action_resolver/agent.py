@@ -163,7 +163,7 @@ _action_agent: Agent[_ActionResolverDeps, str] = Agent(
     model=create_model(),
     deps_type=_ActionResolverDeps,
     output_type=ToolOutput(str, name="done"),
-    instructions="Resolve exactly one character action into concrete state changes.",
+    instructions="Resolve exactly one character action into concrete state changes. Report the outcome in one short, plain sentence — no scene-setting or flourishes.",
 )
 
 # Public alias for tests / external imports.

@@ -40,7 +40,7 @@ def _prepare_output_tools(
     for td in tool_defs:
         if td.name == "speak":
             hint = f"Valid targets: {', '.join(targets)}." if targets else "No one else here — leave target empty."
-            result.append(replace(td, description=f"say something. {hint}"))
+            result.append(replace(td, description=f"say something short — 1-2 sentences, like real speech. {hint}"))
         elif td.name == "travel":
             if options:
                 result.append(replace(td, description=f"travel to a connected location. Valid ids: {', '.join(options)}."))
@@ -57,7 +57,7 @@ def speak_output(
     message: str,
     target: str | None = None,
 ) -> Speak:
-    """say something. can be targeted dialogue or thinking out loud."""
+    """say something short — 1-2 sentences, like real speech. can be targeted dialogue or thinking out loud."""
     targets = _living_targets(ctx)
     if target and target not in targets:
         hint = f"Valid targets: {', '.join(targets)}." if targets else "No one else is here."
@@ -83,7 +83,7 @@ def action_output(
     description: str,
     target: str | None = None,
 ) -> Action:
-    """take a concrete action — search, examine, attempt, interact, discover. describe what and how. use this when you can make progress, not just when speak/travel don't fit."""
+    """take a concrete action — search, examine, attempt, interact, discover. describe what and how in one plain sentence — no flourishes. use this when you can make progress, not just when speak/travel don't fit."""
     return Action(actor=ctx.deps.char.id, description=description, target=target)
 
 
