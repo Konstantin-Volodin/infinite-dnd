@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    volumes:
+      - ./world-state:/app/world-state:ro
+      - ./logs:/app/logs:ro
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy_data:

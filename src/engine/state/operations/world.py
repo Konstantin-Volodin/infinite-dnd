@@ -8,17 +8,31 @@ from src.engine.state.operations._base import _OpsBase
 
 class WorldOps(_OpsBase):
     # ============ QUESTS ============
-    def advance_quest(self, quest_id: str, new_status: str | None = None, step: str | None = None) -> str:
+    def advance_quest(self, quest_id: str, new_status: str | None = None, step: str | None = None, advance: bool = False) -> str:
         quest = self.state.quests.get(quest_id)
         if not quest: return f"Cannot advance quest — '{quest_id}' not found."
 
-        if new_status: quest.status = new_status
-        if step: quest.steps.append(step)
+        # `advance` accomplishes the CURRENT plan objective: log it, move the pointer, maybe auto-complete.
+        # `step` alone (no advance) is a plain log note — used alongside explicit new_status.
+        awarded_step = False
+        if advance:
+            objective = quest.plan[quest.current_step] if quest.current_step < len(quest.plan) else None
+            note = f"{objective} — {step}" if objective and step else (objective or step or "objective accomplished")
+            quest.steps.append(note)
+            quest.current_step += 1
+            awarded_step = True
+            if quest.plan and quest.current_step >= len(quest.plan) and not new_status:
+                new_status = "completed"
+        elif step:
+            quest.steps.append(step)
 
-        # XP award to owner — step=10, completion=50. Silent if owner isn't a known character.
+        if new_status: quest.status = new_status
+        if advance or new_status: self.state.last_quest_advance_time = self.state.time  # stall detection
+
+        # XP award to owner — step/advance=10, completion=50. Silent if owner isn't a known character.
         award_suffix = ""
         if quest.owner and quest.owner in self.state.characters:
-            if step:
+            if awarded_step:
                 self.award_xp(quest.owner, 10, reason=f"quest '{quest_id}' progress")
                 award_suffix = f" (+10 XP to {quest.owner})"
             if new_status == "completed":
@@ -26,11 +40,11 @@ class WorldOps(_OpsBase):
                 award_suffix = f" (+50 XP to {quest.owner})"
         return f"Quest '{quest_id}' updated.{award_suffix}"
 
-    def add_quest(self, quest_id: str, title: str, description: str = "", owner: str | None = None) -> str:
+    def add_quest(self, quest_id: str, title: str, description: str = "", owner: str | None = None, plan: list[str] | None = None) -> str:
         if quest_id in self.state.quests: return f"Quest '{quest_id}' already exists."
 
         owner_id = owner or ""
-        self.state.quests[quest_id] = Quest(id=quest_id, title=title, description=description, owner=owner_id)
+        self.state.quests[quest_id] = Quest(id=quest_id, title=title, description=description, owner=owner_id, plan=plan or [])
         owner_loc = self.state.characters[owner_id].location if owner_id in self.state.characters else ""
         self._log(f"New quest: '{title}'" + (f" (owner: {owner_id})" if owner_id else ""), owner_loc, [owner_id] if owner_id else None)
         return f"Quest '{quest_id}' added."
@@ -119,6 +133,13 @@ class WorldOps(_OpsBase):
 
         del self.state.locations[location_id]
         return f"Location '{location_id}' removed."
+
+    # ============ EVENTS ============
+    def world_event(self, text: str, location_id: str) -> str:
+        """log a narrative event witnessed by everyone present at the location."""
+        witnesses = [cid for cid, c in self.state.characters.items() if c.location == location_id]
+        self._log(text, location_id, witnesses)
+        return text
 
     # ============ TIME ============
     def tick_time(self, event_text: str, location: str, characters: list[str] | None = None) -> str:

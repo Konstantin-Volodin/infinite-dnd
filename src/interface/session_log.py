@@ -31,12 +31,15 @@ class Logger:
         scenario: str | None = None,
         scenario_title: str | None = None,
         log_dir: Path = DEFAULT_LOG_DIR,
+        session_id: str | None = None,
+        append: bool = False,
     ):
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(exist_ok=True)
-        self.session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.session_id = session_id or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.turn = 0
-        self._file = (self.log_dir / f"{self.session_id}.log").open("w", encoding="utf-8")
+        mode = "a" if append else "w"
+        self._file = (self.log_dir / f"{self.session_id}.log").open(mode, encoding="utf-8")
         self._log(
             "game_session_started",
             character_id=character_id,

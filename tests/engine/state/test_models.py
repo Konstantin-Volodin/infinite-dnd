@@ -39,6 +39,16 @@ def test_quest():
     assert quest.status == "active"
     assert quest.owner == "hero-1"
     assert quest.description == "defeat the dragon"
+    # back-compat defaults — old snapshots/scenarios without plan still construct fine
+    assert quest.plan == []
+    assert quest.current_step == 0
+    assert quest.steps == []
+
+
+def test_quest_with_plan():
+    quest = Quest(id="q2", title="Slay Dragon", description="defeat the dragon", plan=["find the lair", "slay the dragon"])
+    assert quest.plan == ["find the lair", "slay the dragon"]
+    assert quest.current_step == 0
 
 
 def test_world_state():

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from src.interface.world_state import format_clock, list_state_scenarios, list_ticks, load_view
+from src.interface.world_state import format_clock, list_state_runs, list_ticks, load_view
 
 
 def _snapshot(tick: int, **overrides) -> dict:
@@ -25,39 +25,40 @@ def _snapshot(tick: int, **overrides) -> dict:
     return base
 
 
-def _write(tmp_path, scenario: str, tick: int, snapshot: dict) -> None:
-    scenario_dir = tmp_path / scenario
-    scenario_dir.mkdir(exist_ok=True)
-    (scenario_dir / f"world_state_{tick}.json").write_text(json.dumps(snapshot), encoding="utf-8")
+def _write(tmp_path, scenario: str, tick: int, snapshot: dict, run_id: str = "run-1") -> None:
+    run_dir = tmp_path / scenario / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / f"world_state_{tick}.json").write_text(json.dumps(snapshot), encoding="utf-8")
 
 
 def test_list_ticks_sorted_numerically(tmp_path):
     for tick in (0, 2, 10, 1):
         _write(tmp_path, "demo", tick, _snapshot(tick))
-    assert list_ticks(tmp_path / "demo") == [0, 1, 2, 10]
+    assert list_ticks(tmp_path / "demo" / "run-1") == [0, 1, 2, 10]
 
 
-def test_list_state_scenarios(tmp_path):
+def test_list_state_runs(tmp_path):
     _write(tmp_path, "demo", 0, _snapshot(0))
     _write(tmp_path, "demo", 1, _snapshot(1))
     (tmp_path / "empty-dir").mkdir()
 
-    scenarios = list_state_scenarios(tmp_path)
-    assert len(scenarios) == 1
-    assert scenarios[0]["scenario"] == "demo"
-    assert scenarios[0]["tick_count"] == 2
-    assert scenarios[0]["latest_tick"] == 1
+    runs = list_state_runs(tmp_path)
+    assert len(runs) == 1
+    assert runs[0]["scenario"] == "demo"
+    assert runs[0]["run_id"] == "run-1"
+    assert runs[0]["tick_count"] == 2
+    assert runs[0]["latest_tick"] == 1
 
 
-def test_list_state_scenarios_missing_dir(tmp_path):
-    assert list_state_scenarios(tmp_path / "nope") == []
+def test_list_state_runs_missing_dir(tmp_path):
+    assert list_state_runs(tmp_path / "nope") == []
 
 
 def test_load_view_defaults_to_latest(tmp_path):
     _write(tmp_path, "demo", 0, _snapshot(0))
     _write(tmp_path, "demo", 1, _snapshot(1, minutes_elapsed=95))
 
-    view = load_view(tmp_path, "demo", None)
+    view = load_view(tmp_path, "demo", "run-1", None)
     assert view["tick"] == 1
     assert view["latest_tick"] == 1
     assert view["ticks"] == [0, 1]
@@ -67,9 +68,9 @@ def test_load_view_defaults_to_latest(tmp_path):
 def test_load_view_missing_tick_raises(tmp_path):
     _write(tmp_path, "demo", 0, _snapshot(0))
     with pytest.raises(FileNotFoundError):
-        load_view(tmp_path, "demo", 7)
+        load_view(tmp_path, "demo", "run-1", 7)
     with pytest.raises(FileNotFoundError):
-        load_view(tmp_path, "missing", None)
+        load_view(tmp_path, "missing", "run-1", None)
 
 
 def test_diff_between_ticks(tmp_path):
@@ -88,7 +89,7 @@ def test_diff_between_ticks(tmp_path):
     _write(tmp_path, "demo", 0, first)
     _write(tmp_path, "demo", 1, second)
 
-    changes = load_view(tmp_path, "demo", 1)["changes"]
+    changes = load_view(tmp_path, "demo", "run-1", 1)["changes"]
     hero = changes["characters"]["hero"]
     assert hero["hp"] == -2
     assert hero["xp"] == 30
@@ -103,7 +104,7 @@ def test_diff_between_ticks(tmp_path):
 
 def test_first_tick_has_no_changes(tmp_path):
     _write(tmp_path, "demo", 0, _snapshot(0))
-    assert load_view(tmp_path, "demo", 0)["changes"] is None
+    assert load_view(tmp_path, "demo", "run-1", 0)["changes"] is None
 
 
 def test_history_clocks_accumulate(tmp_path):
@@ -112,7 +113,7 @@ def test_history_clocks_accumulate(tmp_path):
         {"text": "b", "location": "tavern", "characters": [], "minutes_elapsed": 1450},
     ])
     _write(tmp_path, "demo", 0, snapshot)
-    assert load_view(tmp_path, "demo", 0)["history_clocks"] == ["day 1 · 00:30", "day 2 · 00:40"]
+    assert load_view(tmp_path, "demo", "run-1", 0)["history_clocks"] == ["day 1 · 00:30", "day 2 · 00:40"]
 
 
 def test_format_clock():

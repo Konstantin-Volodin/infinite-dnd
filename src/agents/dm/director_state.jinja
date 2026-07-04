@@ -1,0 +1,35 @@
+## recent events
+{% if recent_events %}
+{% for event in recent_events %}
+- {{ event }}
+{% endfor %}
+{% else %}
+_no prior events._
+{% endif %}
+
+## 🗺️ active quests
+{% for q in quests %}
+- **{{ q.id }}** — {{ q.title }} _(status: {{ q.status }})_
+  - {{ q.description }}
+  - owner: {{ q.owner }}
+{% if q.plan %}
+  - plan:
+{% for step in q.plan %}
+    {{ '→ current: ' if loop.index0 == q.current_step else ('- done: ' if loop.index0 < q.current_step else '- ') }}{{ step }}
+{% endfor %}
+{% endif %}
+{% if interventions.get(q.id) %}
+  - this is intervention #{{ interventions[q.id] + 1 }} on this thread — escalate stakes on the existing thread rather than introducing a new sidetrack.
+{% endif %}
+{% endfor %}
+{% if interventions.get('world') %}
+- untargeted interventions so far: {{ interventions['world'] }} — prefer tying this one to a quest above.
+{% endif %}
+
+## 🎬 scene
+- location: {{ location_id }}
+- present: {{ present | join(', ') if present else 'no one' }}
+
+---
+
+Call `report` with exactly one complication grounded in the state above.

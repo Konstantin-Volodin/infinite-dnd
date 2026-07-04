@@ -2,17 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
-import json
-import webbrowser
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
-
-from src.interface.viewer import _pick_port
-from src.interface.world_state import DEFAULT_STATE_DIR, list_state_scenarios, load_series, load_view
-
 _HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,8 +33,10 @@ _HTML = """<!DOCTYPE html>
     body {
       color: var(--text);
       font-family: var(--sans);
-      font-size: 13px;
-      background: var(--bg);
+      font-size: 14px;
+      background:
+        radial-gradient(1100px 480px at 72% -140px, rgba(230, 180, 80, 0.05), transparent 70%),
+        var(--bg);
       -webkit-font-smoothing: antialiased;
     }
 
@@ -53,7 +44,7 @@ _HTML = """<!DOCTYPE html>
     button { cursor: pointer; background: none; border: none; text-align: left; }
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 
-    .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+    .app { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100vh; }
 
     /* ── Topbar ─────────────────────────────────────────── */
 
@@ -66,17 +57,17 @@ _HTML = """<!DOCTYPE html>
       border-bottom: 1px solid var(--border);
     }
 
-    .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 15px; white-space: nowrap; }
     .brand-mark { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, var(--accent), var(--ember)); flex-shrink: 0; }
 
     .topbar-main { display: flex; align-items: center; gap: 14px; }
 
     .tabs { display: flex; gap: 2px; padding: 3px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 8px; }
-    .tabs a { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-decoration: none; white-space: nowrap; }
+    .tabs a { padding: 5px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; white-space: nowrap; }
     .tabs a:hover { color: var(--text); }
     .tabs a.active { background: var(--accent); color: #1a1408; }
 
-    select#scenario {
+    select#run {
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -84,7 +75,7 @@ _HTML = """<!DOCTYPE html>
       color: var(--text);
       max-width: 260px;
     }
-    select#scenario option { background: var(--panel); }
+    select#run option { background: var(--panel); }
 
     .tick-controls { display: flex; align-items: center; gap: 8px; flex: 1; max-width: 460px; }
     .tick-controls button {
@@ -93,11 +84,11 @@ _HTML = """<!DOCTYPE html>
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
       color: var(--muted);
-      font-size: 12px;
+      font-size: 13px;
     }
     .tick-controls button:hover { color: var(--text); }
     .tick-controls input[type="range"] { flex: 1; accent-color: var(--accent); }
-    .tick-label { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .tick-label { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 
     .live-btn {
       display: flex;
@@ -107,7 +98,7 @@ _HTML = """<!DOCTYPE html>
       border-radius: 8px;
       border: 1px solid var(--border);
       background: rgba(255, 255, 255, 0.04);
-      font-size: 12px;
+      font-size: 12.5px;
       font-weight: 600;
       color: var(--muted);
       white-space: nowrap;
@@ -117,8 +108,8 @@ _HTML = """<!DOCTYPE html>
     .live-btn.on .dot { background: #1a1408; animation: pulse 1.4s ease-in-out infinite; }
     @keyframes pulse { 50% { opacity: 0.3; } }
 
-    .session-meta { margin-left: auto; text-align: right; font-size: 12px; color: var(--muted); min-width: 0; }
-    .session-meta .title { font-weight: 600; font-size: 13px; color: var(--text); }
+    .session-meta { margin-left: auto; text-align: right; font-size: 12.5px; color: var(--muted); min-width: 0; }
+    .session-meta .title { font-weight: 600; font-size: 14px; color: var(--text); }
     .session-meta .clock { font-family: var(--mono); }
 
     /* ── Body ───────────────────────────────────────────── */
@@ -136,13 +127,18 @@ _HTML = """<!DOCTYPE html>
     }
 
     h3.section {
-      font-size: 10.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--faint);
-      margin: 0 6px 8px;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+      margin: 0 6px 10px;
     }
+    h3.section::before { content: ""; width: 3px; height: 11px; border-radius: 2px; background: var(--accent); opacity: 0.8; }
+    h3.section .count { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--faint); letter-spacing: 0; }
 
     /* ── Map ────────────────────────────────────────────── */
 
@@ -165,49 +161,50 @@ _HTML = """<!DOCTYPE html>
     .map-node.pc .body { fill: rgba(230, 180, 80, 0.30); stroke: var(--accent); }
     .map-node.fresh .body { stroke: var(--green); }
     .map-node .halo { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-dasharray: 3 3; }
-    .map-node .label { fill: var(--muted); font-family: var(--mono); font-size: 10.5px; text-anchor: middle; pointer-events: none; }
+    .map-node .label { fill: var(--muted); font-family: var(--mono); font-size: 11px; text-anchor: middle; pointer-events: none; }
     .map-node.pc .label { fill: #eac878; }
     .map-node .count { fill: var(--text); font-family: var(--mono); font-size: 10px; font-weight: 600; text-anchor: middle; pointer-events: none; }
     .map-node .items-dot { fill: var(--amber); }
 
     .loc-detail { overflow-y: auto; padding: 2px 6px; min-height: 0; }
-    .loc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
-    .loc-head .name { font-weight: 600; font-size: 13px; }
-    .loc-desc { font-size: 11.5px; color: var(--muted); line-height: 1.55; margin-bottom: 8px; }
-    .loc-field { margin-bottom: 9px; }
-    .loc-field .k { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin-bottom: 3px; }
-    .loc-detail .who { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .loc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .loc-head .name { font-weight: 600; font-size: 14px; }
+    .loc-desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 9px; }
+    .loc-field { margin-bottom: 10px; }
+    .loc-field .k { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin-bottom: 4px; }
+    .loc-detail .who { font-size: 13px; color: var(--muted); line-height: 1.6; }
     .loc-detail .pc { color: #eac878; font-weight: 600; }
     .loc-detail .dead { color: var(--faint); text-decoration: line-through; }
 
     /* ── Characters ─────────────────────────────────────── */
 
-    .char-panel { overflow-y: auto; padding: 16px 18px; min-width: 0; }
+    .char-panel { overflow-y: auto; padding: 18px 22px; min-width: 0; }
 
-    .char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
 
     .char-card {
-      background: var(--panel);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 55%), var(--panel);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
+      border-radius: 12px;
+      padding: 16px;
       min-width: 0;
+      transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
     }
-    .char-card:hover { border-color: rgba(255, 255, 255, 0.14); }
+    .char-card:hover { border-color: rgba(255, 255, 255, 0.16); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
     .char-card.pc { border-color: rgba(230, 180, 80, 0.45); }
     .char-card.dead { opacity: 0.55; }
     .char-card.changed { border-color: rgba(230, 180, 80, 0.4); }
 
-    .char-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
-    .char-head .name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .char-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin-bottom: 10px; }
+    .char-head .name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
 
     .chip {
       display: inline-flex;
       align-items: center;
-      font-size: 10.5px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.04em;
-      padding: 2px 7px;
+      padding: 2px 8px;
       border-radius: 5px;
       color: var(--muted);
       background: rgba(255, 255, 255, 0.05);
@@ -223,54 +220,96 @@ _HTML = """<!DOCTYPE html>
     .hp-bar.mid span { background: var(--amber); }
     .hp-bar.low span { background: var(--ember); }
 
-    .stat-line { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    .stat-line { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--muted); }
 
-    .char-loc { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+    .char-loc { font-size: 12.5px; color: var(--muted); margin-top: 9px; }
     .char-loc .at { color: var(--faint); }
 
-    .inv-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
-    .pill { font-family: var(--mono); font-size: 10.5px; padding: 1px 7px; border-radius: 5px; background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+    .inv-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .pill { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 5px; background: rgba(255, 255, 255, 0.05); color: var(--muted); }
 
-    .char-goal { font-size: 11.5px; color: var(--faint); margin-top: 8px; line-height: 1.5; }
+    .char-goal { font-size: 12.5px; color: var(--muted); margin-top: 9px; line-height: 1.55; }
 
     .delta-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 
     /* ── Right column ───────────────────────────────────── */
 
-    .side { border-left: 1px solid var(--border); background: var(--panel); display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+    .side { border-left: 1px solid var(--border); background: var(--panel); display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+    .side h3.section { padding: 14px 16px 0; margin: 0 0 8px; }
 
-    .quests { padding: 16px; overflow-y: auto; max-height: 45%; border-bottom: 1px solid var(--border); }
+    .side-panel { overflow-y: auto; padding: 0 16px 14px; min-height: 0; }
 
-    .quest-card { border: 1px solid var(--border); border-radius: 9px; padding: 11px 12px; margin-bottom: 8px; }
+    .quest-card {
+      border: 1px solid var(--border);
+      border-left: 3px solid transparent;
+      border-radius: 10px;
+      padding: 13px 14px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.015);
+      transition: opacity 0.15s ease, border-color 0.15s ease;
+    }
     .quest-card:hover { border-color: rgba(255, 255, 255, 0.14); }
+    .quest-card.active { border-left-color: var(--accent); }
+    .quest-card.done { opacity: 0.6; }
     .quest-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-    .quest-head .title { font-weight: 600; font-size: 12.5px; }
-    .quest-steps { margin: 7px 0 0; padding-left: 16px; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
-    .quest-owner { font-size: 10.5px; color: var(--faint); margin-top: 5px; font-family: var(--mono); }
+    .quest-head .title { font-weight: 600; font-size: 13.5px; }
+    .quest-steps { margin: 8px 0 0; padding-left: 17px; color: var(--muted); font-size: 12.5px; line-height: 1.65; }
+    .quest-owner { font-size: 11px; color: var(--faint); margin-top: 6px; font-family: var(--mono); }
 
-    .history { display: grid; grid-template-rows: auto 1fr; min-height: 0; padding: 16px 0 0; }
-    .history h3.section { padding: 0 16px; }
-    .feed { overflow-y: auto; padding: 0 16px 16px; }
+    /* ── Story feed ─────────────────────────────────────── */
 
-    .event-row { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
-    .event-row .clock { font-family: var(--mono); font-size: 10.5px; color: var(--faint); padding-top: 2px; }
-    .event-row .text { font-size: 12px; color: var(--muted); line-height: 1.55; word-break: break-word; }
+    .story {
+      height: max(200px, 30vh);
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
+    }
+    .story h3.section { padding: 12px 20px 0; margin: 0 0 6px; }
+    .story-body {
+      overflow-y: auto;
+      padding: 10px 20px 16px;
+      min-height: 0;
+      mask-image: linear-gradient(to bottom, transparent, black 14px);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, black 14px);
+    }
+    .feed { max-width: 980px; margin: 0 auto; }
+
+    .event-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); border-left: 2px solid transparent; border-radius: 6px; }
+    .event-row:hover { background: rgba(255, 255, 255, 0.025); }
+    .event-row .clock { font-family: var(--mono); font-size: 11px; color: var(--faint); padding-top: 2px; }
+    .event-row .text { font-size: 13.5px; color: var(--muted); line-height: 1.55; word-break: break-word; }
+    .event-row.fresh { border-left-color: var(--accent); }
     .event-row.fresh .text { color: var(--text); }
-    .event-row .where { color: var(--faint); font-size: 10.5px; }
+    .event-row .where {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 7px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--faint);
+      font-size: 10.5px;
+      font-family: var(--mono);
+      vertical-align: middle;
+    }
 
-    .empty { padding: 26px; text-align: center; color: var(--faint); }
+    .empty { padding: 26px 18px; text-align: center; color: var(--faint); font-size: 13px; border: 1px dashed rgba(255, 255, 255, 0.09); border-radius: 10px; }
 
-    .drawer { position: fixed; z-index: 20; inset: 0; background: rgba(0,0,0,.72); display: none; align-items: center; justify-content: center; }
+    .drawer { position: fixed; z-index: 20; inset: 0; background: rgba(0,0,0,.72); display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); cursor: pointer; }
     .drawer.open { display: flex; }
-    .dialog { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow: auto; background: var(--panel); border: 1px solid rgba(230,180,80,.3); border-radius: 12px; padding: 22px; box-shadow: 0 24px 70px #000; }
+    .dialog { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow: auto; background: var(--panel); border: 1px solid rgba(230,180,80,.3); border-radius: 12px; padding: 24px; box-shadow: 0 24px 70px #000; cursor: auto; }
     .dialog-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
-    .dialog h2 { margin:0; font-size:17px; }
+    .dialog h2 { margin:0; font-size:18px; }
+    .dialog-head button { font-size: 20px; line-height: 1; color: var(--muted); padding: 4px 10px; border-radius: 7px; }
+    .dialog-head button:hover { color: var(--text); background: rgba(255,255,255,.06); }
+    .dialog-hint { margin-top: 18px; text-align: center; font-size: 11px; color: var(--faint); }
     .char-card { cursor:pointer; }
     .spark { width:82px; height:22px; margin-left:auto; overflow:visible; }
     .spark polyline { fill:none; stroke:var(--accent); stroke-width:1.5; vector-effect:non-scaling-stroke; }
     .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .detail-field { border-top:1px solid var(--border); padding-top:10px; }
-    .detail-field .k { display:block; color:var(--accent); font:10px var(--mono); text-transform:uppercase; margin-bottom:6px; }
+    .detail-field .k { display:block; color:var(--accent); font:11px var(--mono); text-transform:uppercase; margin-bottom:6px; }
 
     ::-webkit-scrollbar { width: 9px; height: 9px; }
     ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 5px; }
@@ -287,7 +326,7 @@ _HTML = """<!DOCTYPE html>
     <div class="topbar">
       <div class="brand"><span class="brand-mark"></span>infinite-dnd</div>
       <div class="topbar-main">
-        <select id="scenario"></select>
+        <select id="run"></select>
         <div class="tick-controls">
           <button id="tick-prev" title="Previous tick">‹</button>
           <input type="range" id="tick-slider" min="0" max="0" value="0">
@@ -310,20 +349,19 @@ _HTML = """<!DOCTYPE html>
       </div>
 
       <div class="char-panel">
-        <h3 class="section">Characters</h3>
+        <h3 class="section">Characters <span class="count" id="char-count"></span></h3>
         <div class="char-grid" id="char-grid"></div>
       </div>
 
       <div class="side">
-        <div class="quests">
-          <h3 class="section">Quests</h3>
-          <div id="quest-list"></div>
-        </div>
-        <div class="history">
-          <h3 class="section">History</h3>
-          <div class="feed" id="feed"></div>
-        </div>
+        <h3 class="section">Quests <span class="count" id="quest-count">0</span></h3>
+        <div class="side-panel" id="panel-quests"><div id="quest-list"></div></div>
       </div>
+    </div>
+
+    <div class="story">
+      <h3 class="section">Story <span class="count" id="story-count">0</span></h3>
+      <div class="story-body" id="story-body"><div class="feed" id="feed"></div></div>
     </div>
   </div>
 
@@ -334,8 +372,9 @@ _HTML = """<!DOCTYPE html>
     const QUEST_COLOR = { active: "amber", completed: "green", failed: "ember" };
 
     const state = {
-      scenarios: [],
+      runs: [],
       scenario: null,
+      runId: null,
       view: null,
       live: true,
       timer: null,
@@ -346,7 +385,7 @@ _HTML = """<!DOCTYPE html>
     };
 
     const dom = {
-      scenario: document.getElementById("scenario"),
+      run: document.getElementById("run"),
       slider: document.getElementById("tick-slider"),
       tickLabel: document.getElementById("tick-label"),
       tickPrev: document.getElementById("tick-prev"),
@@ -358,8 +397,12 @@ _HTML = """<!DOCTYPE html>
       mapSvg: document.getElementById("map-svg"),
       locDetail: document.getElementById("loc-detail"),
       charGrid: document.getElementById("char-grid"),
+      charCount: document.getElementById("char-count"),
       questList: document.getElementById("quest-list"),
+      questCount: document.getElementById("quest-count"),
       feed: document.getElementById("feed"),
+      storyBody: document.getElementById("story-body"),
+      storyCount: document.getElementById("story-count"),
     };
 
     function escapeHtml(value) {
@@ -385,34 +428,41 @@ _HTML = """<!DOCTYPE html>
       return response.json();
     }
 
-    async function loadScenarios() {
-      state.scenarios = await fetchJson("/api/scenarios");
-      renderScenarios();
-      if (!state.scenarios.length) {
+    function runKey(scenario, runId) {
+      return `${scenario}/${runId}`;
+    }
+
+    async function loadRuns() {
+      state.runs = await fetchJson("/api/runs");
+      renderRuns();
+      if (!state.runs.length) {
         dom.charGrid.innerHTML = "";
         dom.metaTitle.textContent = "No snapshots yet";
         dom.locDetail.innerHTML = '<div class="empty">Run a game to produce world-state snapshots.</div>';
         return;
       }
-      if (!state.scenario || !state.scenarios.some((s) => s.scenario === state.scenario)) {
-        state.scenario = state.scenarios[0].scenario;
-        dom.scenario.value = state.scenario;
+      if (!state.scenario || !state.runId || !state.runs.some((r) => r.scenario === state.scenario && r.run_id === state.runId)) {
+        state.scenario = state.runs[0].scenario;
+        state.runId = state.runs[0].run_id;
+        dom.run.value = runKey(state.scenario, state.runId);
       }
       await loadView(null);
     }
 
     async function loadView(tick) {
-      if (!state.scenario) return;
+      if (!state.scenario || !state.runId) return;
       const query = tick === null || tick === undefined ? "" : `?tick=${tick}`;
-      state.view = await fetchJson(`/api/state/${encodeURIComponent(state.scenario)}${query}`);
-      state.series = await fetchJson(`/api/series/${encodeURIComponent(state.scenario)}`);
+      const scenarioPart = encodeURIComponent(state.scenario);
+      const runPart = encodeURIComponent(state.runId);
+      state.view = await fetchJson(`/api/state/${scenarioPart}/${runPart}${query}`);
+      state.series = await fetchJson(`/api/series/${scenarioPart}/${runPart}`);
       renderAll();
     }
 
-    function renderScenarios() {
-      dom.scenario.innerHTML = state.scenarios.map((s) => `
-        <option value="${escapeHtml(s.scenario)}" ${s.scenario === state.scenario ? "selected" : ""}>
-          ${escapeHtml(s.title)} (${escapeHtml(s.tick_count)} ticks)
+    function renderRuns() {
+      dom.run.innerHTML = state.runs.map((r) => `
+        <option value="${escapeHtml(runKey(r.scenario, r.run_id))}" ${r.scenario === state.scenario && r.run_id === state.runId ? "selected" : ""}>
+          ${escapeHtml(r.title)} · ${escapeHtml(r.run_id)} (${escapeHtml(r.tick_count)} ticks)
         </option>
       `).join("");
     }
@@ -614,6 +664,7 @@ _HTML = """<!DOCTYPE html>
       const chars = Object.values(view.state.characters || {});
       chars.sort((a, b) => (a.id === view.pc ? -1 : b.id === view.pc ? 1 : a.id.localeCompare(b.id)));
 
+      dom.charCount.textContent = chars.length || "";
       dom.charGrid.innerHTML = chars.map((c) => {
         const stats = c.stats || {};
         const dead = (stats.hp ?? 1) <= 0;
@@ -660,7 +711,8 @@ _HTML = """<!DOCTYPE html>
         <div class="detail-field"><span class="k">Stats</span>${escapeHtml(stats.hp ?? 0)}/${escapeHtml(stats.max_hp ?? "?")} HP · level ${escapeHtml(stats.level ?? 1)} · ${escapeHtml(stats.xp ?? 0)} XP · ${escapeHtml(stats.gold ?? 0)} gold</div>
         <div class="detail-field"><span class="k">Backstory</span>${escapeHtml(c.backstory || "—")}</div><div class="detail-field"><span class="k">Personality</span>${escapeHtml(c.personality || "—")}</div>
         <div class="detail-field"><span class="k">Relationships</span>${Object.entries(c.relationships || {}).map(([k,v]) => `${escapeHtml(k)}: ${escapeHtml(v)}`).join("<br>") || "—"}</div>
-        <div class="detail-field"><span class="k">Knowledge</span>${(c.knowledge || []).map(escapeHtml).join("<br>") || "—"}</div></div>`;
+        <div class="detail-field"><span class="k">Knowledge</span>${(c.knowledge || []).map(escapeHtml).join("<br>") || "—"}</div></div>
+        <div class="dialog-hint">esc or click outside to close</div>`;
       document.getElementById("char-drawer").classList.add("open");
     }
 
@@ -672,15 +724,17 @@ _HTML = """<!DOCTYPE html>
       const rank = { active: 0, completed: 1, failed: 2 };
       quests.sort((a, b) => (rank[(a.status || "").toLowerCase()] ?? 0) - (rank[(b.status || "").toLowerCase()] ?? 0));
 
+      dom.questCount.textContent = quests.length;
       dom.questList.innerHTML = quests.map((q) => {
         const status = (q.status || "active").toLowerCase();
+        const cardClass = status === "active" ? "active" : ["completed", "failed"].includes(status) ? "done" : "";
         const delta = changes[q.id];
         const chips = [];
         if (delta?.new) chips.push('<span class="chip violet">new</span>');
         if (delta?.status_from) chips.push(`<span class="chip amber">${escapeHtml(delta.status_from)} →</span>`);
         if (delta?.steps_updated) chips.push('<span class="chip amber">progress</span>');
         return `
-          <div class="quest-card">
+          <div class="quest-card ${cardClass}">
             <div class="quest-head">
               <span class="title">${escapeHtml(q.title || q.id)}</span>
               <span class="chip ${QUEST_COLOR[status] || ""}">${escapeHtml(status)}</span>
@@ -699,13 +753,14 @@ _HTML = """<!DOCTYPE html>
       const history = view.state.history || [];
       const clocks = view.history_clocks || [];
       const freshFrom = history.length - (view.changes?.new_history || 0);
+      dom.storyCount.textContent = history.length;
       dom.feed.innerHTML = history.map((event, i) => `
         <div class="event-row ${i >= freshFrom ? "fresh" : ""}">
           <span class="clock">${escapeHtml(clocks[i] || "")}</span>
-          <span class="text">${escapeHtml(event.text)} <span class="where">· ${escapeHtml(event.location || "")}</span></span>
+          <span class="text">${escapeHtml(event.text)}${event.location ? ` <span class="where">${escapeHtml(event.location)}</span>` : ""}</span>
         </div>
       `).join("") || '<div class="empty">Nothing has happened yet.</div>';
-      dom.feed.scrollTop = dom.feed.scrollHeight;
+      dom.storyBody.scrollTop = dom.storyBody.scrollHeight;
     }
 
     // ── Live polling ────────────────────────────────────────
@@ -721,18 +776,21 @@ _HTML = """<!DOCTYPE html>
     async function pollLive() {
       try {
         state.pollCount += 1;
-        if (!state.scenarios.length || state.pollCount % 5 === 0) {
-          const scenarios = await fetchJson("/api/scenarios");
-          const changed = JSON.stringify(scenarios) !== JSON.stringify(state.scenarios);
-          state.scenarios = scenarios;
-          if (changed) renderScenarios();
-          if (!state.scenario && scenarios.length) {
-            state.scenario = scenarios[0].scenario;
-            dom.scenario.value = state.scenario;
+        if (!state.runs.length || state.pollCount % 5 === 0) {
+          const runs = await fetchJson("/api/runs");
+          const changed = JSON.stringify(runs) !== JSON.stringify(state.runs);
+          state.runs = runs;
+          if (changed) renderRuns();
+          if ((!state.scenario || !state.runId) && runs.length) {
+            state.scenario = runs[0].scenario;
+            state.runId = runs[0].run_id;
+            dom.run.value = runKey(state.scenario, state.runId);
           }
         }
-        if (!state.scenario) return;
-        const fresh = await fetchJson(`/api/state/${encodeURIComponent(state.scenario)}`);
+        if (!state.scenario || !state.runId) return;
+        // Always poll the currently selected run, not the newest — a new run
+        // starting elsewhere must not yank the view away mid-session.
+        const fresh = await fetchJson(`/api/state/${encodeURIComponent(state.scenario)}/${encodeURIComponent(state.runId)}`);
         const current = state.view;
         const currentLen = current ? (current.state.history || []).length : -1;
         if (!current || fresh.tick !== current.tick || (fresh.state.history || []).length !== currentLen) {
@@ -746,8 +804,10 @@ _HTML = """<!DOCTYPE html>
 
     // ── Events ──────────────────────────────────────────────
 
-    dom.scenario.addEventListener("change", () => {
-      state.scenario = dom.scenario.value;
+    dom.run.addEventListener("change", () => {
+      const sep = dom.run.value.indexOf("/");
+      state.scenario = dom.run.value.slice(0, sep);
+      state.runId = dom.run.value.slice(sep + 1);
       state.mapLayout = null;
       state.selectedLoc = null;
       loadView(null).catch(() => {});
@@ -786,9 +846,16 @@ _HTML = """<!DOCTYPE html>
     });
 
     dom.charGrid.addEventListener("click", (event) => { const card=event.target.closest("[data-char]"); if(card) showCharacter(card.dataset.char); });
-    document.body.addEventListener("click", (event) => { const close=event.target.closest("[data-close]"); if(close) document.getElementById(close.dataset.close).classList.remove("open"); });
+    document.body.addEventListener("click", (event) => {
+      const close = event.target.closest("[data-close]");
+      if (close) document.getElementById(close.dataset.close).classList.remove("open");
+      else if (event.target.classList.contains("drawer")) event.target.classList.remove("open");
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") document.querySelectorAll(".drawer.open").forEach((d) => d.classList.remove("open"));
+    });
 
-    loadScenarios().catch((error) => {
+    loadRuns().catch((error) => {
       dom.locDetail.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
     });
     setLive(true);
@@ -796,97 +863,3 @@ _HTML = """<!DOCTYPE html>
 </body>
 </html>
 """
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Launch the Infinite DnD world-state dashboard.")
-    parser.add_argument("path", nargs="?", default=str(DEFAULT_STATE_DIR), help="World-state directory to watch.")
-    parser.add_argument("--host", default="127.0.0.1", help="Host interface to bind.")
-    parser.add_argument("--port", type=int, default=8766, help="Preferred port for the local server.")
-    parser.add_argument("--no-browser", action="store_true", help="Do not auto-open a browser tab.")
-    args = parser.parse_args(argv)
-
-    target = Path(args.path)
-    server = ThreadingHTTPServer((args.host, _pick_port(args.host, args.port)), _build_handler(target))
-    url = f"http://{args.host}:{server.server_port}"
-    print(f"Serving world dashboard at {url}")
-    print(f"Watching snapshots in {target.resolve()}")
-
-    if not args.no_browser:
-        webbrowser.open(url)
-
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopping world dashboard.")
-    finally:
-        server.server_close()
-
-    return 0
-
-
-def _build_handler(state_dir: Path) -> type[BaseHTTPRequestHandler]:
-    class DashboardHandler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
-            parsed = urlparse(self.path)
-            if parsed.path == "/":
-                self._send_html(_HTML)
-                return
-            if parsed.path == "/api/scenarios":
-                self._send_json(list_state_scenarios(state_dir))
-                return
-            if parsed.path.startswith("/api/state/"):
-                scenario = unquote(parsed.path.removeprefix("/api/state/"))
-                if not _is_known_scenario(scenario):
-                    self._send_json({"error": f"Scenario not found: {scenario}"}, status=HTTPStatus.NOT_FOUND)
-                    return
-                tick_values = parse_qs(parsed.query).get("tick")
-                try:
-                    tick = int(tick_values[0]) if tick_values else None
-                except ValueError:
-                    self._send_json({"error": f"Invalid tick: {tick_values[0]}"}, status=HTTPStatus.BAD_REQUEST)
-                    return
-                try:
-                    self._send_json(load_view(state_dir, scenario, tick))
-                except FileNotFoundError as exc:
-                    self._send_json({"error": str(exc)}, status=HTTPStatus.NOT_FOUND)
-                return
-            if parsed.path.startswith("/api/series/"):
-                scenario = unquote(parsed.path.removeprefix("/api/series/"))
-                if not _is_known_scenario(scenario):
-                    self._send_json({"error": f"Scenario not found: {scenario}"}, status=HTTPStatus.NOT_FOUND)
-                    return
-                self._send_json(load_series(state_dir, scenario))
-                return
-            self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
-
-        def log_message(self, format: str, *args) -> None:  # noqa: A003
-            return
-
-        def _send_html(self, html: str, status: HTTPStatus = HTTPStatus.OK) -> None:
-            body = html.encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
-
-        def _send_json(self, payload: object, status: HTTPStatus = HTTPStatus.OK) -> None:
-            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
-
-    def _is_known_scenario(scenario: str) -> bool:
-        # Path traversal guard: only serve scenario names discovered under the state dir.
-        return any(meta["scenario"] == scenario for meta in list_state_scenarios(state_dir))
-
-    return DashboardHandler
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

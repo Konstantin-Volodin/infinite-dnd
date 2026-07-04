@@ -59,6 +59,37 @@ def test_roundtrip(tmp_path):
     assert tool_return["tool_returns"] == ["speak"]
 
 
+def test_logger_uses_explicit_session_id(tmp_path):
+    logger = Logger(
+        character_id="hero",
+        max_turns=1,
+        scenario="demo",
+        scenario_title="Demo Quest",
+        log_dir=tmp_path,
+        session_id="explicit-id",
+    )
+    logger.close()
+
+    assert logger.session_id == "explicit-id"
+    assert (tmp_path / "explicit-id.log").exists()
+
+
+def test_logger_append_preserves_existing_session(tmp_path):
+    path = tmp_path / "resumed.log"
+    path.write_text('{"event": "earlier"}\n', encoding="utf-8")
+
+    logger = Logger(
+        character_id="hero",
+        max_turns=1,
+        log_dir=tmp_path,
+        session_id="resumed",
+        append=True,
+    )
+    logger.close()
+
+    assert path.read_text(encoding="utf-8").startswith('{"event": "earlier"}\n')
+
+
 def test_digest_legacy_repr_string():
     message = (
         "ModelResponse(parts=[ToolCallPart(tool_name='travel', args='{}', tool_call_id='x')], "

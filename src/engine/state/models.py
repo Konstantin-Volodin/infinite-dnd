@@ -4,7 +4,7 @@ Data Models - Pydantic models for game state.
     - Location: id, description, connections, features, items.
     - Character: id, role, backstory, personality, goal, location, relationships, inventory, knowledge, stats.
     - HistoryEvent: text, location, characters involved.
-    - Quest: id, title, description, status, owner, steps.
+    - Quest: id, title, description, status, owner, plan, current_step, steps.
     - WorldState: time, locations, characters, quests, history.
 
 See tests/engine/state/test_models.py for coverage.
@@ -54,14 +54,18 @@ class Quest(BaseModel):
     id: str
     title: str
     description: str
-    status: str = "active" 
-    owner: str = "" 
-    steps: List[str] = []
+    status: str = "active"
+    owner: str = ""
+    plan: List[str] = []  # ordered, concrete objectives set at creation
+    current_step: int = 0  # index into plan of the current objective
+    steps: List[str] = []  # progress log — accomplished objectives + notes
 
 
 class WorldState(BaseModel):
     time: int = 0
     minutes_elapsed: int = 0
+    last_quest_advance_time: int = 0  # tick of the most recent quest advancement — stall detection
+    director_interventions: Dict[str, int] = {}  # quest id (or "world") → director beat count
     locations: Dict[str, Location] = {}
     characters: Dict[str, Character] = {}
     quests: Dict[str, Quest] = {}

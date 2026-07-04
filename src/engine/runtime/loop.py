@@ -3,6 +3,7 @@
 import asyncio
 import sys
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
@@ -12,6 +13,7 @@ from src.engine.state.models import HistoryEvent
 from src.agents.character.agent import CharacterDeps, agent as character_agent
 from src.agents.character.tools import Action, Attack, CharacterTool, Speak, Travel, Wait
 from src.agents.dm.agent import DMDeps, DMResult, agent as dm_agent
+from src.agents.dm.director import DirectorDeps, agent as director_agent
 from src.agents.action_resolver.agent import resolve
 from src.interface.session_log import Logger
 
@@ -21,6 +23,11 @@ _DM_USAGE = UsageLimits(request_limit=16)
 
 # Locations must resolve before NPCs/items that anchor to them. Quests last (anchor to PCs).
 _CREATE_ORDER = {"location": 0, "npc": 1, "item": 2, "quest": 3}
+
+# Stall detection — director fires when no quest advanced for this many ticks,
+# or the last few events are all talk/waiting.
+_STALL_QUIET_TICKS = 6
+_STALL_IDLE_EVENTS = 5
 
 
 # ─── Scheduler ────────────────────────────────────────────────
@@ -59,6 +66,29 @@ def _describe_tool(tool: CharacterTool) -> str:
         suffix = f" ({tool.target})" if tool.target else ""
         return f"action{suffix}: {tool.description}"
     return repr(tool)
+
+
+# ─── Stall detection ──────────────────────────────────────────
+
+def _is_idle_event(text: str) -> bool:
+    """Speak/wait-style event — mirrors the dialogue heuristic in character/context.py."""
+    lowered = text.lower()
+    return '"' in text or "says" in lowered or "waits" in lowered
+
+
+def _is_stalled(state: WorldState) -> bool:
+    """True when no quest has advanced for a while, or recent events are all chatter/waiting."""
+    if state.time - state.last_quest_advance_time >= _STALL_QUIET_TICKS:
+        return True
+    tail = state.history[-_STALL_IDLE_EVENTS:]
+    return len(tail) == _STALL_IDLE_EVENTS and all(_is_idle_event(e.text) for e in tail)
+
+
+def _record_intervention(state: WorldState, quest_id: str | None) -> str:
+    """Bump the escalation counter for the targeted quest, or 'world' if untargeted/unknown."""
+    key = quest_id if quest_id and quest_id in state.quests else "world"
+    state.director_interventions[key] = state.director_interventions.get(key, 0) + 1
+    return key
 
 
 # ─── Agent flows ──────────────────────────────────────────────
@@ -117,6 +147,35 @@ async def flow_dm(state: WorldState, new_events: list[HistoryEvent], logger: Log
     return dm_result
 
 
+async def flow_director(state: WorldState, location_id: str, logger: Logger) -> None:
+    """Stall-breaker: one LLM call that introduces a single complication grounded in existing state."""
+    label = "director"
+    try:
+        with logger.run(label):
+            result = await director_agent.run(
+                "The story has stalled. Introduce exactly one grounded complication.",
+                deps=DirectorDeps(state=state, location_id=location_id),
+                usage_limits=_DM_USAGE,
+            )
+            logger.log_messages(label, result.all_messages())
+    except UsageLimitExceeded as exc:
+        print(f"  [limit] director beat ended: {exc}", flush=True)
+        return
+    beat = result.output
+
+    # Director events are retcon-style arrivals: logged, printed, 0 minutes.
+    pre = len(state.history)
+    if beat.create:
+        await resolve(beat.create, state, logger=logger)
+    if beat.event:
+        WorldOperations(state).world_event(beat.event, location_id)
+    for event in state.history[pre:]:
+        print(f"  {event.text}  (director)")
+
+    key = _record_intervention(state, beat.quest_id)
+    logger.log_event("director_beat", quest=key, event=beat.event)
+
+
 # ─── Tick composition ────────────────────────────────────────
 
 async def tick(
@@ -166,6 +225,11 @@ async def tick(
     for event in state.history[pre_quest:]:
         print(f"  {event.text}")
 
+    # 3. Director beat: when the story stalls, one proactive complication breaks it.
+    if _is_stalled(state):
+        await flow_director(state, state.characters[active_pc_id].location, logger)
+        state.last_quest_advance_time = state.time  # suppress consecutive fires
+
 
 # ============================================================
 # Entry point
@@ -196,7 +260,9 @@ async def _run_game(
     pc_controller: Callable[[str, WorldState], Awaitable[CharacterTool]] | None = None,
     progress_callback: Callable[[WorldState], None] | None = None,
 ) -> None:
-    manager = StateManager(scenario=scenario)
+    session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    manager = StateManager(scenario=scenario, run_id=None if resume else session_id, resume=resume)
+    session_id = manager.run_id
     latest = manager.latest_snapshot_name() if resume else None
     state = manager.load_state(latest) if latest else manager.init_state()
 
@@ -220,6 +286,8 @@ async def _run_game(
         max_turns=max_turns,
         scenario=manager.scenario,
         scenario_title=manager.manifest.get("title", manager.scenario),
+        session_id=session_id,
+        append=resume,
     )
     try:
         manager.save_state(state)

@@ -31,3 +31,25 @@ def dm_context(deps) -> str:
         quest_ids=quest_ids,
         quests=quests,
     )
+
+
+def director_system() -> str:
+    return render("dm/director_identity.jinja")
+
+
+def director_context(deps) -> str:
+    state: WorldState = deps.state
+    recent_events = [e.text for e in state.history[-10:]]
+    quests = [
+        q for q in state.quests.values()
+        if str(getattr(q, "status", "active")).lower() not in ("completed", "failed")
+    ]
+    present = sorted(cid for cid, c in state.characters.items() if c.location == deps.location_id)
+    return render(
+        "dm/director_state.jinja",
+        recent_events=recent_events,
+        quests=quests,
+        interventions=state.director_interventions,
+        location_id=deps.location_id,
+        present=present,
+    )

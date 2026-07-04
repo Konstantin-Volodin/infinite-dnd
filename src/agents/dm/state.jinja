@@ -41,8 +41,16 @@ _no prior events._
 - **{{ q.id }}** — {{ q.title }} _(status: {{ q.status }})_
   - {{ q.description }}
   - owner: {{ q.owner }}
+{% if q.plan %}
+  - plan:
+{% for step in q.plan %}
+    {{ '→ current: ' if loop.index0 == q.current_step else ('- done: ' if loop.index0 < q.current_step else '- ') }}{{ step }}
+{% endfor %}
+{% else %}
+  - no plan set.
+{% endif %}
 {% if q.steps %}
-  - steps so far: {{ q.steps | join(' → ') }}
+  - log so far: {{ q.steps | join(' → ') }}
 {% endif %}
 {% endfor %}
 

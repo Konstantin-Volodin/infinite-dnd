@@ -1,3 +1,6 @@
+import json
+import os
+
 import pytest
 
 from src.engine.state.loader import StateManager
@@ -6,8 +9,8 @@ from src.world import list_scenarios
 
 
 @pytest.mark.parametrize("scenario", list_scenarios())
-def test_init_state_for_scenario(scenario):
-    manager = StateManager(scenario=scenario)
+def test_init_state_for_scenario(scenario, tmp_path):
+    manager = StateManager(scenario=scenario, state_dir=str(tmp_path))
     state = manager.init_state()
 
     assert manager.scenario == scenario
@@ -32,9 +35,9 @@ def test_init_state_for_scenario(scenario):
             assert quest.owner in state.characters, f"quest {quest_id} owned by unknown character {quest.owner}"
 
 
-def test_save_load_round_trip():
+def test_save_load_round_trip(tmp_path):
     # round-trip save/load on the default (random) scenario
-    manager = StateManager()
+    manager = StateManager(state_dir=str(tmp_path))
     state = manager.load_state()
     state.time += 1
     manager.save_state(state)
@@ -49,3 +52,88 @@ def test_latest_snapshot_name_uses_numeric_order(tmp_path):
         (manager.state_dir / f"world_state_{tick}.json").write_text("{}", encoding="utf-8")
     (manager.state_dir / "world_state_bad.json").write_text("{}", encoding="utf-8")
     assert manager.latest_snapshot_name() == "world_state_10.json"
+
+
+def test_distinct_run_ids_do_not_collide(tmp_path):
+    manager_a = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path), run_id="run-a")
+    manager_b = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path), run_id="run-b")
+
+    assert manager_a.state_dir != manager_b.state_dir
+
+    state = manager_a.init_state()
+    manager_a.save_state(state)
+
+    assert manager_a.latest_snapshot_name() is not None
+    assert manager_b.latest_snapshot_name() is None
+
+
+def test_resume_selects_latest_run_with_snapshots(tmp_path):
+    older = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path), run_id="older")
+    newer = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path), run_id="newer")
+    empty = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path), run_id="empty")
+
+    older.save_state(older.init_state())
+    newer_state = newer.init_state()
+    newer_state.time = 2
+    newer.save_state(newer_state)
+    older_snapshot = older.state_dir / "world_state_0.json"
+    newer_snapshot = newer.state_dir / "world_state_2.json"
+    older_snapshot.touch()
+    newer_snapshot.touch()
+    older_snapshot_time = older_snapshot.stat().st_mtime - 10
+    os.utime(older_snapshot, (older_snapshot_time, older_snapshot_time))
+
+    resumed = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path), resume=True)
+
+    assert resumed.run_id == "newer"
+    assert resumed.latest_snapshot_name() == "world_state_2.json"
+    assert empty.latest_snapshot_name() is None
+
+
+def test_run_id_auto_generated_when_omitted(tmp_path):
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    assert isinstance(manager.run_id, str)
+    assert manager.run_id
+
+
+def test_init_state_backcompat_quest_without_plan(tmp_path, monkeypatch):
+    """Old scenario quests.json files (pre-plan) must still load — pydantic defaults fill plan/current_step."""
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    legacy_quests = [{"id": "legacy-quest", "title": "Old Quest", "description": "no plan here", "owner": "", "status": "active"}]
+
+    original_read_json = manager.read_json
+    def fake_read_json(path):
+        return legacy_quests if str(path).endswith("quests.json") else original_read_json(path)
+    monkeypatch.setattr(manager, "read_json", fake_read_json)
+
+    state = manager.init_state()
+    quest = state.quests["legacy-quest"]
+    assert quest.plan == []
+    assert quest.current_step == 0
+    assert quest.steps == []
+
+
+def test_load_state_backcompat_without_director_fields(tmp_path):
+    """Old snapshots (pre-director) must still load — pydantic defaults fill the tracking fields."""
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    data = json.loads(manager.init_state().model_dump_json())
+    del data["director_interventions"]
+    del data["last_quest_advance_time"]
+    (manager.state_dir / "world_state_5.json").write_text(json.dumps(data), encoding="utf-8")
+
+    loaded = manager.load_state(world_state_file="world_state_5.json")
+    assert loaded.director_interventions == {}
+    assert loaded.last_quest_advance_time == 0
+
+
+def test_director_fields_survive_save_load_round_trip(tmp_path):
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    state = manager.init_state()
+    state.time = 3
+    state.last_quest_advance_time = 2
+    state.director_interventions = {"expose-the-smugglers": 1, "world": 2}
+    manager.save_state(state)
+
+    loaded = manager.load_state(world_state_file="world_state_3.json")
+    assert loaded.last_quest_advance_time == 2
+    assert loaded.director_interventions == {"expose-the-smugglers": 1, "world": 2}

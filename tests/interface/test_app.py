@@ -18,12 +18,12 @@ def test_nav_marks_active_tab():
 
 
 def test_series_math(tmp_path):
-    scenario = tmp_path / "demo"
-    scenario.mkdir()
+    run_dir = tmp_path / "demo" / "run-1"
+    run_dir.mkdir(parents=True)
     for tick, hp, xp, gold in [(0, 5, 0, 1), (2, 3, 10, 4)]:
         payload = {"characters": {"hero": {"stats": {"hp": hp, "xp": xp, "gold": gold}}}}
-        (scenario / f"world_state_{tick}.json").write_text(json.dumps(payload), encoding="utf-8")
-    assert load_series(tmp_path, "demo")["hero"] == [
+        (run_dir / f"world_state_{tick}.json").write_text(json.dumps(payload), encoding="utf-8")
+    assert load_series(tmp_path, "demo", "run-1")["hero"] == [
         {"tick": 0, "hp": 5, "xp": 0, "gold": 1},
         {"tick": 2, "hp": 3, "xp": 10, "gold": 4},
     ]

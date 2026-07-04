@@ -35,10 +35,23 @@ AnyTool = CharacterTool | Create | Modify
 async def resolve(tool: AnyTool, state: WorldState, usage: RunUsage | None = None, logger: Logger | None = None) -> str:
     """Execute a tool call against world state. Single writer surface."""
     result = await _dispatch(tool, state, usage, logger)
+    _apply_self_updates(tool, state)
     if logger:
         subject = getattr(tool, "actor", None) or getattr(tool, "target_id", None) or getattr(tool, "name", None)
         logger.log_event("resolved", tool=type(tool).__name__, subject=subject, result=result)
     return result
+
+
+def _apply_self_updates(tool: AnyTool, state: WorldState) -> None:
+    """Deterministically apply a character tool's optional self-updates (remember/new_goal). No extra LLM call."""
+    actor = getattr(tool, "actor", None)
+    if not actor or actor not in state.characters:
+        return
+    ops = WorldOperations(state)
+    if remember := getattr(tool, "remember", None):
+        ops.add_knowledge(actor, remember)
+    if new_goal := getattr(tool, "new_goal", None):
+        ops.set_goal(actor, new_goal)
 
 
 async def _dispatch(tool: AnyTool, state: WorldState, usage: RunUsage | None, logger: Logger | None) -> str:
@@ -108,6 +121,7 @@ def _resolve_create(tool: Create, state: WorldState) -> str:
             title=tool.name,
             description=tool.description,
             owner=tool.owner,
+            plan=tool.plan,
         )
     return f"Unknown create type: {tool.type!r}."
 
@@ -115,9 +129,9 @@ def _resolve_create(tool: Create, state: WorldState) -> str:
 def _resolve_modify(tool: Modify, state: WorldState) -> str:
     ops = WorldOperations(state)
     if tool.action == "update_quest":
-        if not tool.status and not tool.step:
-            return "Cannot update a quest without status or step."
-        return ops.advance_quest(tool.target_id, new_status=tool.status, step=tool.step)
+        if not tool.status and not tool.step and not tool.advance:
+            return "Cannot update a quest without status, step, or advance."
+        return ops.advance_quest(tool.target_id, new_status=tool.status, step=tool.step, advance=tool.advance)
     if tool.action == "remove_npc":
         return ops.delete_npc(tool.target_id, reason=tool.reason or "")
     if tool.action == "update_location":

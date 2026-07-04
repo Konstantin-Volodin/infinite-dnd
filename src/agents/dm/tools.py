@@ -14,6 +14,7 @@ class Create(BaseModel):
     role: str | None = None
     goal: str | None = None
     owner: str | None = None
+    plan: list[str] | None = None
 
 
 class Modify(BaseModel):
@@ -22,4 +23,5 @@ class Modify(BaseModel):
     target_id: str
     status: str | None = None
     step: str | None = None
+    advance: bool = False
     reason: str | None = None

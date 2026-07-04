@@ -27,12 +27,14 @@ class NewEntity(BaseModel):
     role: str | None = None
     goal: str | None = None
     owner: str | None = None
+    plan: list[str] | None = None  # quests only: 3-5 concrete, ordered objectives
 
 
 class QuestUpdate(BaseModel):
     quest_id: str
     new_status: str | None = None
     step: str | None = None
+    advance: bool = False  # the quest's CURRENT objective was clearly accomplished this turn
 
 
 @dataclass
@@ -58,14 +60,15 @@ def dm_output(
             role=e.role,
             goal=e.goal,
             owner=e.owner,
+            plan=e.plan,
         )
         for e in entities
         if e.name.strip()
     ]
     modifies = [
-        Modify(action="update_quest", target_id=u.quest_id, status=u.new_status, step=u.step)
+        Modify(action="update_quest", target_id=u.quest_id, status=u.new_status, step=u.step, advance=u.advance)
         for u in quest_updates
-        if u.new_status or u.step
+        if u.new_status or u.step or u.advance
     ]
     clamped_minutes = [max(0, min(int(m), 1440)) for m in minutes]
     return DMResult(creates=creates, modifies=modifies, minutes=clamped_minutes)

@@ -56,47 +56,59 @@ def speak_output(
     ctx: RunContext[CharacterDeps],
     message: str,
     target: str | None = None,
+    remember: str | None = None,
+    new_goal: str | None = None,
 ) -> Speak:
     """say something short — 1-2 sentences, like real speech. can be targeted dialogue or thinking out loud."""
     targets = _living_targets(ctx)
     if target and target not in targets:
         hint = f"Valid targets: {', '.join(targets)}." if targets else "No one else is here."
         raise ModelRetry(f"Cannot speak to {target!r}. {hint}")
-    return Speak(actor=ctx.deps.char.id, message=message, target=target)
+    return Speak(actor=ctx.deps.char.id, message=message, target=target, remember=remember, new_goal=new_goal)
 
 
 def travel_output(
     ctx: RunContext[CharacterDeps],
     location: str,
+    remember: str | None = None,
+    new_goal: str | None = None,
 ) -> Travel:
     """travel to a connected location, or propose a new one for the DM to introduce."""
-    return Travel(actor=ctx.deps.char.id, destination=location)
+    return Travel(actor=ctx.deps.char.id, destination=location, remember=remember, new_goal=new_goal)
 
 
-def wait_output(ctx: RunContext[CharacterDeps]) -> Wait:
+def wait_output(
+    ctx: RunContext[CharacterDeps],
+    remember: str | None = None,
+    new_goal: str | None = None,
+) -> Wait:
     """do nothing for now and wait to see what happens next."""
-    return Wait(actor=ctx.deps.char.id)
+    return Wait(actor=ctx.deps.char.id, remember=remember, new_goal=new_goal)
 
 
 def action_output(
     ctx: RunContext[CharacterDeps],
     description: str,
     target: str | None = None,
+    remember: str | None = None,
+    new_goal: str | None = None,
 ) -> Action:
     """take a concrete action — search, examine, attempt, interact, discover. describe what and how in one plain sentence — no flourishes. use this when you can make progress, not just when speak/travel don't fit."""
-    return Action(actor=ctx.deps.char.id, description=description, target=target)
+    return Action(actor=ctx.deps.char.id, description=description, target=target, remember=remember, new_goal=new_goal)
 
 
 def attack_output(
     ctx: RunContext[CharacterDeps],
     target: str,
+    remember: str | None = None,
+    new_goal: str | None = None,
 ) -> Attack:
     """attack a character here. a serious, violent act with lasting consequences."""
     targets = _living_targets(ctx)
     if target not in targets:
         hint = f"Valid targets: {', '.join(targets)}." if targets else "No one here to attack."
         raise ModelRetry(f"Cannot attack {target!r}. {hint}")
-    return Attack(actor=ctx.deps.char.id, target=target)
+    return Attack(actor=ctx.deps.char.id, target=target, remember=remember, new_goal=new_goal)
 
 
 CHARACTER_RESPONSE_OUTPUTS = [

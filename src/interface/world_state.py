@@ -29,30 +29,34 @@ def list_ticks(scenario_dir: Path) -> list[int]:
     return sorted(ticks)
 
 
-def list_state_scenarios(state_dir: Path) -> list[dict[str, Any]]:
-    """Scenario directories under the state dir that hold at least one snapshot, newest first."""
+def list_state_runs(state_dir: Path) -> list[dict[str, Any]]:
+    """Run directories (scenario/run_id) under the state dir that hold at least one snapshot, newest first."""
     target = Path(state_dir)
     if not target.exists():
         return []
     result: list[dict[str, Any]] = []
-    for candidate in sorted(target.iterdir()):
-        if not candidate.is_dir():
+    for scenario_candidate in sorted(target.iterdir()):
+        if not scenario_candidate.is_dir():
             continue
-        ticks = list_ticks(candidate)
-        if not ticks:
-            continue
-        latest = candidate / f"world_state_{ticks[-1]}.json"
-        manifest = _safe_manifest(candidate.name)
-        result.append(
-            {
-                "scenario": candidate.name,
-                "title": manifest.get("title", candidate.name),
-                "pc": manifest.get("pc"),
-                "tick_count": len(ticks),
-                "latest_tick": ticks[-1],
-                "modified_time": datetime.fromtimestamp(latest.stat().st_mtime).isoformat(),
-            }
-        )
+        manifest = _safe_manifest(scenario_candidate.name)
+        for run_candidate in sorted(scenario_candidate.iterdir()):
+            if not run_candidate.is_dir():
+                continue
+            ticks = list_ticks(run_candidate)
+            if not ticks:
+                continue
+            latest = run_candidate / f"world_state_{ticks[-1]}.json"
+            result.append(
+                {
+                    "scenario": scenario_candidate.name,
+                    "run_id": run_candidate.name,
+                    "title": manifest.get("title", scenario_candidate.name),
+                    "pc": manifest.get("pc"),
+                    "tick_count": len(ticks),
+                    "latest_tick": ticks[-1],
+                    "modified_time": datetime.fromtimestamp(latest.stat().st_mtime).isoformat(),
+                }
+            )
     result.sort(key=lambda item: item["modified_time"], reverse=True)
     return result
 
@@ -68,25 +72,26 @@ def _safe_manifest(scenario: str) -> dict[str, Any]:
 # Loading
 # ============================================================
 
-def load_view(state_dir: Path, scenario: str, tick: int | None = None) -> dict[str, Any]:
+def load_view(state_dir: Path, scenario: str, run_id: str, tick: int | None = None) -> dict[str, Any]:
     """One snapshot plus everything the dashboard needs: tick list, PC id, diff vs previous tick, event clocks."""
-    scenario_path = Path(state_dir) / scenario
-    ticks = list_ticks(scenario_path)
+    run_path = Path(state_dir) / scenario / run_id
+    ticks = list_ticks(run_path)
     if not ticks:
-        raise FileNotFoundError(f"No snapshots found for scenario '{scenario}'")
+        raise FileNotFoundError(f"No snapshots found for scenario '{scenario}' run '{run_id}'")
 
     if tick is None:
         tick = ticks[-1]
     if tick not in ticks:
-        raise FileNotFoundError(f"No snapshot for tick {tick} in scenario '{scenario}'")
+        raise FileNotFoundError(f"No snapshot for tick {tick} in scenario '{scenario}' run '{run_id}'")
 
-    state = _read_snapshot(scenario_path, tick)
+    state = _read_snapshot(run_path, tick)
     tick_index = ticks.index(tick)
-    prev_state = _read_snapshot(scenario_path, ticks[tick_index - 1]) if tick_index > 0 else None
+    prev_state = _read_snapshot(run_path, ticks[tick_index - 1]) if tick_index > 0 else None
     manifest = _safe_manifest(scenario)
 
     return {
         "scenario": scenario,
+        "run_id": run_id,
         "title": manifest.get("title", scenario),
         "pc": manifest.get("pc"),
         "tick": tick,
@@ -98,12 +103,12 @@ def load_view(state_dir: Path, scenario: str, tick: int | None = None) -> dict[s
     }
 
 
-def load_series(state_dir: Path, scenario: str) -> dict[str, list[dict[str, int]]]:
+def load_series(state_dir: Path, scenario: str, run_id: str) -> dict[str, list[dict[str, int]]]:
     """Character stat history across every available snapshot."""
-    scenario_path = Path(state_dir) / scenario
+    run_path = Path(state_dir) / scenario / run_id
     result: dict[str, list[dict[str, int]]] = {}
-    for tick in list_ticks(scenario_path):
-        snapshot = _read_snapshot(scenario_path, tick)
+    for tick in list_ticks(run_path):
+        snapshot = _read_snapshot(run_path, tick)
         for character_id, character in snapshot.get("characters", {}).items():
             stats = character.get("stats", {})
             result.setdefault(character_id, []).append({
@@ -115,8 +120,8 @@ def load_series(state_dir: Path, scenario: str) -> dict[str, list[dict[str, int]
     return result
 
 
-def _read_snapshot(scenario_path: Path, tick: int) -> dict[str, Any]:
-    with (scenario_path / f"world_state_{tick}.json").open("r", encoding="utf-8") as handle:
+def _read_snapshot(run_path: Path, tick: int) -> dict[str, Any]:
+    with (run_path / f"world_state_{tick}.json").open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 

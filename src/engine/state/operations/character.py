@@ -198,6 +198,16 @@ class CharacterOps(_OpsBase):
         return result
 
     # ============ CHARACTER UPDATE ============
+    def set_goal(self, character_id: str, new_goal: str) -> str:
+        """replace a character's own goal — logged as a private event (visible only to them)."""
+        char = self.state.characters.get(character_id)
+        if not char: return f"Cannot set goal — character '{character_id}' not found."
+
+        char.goal = new_goal
+        result = f"{character_id}'s goal is now: {new_goal}"
+        self._log(result, char.location, [character_id])
+        return result
+
     def update_character(self, character_id: str, backstory: str | None = None, personality: str | None = None, goal: str | None = None, role: str | None = None) -> str:
         char = self.state.characters.get(character_id)
         if not char: return f"Cannot update — character '{character_id}' not found."

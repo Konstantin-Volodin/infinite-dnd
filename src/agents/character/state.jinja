@@ -38,8 +38,13 @@
 {% if quests %}
 {% for q in quests %}
 - **{{ q.title }}**: {{ q.description }}
+{% if q.plan and q.current_step < q.plan|length %}
+  - **current objective:** {{ q.plan[q.current_step] }}
+{% else %}
+  - **current objective:** none set
+{% endif %}
 {% if q.steps %}
-Steps: {{ q.steps | join(', ') }}
+  - progress so far: {{ q.steps | join(', ') }}
 {% endif %}
 {% endfor %}
 {% else %}

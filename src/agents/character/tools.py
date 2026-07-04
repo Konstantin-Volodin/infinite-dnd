@@ -9,32 +9,38 @@ from typing import Literal, Union
 from pydantic import BaseModel
 
 
-class Speak(BaseModel):
+class CharacterToolBase(BaseModel):
+    """Shared optional fields every character tool carries — applied deterministically by the resolver."""
+    remember: str | None = None  # one concrete fact to store in my own knowledge
+    new_goal: str | None = None  # replacement for my own goal, when something changed it
+
+
+class Speak(CharacterToolBase):
     kind: Literal["speak"] = "speak"
     actor: str
     message: str
     target: str | None = None
 
 
-class Travel(BaseModel):
+class Travel(CharacterToolBase):
     kind: Literal["travel"] = "travel"
     actor: str
     destination: str
 
 
-class Wait(BaseModel):
+class Wait(CharacterToolBase):
     kind: Literal["wait"] = "wait"
     actor: str
 
 
-class Action(BaseModel):
+class Action(CharacterToolBase):
     kind: Literal["action"] = "action"
     actor: str
     description: str
     target: str | None = None
 
 
-class Attack(BaseModel):
+class Attack(CharacterToolBase):
     kind: Literal["attack"] = "attack"
     actor: str
     target: str

@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from src.interface.dashboard import _HTML as WORLD_HTML
 from src.interface.session_log import DEFAULT_LOG_DIR, list_logs, load_session
 from src.interface.viewer import _HTML as LOGS_HTML, _pick_port
-from src.interface.world_state import DEFAULT_STATE_DIR, list_state_scenarios, load_series, load_view
+from src.interface.world_state import DEFAULT_STATE_DIR, list_state_runs, load_series, load_view
 
 
 def _with_nav(html: str, active: str) -> str:
@@ -37,26 +37,34 @@ def _build_handler(
                 self._send_html(_with_nav(WORLD_HTML, "world"))
             elif parsed.path == "/logs":
                 self._send_html(_with_nav(LOGS_HTML, "logs"))
-            elif parsed.path == "/api/scenarios":
-                self._send_json(list_state_scenarios(state_dir))
+            elif parsed.path == "/api/runs":
+                self._send_json(list_state_runs(state_dir))
             elif parsed.path == "/api/files":
                 self._send_json(list_logs(log_dir))
             elif parsed.path.startswith("/api/state/"):
-                scenario = unquote(parsed.path.removeprefix("/api/state/"))
+                parts = self._parse_run_path(parsed.path, "/api/state/")
+                if parts is None:
+                    self._send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                scenario, run_id = parts
                 tick_values = parse_qs(parsed.query).get("tick")
                 try:
                     tick = int(tick_values[0]) if tick_values else None
-                    self._require_scenario(scenario)
-                    self._send_json(load_view(state_dir, scenario, tick))
+                    self._require_run(scenario, run_id)
+                    self._send_json(load_view(state_dir, scenario, run_id, tick))
                 except ValueError as exc:
                     self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
                 except FileNotFoundError as exc:
                     self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
             elif parsed.path.startswith("/api/series/"):
-                scenario = unquote(parsed.path.removeprefix("/api/series/"))
+                parts = self._parse_run_path(parsed.path, "/api/series/")
+                if parts is None:
+                    self._send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                scenario, run_id = parts
                 try:
-                    self._require_scenario(scenario)
-                    self._send_json(load_series(state_dir, scenario))
+                    self._require_run(scenario, run_id)
+                    self._send_json(load_series(state_dir, scenario, run_id))
                 except FileNotFoundError as exc:
                     self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
             elif parsed.path.startswith("/api/logs/"):
@@ -69,11 +77,23 @@ def _build_handler(
             else:
                 self._send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
 
-        def _require_scenario(self, scenario: object) -> None:
-            if not isinstance(scenario, str) or not any(
-                meta["scenario"] == scenario for meta in list_state_scenarios(state_dir)
+        def _parse_run_path(self, path: str, prefix: str) -> tuple[str, str] | None:
+            remainder = unquote(path.removeprefix(prefix))
+            parts = remainder.split("/")
+            if len(parts) != 2 or not parts[0] or not parts[1]:
+                return None
+            return parts[0], parts[1]
+
+        def _require_run(self, scenario: object, run_id: object) -> None:
+            if (
+                not isinstance(scenario, str)
+                or not isinstance(run_id, str)
+                or not any(
+                    meta["scenario"] == scenario and meta["run_id"] == run_id
+                    for meta in list_state_runs(state_dir)
+                )
             ):
-                raise FileNotFoundError(f"Scenario not found: {scenario}")
+                raise FileNotFoundError(f"Run not found: {scenario}/{run_id}")
 
         def _send_html(self, html: str) -> None:
             body = html.encode("utf-8")
