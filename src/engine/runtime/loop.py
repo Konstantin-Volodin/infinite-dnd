@@ -17,6 +17,7 @@ from src.agents.dm.agent import DMDeps, DMResult, agent as dm_agent
 from src.agents.dm.director import DirectorDeps, agent as director_agent
 from src.agents.action_resolver.agent import resolve
 from src.interface.session_log import Logger
+from .chronicle import compact_history
 from .replay import ReplayTape
 
 
@@ -340,6 +341,7 @@ async def _run_game(
             print(f"\n--- Tick {state.time + 1} ---")
             logger.log_turn(t + 1)
             await tick(pc_id, state, state.time, logger, pc_controller, replay)
+            await compact_history(state, logger, replay)  # between ticks only — never mid-tick
             logger.log_event("world_snapshot", **_snapshot(state))
             state.time += 1
             manager.save_state(state)

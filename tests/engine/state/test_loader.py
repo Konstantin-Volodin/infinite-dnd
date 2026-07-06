@@ -157,6 +157,28 @@ def test_load_state_backcompat_without_director_fields(tmp_path):
     assert loaded.last_quest_advance_time == 0
 
 
+def test_load_state_backcompat_without_chronicle(tmp_path):
+    """Old snapshots (pre-chronicle) must still load — pydantic defaults fill an empty list."""
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    data = json.loads(manager.init_state().model_dump_json())
+    del data["chronicle"]
+    (manager.state_dir / "world_state_5.json").write_text(json.dumps(data), encoding="utf-8")
+
+    loaded = manager.load_state(world_state_file="world_state_5.json")
+    assert loaded.chronicle == []
+
+
+def test_chronicle_survives_save_load_round_trip(tmp_path):
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    state = manager.init_state()
+    state.time = 3
+    state.chronicle = ["The hero once cleared the smuggler's den."]
+    manager.save_state(state)
+
+    loaded = manager.load_state(world_state_file="world_state_3.json")
+    assert loaded.chronicle == ["The hero once cleared the smuggler's den."]
+
+
 def test_director_fields_survive_save_load_round_trip(tmp_path):
     manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
     state = manager.init_state()

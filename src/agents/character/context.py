@@ -57,6 +57,7 @@ def character_context(char: Character, state: WorldState) -> str:
         health_status=health_status,
         loc=loc,
         knowledge=knowledge,
+        chronicle=state.chronicle[-3:],
         recent_events=recent_events,
         someone_speaking_to_me=someone_speaking_to_me,
         others=others,

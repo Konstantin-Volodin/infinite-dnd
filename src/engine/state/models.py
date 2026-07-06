@@ -5,7 +5,7 @@ Data Models - Pydantic models for game state.
     - Character: id, role, backstory, personality, goal, location, relationships, inventory, knowledge, stats.
     - HistoryEvent: text, location, characters involved.
     - Quest: id, title, description, status, owner, plan, current_step, steps.
-    - WorldState: time, locations, characters, quests, history.
+    - WorldState: time, locations, characters, quests, history, chronicle.
 
 See tests/engine/state/test_models.py for coverage.
 """
@@ -77,3 +77,4 @@ class WorldState(BaseModel):
     characters: Dict[str, Character] = Field(default_factory=dict)
     quests: Dict[str, Quest] = Field(default_factory=dict)
     history: List[HistoryEvent] = Field(default_factory=list)
+    chronicle: List[str] = Field(default_factory=list)  # compact era summaries of history archived by compaction

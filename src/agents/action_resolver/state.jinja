@@ -58,6 +58,12 @@
 {% endfor %}
 {% endif %}
 
+{% if chronicle %}
+## chronicle (long-term memory, oldest first)
+{% for entry in chronicle %}
+- {{ entry }}
+{% endfor %}
+{% endif %}
 ## recent events
 {% if recent_events %}
 {% for event in recent_events %}

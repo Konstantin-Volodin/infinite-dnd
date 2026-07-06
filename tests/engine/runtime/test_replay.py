@@ -54,6 +54,7 @@ def test_tape_round_trips_all_structured_output_types(tmp_path):
         create=Create(type="npc", name="Bailiff", location="tavern"),
         quest_id="q1",
     ))
+    recording.chronicle("The hero spent a week rebuilding the tavern's trade.")
 
     playback = ReplayTape.playback(path)
     assert playback.resolve_context(None, None) == ("crossroads", "hero")
@@ -68,6 +69,7 @@ def test_tape_round_trips_all_structured_output_types(tmp_path):
         create=Create(type="npc", name="Bailiff", location="tavern"),
         quest_id="q1",
     )
+    assert playback.chronicle() == "The hero spent a week rebuilding the tavern's trade."
     playback.assert_consumed()
 
 

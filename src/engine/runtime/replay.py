@@ -21,7 +21,7 @@ from src.agents.dm.tools import Create, Modify
 from src.engine.state import WorldState
 
 
-ReplayKind = Literal["character", "action_resolution", "dm", "director"]
+ReplayKind = Literal["character", "action_resolution", "dm", "director", "chronicle"]
 _CHARACTER_ADAPTER = TypeAdapter(CharacterTool)
 
 
@@ -115,6 +115,9 @@ class ReplayTape:
             minutes=[int(value) for value in payload["minutes"]],
         )
 
+    def chronicle(self, output: str | None = None) -> str:
+        return str(self._exchange("chronicle", "chronicle", output))
+
     def action_resolution(self, actor_id: str, state: WorldState, result: str | None = None) -> str:
         """Record or restore the stateful result of a free-form Action.
 
@@ -186,7 +189,7 @@ class ReplayTape:
                     self._scenario = str(raw["scenario"])
                     self._character_id = str(raw["character_id"])
                     continue
-                if kind not in {"character", "action_resolution", "dm", "director"}:
+                if kind not in {"character", "action_resolution", "dm", "director", "chronicle"}:
                     raise ValueError(f"unknown kind {kind!r}")
                 entries.append(_Entry(kind=kind, key=str(raw["key"]), output=raw["output"]))
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:

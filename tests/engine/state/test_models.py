@@ -74,15 +74,25 @@ def test_world_state():
     assert world.history == [HistoryEvent(text="Hero enters the forest", location="forest-1", characters=["hero-1"])]
 
 
+def test_world_state_chronicle_defaults_empty_and_round_trips():
+    world = WorldState()
+    assert world.chronicle == []
+
+    world.chronicle.append("Long ago, the hero entered the forest.")
+    assert WorldState.model_validate(world.model_dump()).chronicle == ["Long ago, the hero entered the forest."]
+
+
 def test_collection_defaults_are_not_shared():
     first = WorldState()
     second = WorldState()
 
     first.locations["forest"] = Location(id="forest")
     first.history.append(HistoryEvent(text="arrived", location="forest"))
+    first.chronicle.append("a summary")
 
     assert second.locations == {}
     assert second.history == []
+    assert second.chronicle == []
 
     first_character = Character(id="first")
     second_character = Character(id="second")

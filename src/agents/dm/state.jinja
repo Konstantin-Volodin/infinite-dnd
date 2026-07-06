@@ -1,3 +1,9 @@
+{% if chronicle %}
+## chronicle (long-term memory, oldest first)
+{% for entry in chronicle %}
+- {{ entry }}
+{% endfor %}
+{% endif %}
 ## recent context (for continuity — do not re-estimate time for these)
 {% if context_events %}
 {% for event in context_events %}

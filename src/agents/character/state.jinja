@@ -53,6 +53,12 @@
 
 *... recent information about the world ...*
 
+{% if chronicle %}
+## 📖 how we got here
+{% for entry in chronicle %}
+- {{ entry }}
+{% endfor %}
+{% endif %}
 ## 💭 what just happened
 {% if recent_events %}
 {% for event in recent_events[:-1] %}
