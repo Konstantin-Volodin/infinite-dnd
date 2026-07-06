@@ -4,6 +4,7 @@ import asyncio
 import sys
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from io import TextIOWrapper
 
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
@@ -16,6 +17,7 @@ from src.agents.dm.agent import DMDeps, DMResult, agent as dm_agent
 from src.agents.dm.director import DirectorDeps, agent as director_agent
 from src.agents.action_resolver.agent import resolve
 from src.interface.session_log import Logger
+from .replay import ReplayTape
 
 
 _AGENT_USAGE = UsageLimits(request_limit=12)
@@ -98,14 +100,17 @@ async def flow_agent_turn(
     state: WorldState,
     logger: Logger,
     pc_controller: Callable[[str, WorldState], Awaitable[CharacterTool]] | None = None,
+    replay: ReplayTape | None = None,
 ) -> CharacterTool | None:
     """Ask the acting character to pick one next step."""
     char = state.characters[actor_id]
     print(f"  [{actor_id}]", flush=True)
+    if replay and replay.is_playback:
+        return replay.character(actor_id)
     if pc_controller is not None:
         intent = await pc_controller(actor_id, state)
         logger.log_event("player_action", actor=actor_id, tool=intent.kind, action=intent.model_dump(mode="json"))
-        return intent
+        return replay.character(actor_id, intent) if replay else intent
     label = f"character:{actor_id}"
     try:
         with logger.run(label):
@@ -117,14 +122,19 @@ async def flow_agent_turn(
             logger.log_messages(label, result.all_messages())
     except UsageLimitExceeded as exc:
         print(f"  [limit] {actor_id}'s turn ended: {exc}", flush=True)
-        return None
-    return result.output
+        return replay.character(actor_id, None) if replay else None
+    output = result.output
+    return replay.character(actor_id, output) if replay else output
 
 
-async def flow_dm(state: WorldState, new_events: list[HistoryEvent], logger: Logger) -> DMResult:
+async def flow_dm(
+    state: WorldState, new_events: list[HistoryEvent], logger: Logger, replay: ReplayTape | None = None
+) -> DMResult:
     """One LLM call: enrich the world, review quests, and estimate time for this tick's new events."""
     if not new_events:
         return DMResult(creates=[], modifies=[], minutes=[])
+    if replay and replay.is_playback:
+        return replay.dm()
     new_texts = [e.text for e in new_events]
     tail = state.history[: -len(new_events)]  # new_events is non-empty here (checked above)
     context_events = [e.text for e in tail[-10:]]
@@ -139,29 +149,42 @@ async def flow_dm(state: WorldState, new_events: list[HistoryEvent], logger: Log
             logger.log_messages(label, result.all_messages())
     except UsageLimitExceeded as exc:
         print(f"  [limit] dm review ended: {exc}", flush=True)
-        return DMResult(creates=[], modifies=[], minutes=[1] * len(new_events))
+        fallback = DMResult(creates=[], modifies=[], minutes=[1] * len(new_events))
+        return replay.dm(fallback) if replay else fallback
     dm_result = result.output
     if not dm_result.minutes or len(dm_result.minutes) != len(new_events):
         dm_result.minutes = [1] * len(new_events)
     dm_result.creates = sorted(dm_result.creates, key=lambda i: _CREATE_ORDER.get(i.type, 3))
-    return dm_result
+    return replay.dm(dm_result) if replay else dm_result
 
 
-async def flow_director(state: WorldState, location_id: str, logger: Logger) -> None:
+async def flow_director(
+    state: WorldState, location_id: str, logger: Logger, replay: ReplayTape | None = None
+) -> None:
     """Stall-breaker: one LLM call that introduces a single complication grounded in existing state."""
     label = "director"
-    try:
-        with logger.run(label):
-            result = await director_agent.run(
-                "The story has stalled. Introduce exactly one grounded complication.",
-                deps=DirectorDeps(state=state, location_id=location_id),
-                usage_limits=_DM_USAGE,
-            )
-            logger.log_messages(label, result.all_messages())
-    except UsageLimitExceeded as exc:
-        print(f"  [limit] director beat ended: {exc}", flush=True)
+    if replay and replay.is_playback:
+        beat = replay.director()
+    else:
+        try:
+            with logger.run(label):
+                result = await director_agent.run(
+                    "The story has stalled. Introduce exactly one grounded complication.",
+                    deps=DirectorDeps(state=state, location_id=location_id),
+                    usage_limits=_DM_USAGE,
+                )
+                logger.log_messages(label, result.all_messages())
+        except UsageLimitExceeded as exc:
+            print(f"  [limit] director beat ended: {exc}", flush=True)
+            if replay:
+                replay.director(None)
+            return
+        beat = result.output
+        if replay:
+            beat = replay.director(beat)
+
+    if beat is None:
         return
-    beat = result.output
 
     # Director events are retcon-style arrivals: logged, printed, 0 minutes.
     pre = len(state.history)
@@ -173,7 +196,7 @@ async def flow_director(state: WorldState, location_id: str, logger: Logger) -> 
         print(f"  {event.text}  (director)")
 
     key = _record_intervention(state, beat.quest_id)
-    logger.log_event("director_beat", quest=key, event=beat.event)
+    logger.log_event("director_beat", quest=key, text=beat.event)
 
 
 # ─── Tick composition ────────────────────────────────────────
@@ -184,22 +207,28 @@ async def tick(
     tick_index: int,
     logger: Logger,
     pc_controller: Callable[[str, WorldState], Awaitable[CharacterTool]] | None = None,
+    replay: ReplayTape | None = None,
 ) -> None:
     actor_id = _pick_next_actor(state, active_pc_id, tick_index)
 
     controller = pc_controller if actor_id == active_pc_id else None
-    intent = await flow_agent_turn(actor_id, state, logger, controller)
+    intent = await flow_agent_turn(actor_id, state, logger, controller, replay)
     if intent is None:
         return
     print(f"    ↳ {_describe_tool(intent)}")
 
     # 1. Resolve the turn.
     pre = len(state.history)
-    await resolve(intent, state, logger=logger)
+    if replay and replay.is_playback and isinstance(intent, Action):
+        replay.action_resolution(actor_id, state)
+    else:
+        resolution = await resolve(intent, state, logger=logger)
+        if replay and isinstance(intent, Action):
+            replay.action_resolution(actor_id, state, resolution)
     new_events = state.history[pre:]
 
     # 2. One DM call: time estimates, new entities, and quest progress.
-    dm = await flow_dm(state, new_events, logger)
+    dm = await flow_dm(state, new_events, logger, replay)
 
     # 2a. Stamp elapsed time onto the resulting events and advance the clock.
     for event, mins in zip(new_events, dm.minutes):
@@ -227,7 +256,7 @@ async def tick(
 
     # 3. Director beat: when the story stalls, one proactive complication breaks it.
     if _is_stalled(state):
-        await flow_director(state, state.characters[active_pc_id].location, logger)
+        await flow_director(state, state.characters[active_pc_id].location, logger, replay)
         state.last_quest_advance_time = state.time  # suppress consecutive fires
 
 
@@ -259,7 +288,10 @@ async def _run_game(
     stop_check: Callable[[], bool] | None = None,
     pc_controller: Callable[[str, WorldState], Awaitable[CharacterTool]] | None = None,
     progress_callback: Callable[[WorldState], None] | None = None,
+    replay: ReplayTape | None = None,
 ) -> None:
+    if replay:
+        scenario, character_id = replay.resolve_context(scenario, character_id)
     session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     manager = StateManager(scenario=scenario, run_id=None if resume else session_id, resume=resume)
     session_id = manager.run_id
@@ -276,6 +308,9 @@ async def _run_game(
         pc_id = character_id or manager.manifest["pc"]
         if pc_id not in state.characters:
             raise RuntimeError(f"PC '{pc_id}' not in scenario '{manager.scenario}'")
+
+    if replay:
+        replay.bind_context(manager.scenario, pc_id)
 
     print(f"\n=== {manager.manifest.get('title', manager.scenario)} ===")
     print(manager.manifest.get("hook", ""))
@@ -304,7 +339,7 @@ async def _run_game(
                 break
             print(f"\n--- Tick {state.time + 1} ---")
             logger.log_turn(t + 1)
-            await tick(pc_id, state, state.time, logger, pc_controller)
+            await tick(pc_id, state, state.time, logger, pc_controller, replay)
             logger.log_event("world_snapshot", **_snapshot(state))
             state.time += 1
             manager.save_state(state)
@@ -312,9 +347,19 @@ async def _run_game(
                 progress_callback(state)
     finally:
         logger.close()
+    if replay:
+        replay.assert_consumed()
 
 
-def run_game(character_id: str | None = None, max_turns: int = 50, scenario: str | None = None, new_character: dict | None = None) -> None:
+def run_game(
+    character_id: str | None = None,
+    max_turns: int = 50,
+    scenario: str | None = None,
+    new_character: dict | None = None,
+    *,
+    replay: ReplayTape | None = None,
+) -> None:
     # Narrative text (arrows, em-dashes) doesn't fit Windows' default console codepage.
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    asyncio.run(_run_game(scenario, character_id, max_turns, new_character))
+    if isinstance(sys.stdout, TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    asyncio.run(_run_game(scenario, character_id, max_turns, new_character, replay=replay))

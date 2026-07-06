@@ -3,7 +3,7 @@ import os
 from contextlib import nullcontext
 
 from src.agents.server import LlamaServer
-from src.engine.runtime import run_game
+from src.engine.runtime import ReplayTape, run_game
 from src.engine.state import StateManager, slugify
 
 
@@ -41,6 +41,9 @@ def main() -> None:
     parser.add_argument("--character", default=None, help="PC id to play as (default: scenario's manifest pc).")
     parser.add_argument("--turns", type=int, default=50, help="Max turns to run.")
     parser.add_argument("--new-character", action="store_true", help="Create a new PC interactively instead of playing a scenario's preset character.")
+    replay_group = parser.add_mutually_exclusive_group()
+    replay_group.add_argument("--record-replay", metavar="PATH", help="Record structured agent outputs to a JSONL replay tape.")
+    replay_group.add_argument("--replay", metavar="PATH", help="Replay structured agent outputs from a JSONL tape without character, DM, or director calls.")
     args = parser.parse_args()
 
     scenario = args.scenario
@@ -52,9 +55,21 @@ def main() -> None:
         new_character = _prompt_new_character(sorted(state.locations), set(state.characters))
 
     # LlamaServer manages the local llama.cpp process; skip it when routing to a hosted provider.
-    server = LlamaServer() if os.getenv("LLM_PROVIDER", "local") == "local" else nullcontext()
+    if args.replay:
+        tape = ReplayTape.playback(args.replay)
+    elif args.record_replay:
+        tape = ReplayTape.recording(args.record_replay)
+    else:
+        tape = None
+    server = LlamaServer() if not args.replay and os.getenv("LLM_PROVIDER", "local") == "local" else nullcontext()
     with server:
-        run_game(character_id=args.character, max_turns=args.turns, scenario=scenario, new_character=new_character)
+        run_game(
+            character_id=args.character,
+            max_turns=args.turns,
+            scenario=scenario,
+            new_character=new_character,
+            replay=tape,
+        )
 
 
 if __name__ == "__main__":
