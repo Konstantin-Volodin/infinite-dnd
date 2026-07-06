@@ -3,6 +3,7 @@ import os
 
 import pytest
 
+import src.engine.state.loader as loader_module
 from src.engine.state.loader import StateManager
 from src.engine.state.models import Character, Location, Quest, WorldState
 from src.world import list_scenarios
@@ -43,6 +44,36 @@ def test_save_load_round_trip(tmp_path):
     manager.save_state(state)
     loaded = manager.load_state(world_state_file=f"world_state_{state.time}.json")
     assert loaded == state
+
+
+def test_save_state_atomically_replaces_existing_snapshot(tmp_path):
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    state = manager.init_state()
+    state_file = manager.state_dir / f"world_state_{state.time}.json"
+    state_file.write_text("incomplete", encoding="utf-8")
+
+    manager.save_state(state)
+
+    assert WorldState(**json.loads(state_file.read_text(encoding="utf-8"))) == state
+    assert list(manager.state_dir.glob("*.tmp")) == []
+
+
+def test_save_state_leaves_existing_snapshot_intact_if_replace_fails(tmp_path, monkeypatch):
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+    state = manager.init_state()
+    state_file = manager.state_dir / f"world_state_{state.time}.json"
+    state_file.write_text("previous complete snapshot", encoding="utf-8")
+
+    def fail_replace(source, destination):
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(loader_module.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="simulated replace failure"):
+        manager.save_state(state)
+
+    assert state_file.read_text(encoding="utf-8") == "previous complete snapshot"
+    assert list(manager.state_dir.glob("*.tmp")) == []
 
 
 def test_latest_snapshot_name_uses_numeric_order(tmp_path):

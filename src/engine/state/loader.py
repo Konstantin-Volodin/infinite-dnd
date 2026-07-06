@@ -1,7 +1,9 @@
 """State Manager - load/save world state from JSON files."""
 
 import json
+import os
 import re
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -108,7 +110,7 @@ class StateManager:
         )
         return word_state
 
-    def load_state(self, world_state_file: str = None) -> WorldState:
+    def load_state(self, world_state_file: str | None = None) -> WorldState:
         """Load saved state, or create fresh from setup if none exists."""
 
         if world_state_file:
@@ -134,7 +136,25 @@ class StateManager:
         return latest[1] if latest else None
 
     def save_state(self, state: WorldState):
-        """Save current world state to JSON."""
+        """Atomically save current world state to JSON."""
         state_file = self.state_dir / f"world_state_{state.time}.json"
-        with state_file.open("w", encoding="utf-8") as state_file:
-            state_file.write(state.model_dump_json(indent=2))
+        serialized_state = state.model_dump_json(indent=2)
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self.state_dir,
+                prefix=f".{state_file.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
+                temp_file.write(serialized_state)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+
+            os.replace(temp_path, state_file)
+        finally:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
