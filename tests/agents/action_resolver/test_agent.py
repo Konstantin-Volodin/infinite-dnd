@@ -3,12 +3,16 @@ import asyncio
 from src.engine.state.models import Character, Location, WorldState
 from src.agents.action_resolver.agent import resolve
 from src.agents.character.tools import Speak, Wait
+from src.agents.dm.tools import Modify
 
 
 def _state() -> WorldState:
     return WorldState(
         locations={"tavern": Location(id="tavern", connections=[])},
-        characters={"hero": Character(id="hero", role="warrior", location="tavern", goal="find the ale")},
+        characters={
+            "hero": Character(id="hero", role="warrior", location="tavern", goal="find the ale"),
+            "merchant": Character(id="merchant", role="merchant", location="tavern"),
+        },
     )
 
 
@@ -46,3 +50,27 @@ def test_no_self_updates_when_fields_absent():
     asyncio.run(resolve(tool, state))
     assert state.characters["hero"].goal == "find the ale"  # unchanged
     assert len(state.history) == history_before + 1  # only the wait event itself
+
+
+def test_modify_update_relationship_applied():
+    state = _state()
+    tool = Modify(action="update_relationship", target_id="hero", other_id="merchant", reason="grateful — she healed me")
+    result = asyncio.run(resolve(tool, state))
+    assert state.characters["hero"].relationships["merchant"] == "grateful — she healed me"
+    assert "grateful" in result
+
+
+def test_modify_update_relationship_unknown_target():
+    state = _state()
+    tool = Modify(action="update_relationship", target_id="ghost", other_id="merchant", reason="hostile")
+    result = asyncio.run(resolve(tool, state))
+    assert "Cannot update relationship" in result
+    assert "ghost" not in state.characters
+
+
+def test_modify_update_relationship_missing_fields():
+    state = _state()
+    tool = Modify(action="update_relationship", target_id="hero", other_id=None, reason=None)
+    result = asyncio.run(resolve(tool, state))
+    assert "Cannot update relationship" in result
+    assert state.characters["hero"].relationships == {}

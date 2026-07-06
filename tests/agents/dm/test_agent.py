@@ -1,4 +1,4 @@
-from src.agents.dm.agent import NewEntity, QuestUpdate, DMResult, dm_output
+from src.agents.dm.agent import NewEntity, QuestUpdate, RelationshipUpdate, DMResult, dm_output
 from src.agents.dm.tools import Create, Modify
 
 
@@ -9,7 +9,7 @@ def test_dm_output_entities_filtered():
         NewEntity(type="item", name="", description="nameless item — should be filtered"),
         NewEntity(type="quest", name="Find the Vault", description="locate the cold-hearth vault", owner="alice", plan=["search the cellar", "find the vault key", "open the vault"]),
     ]
-    result = dm_output(None, entities, [], [])  # type: ignore[arg-type]
+    result = dm_output(None, entities, [], [], [])  # type: ignore[arg-type]
     assert isinstance(result, DMResult)
     assert len(result.creates) == 3  # empty-name filtered
     assert all(isinstance(t, Create) for t in result.creates)
@@ -26,7 +26,7 @@ def test_dm_output_quest_updates_filtered():
         QuestUpdate(quest_id="find-kaelen", advance=True),
         QuestUpdate(quest_id="noise"),  # empty — should be dropped
     ]
-    result = dm_output(None, [], updates, [])  # type: ignore[arg-type]
+    result = dm_output(None, [], updates, [], [])  # type: ignore[arg-type]
     assert len(result.modifies) == 3  # empty update filtered out
     assert all(isinstance(t, Modify) for t in result.modifies)
     assert result.modifies[0].target_id == "find-brother" and result.modifies[0].status == "completed" and result.modifies[0].step is None
@@ -34,11 +34,27 @@ def test_dm_output_quest_updates_filtered():
     assert result.modifies[2].target_id == "find-kaelen" and result.modifies[2].advance is True
 
 
+def test_dm_output_relationship_updates_filtered():
+    updates = [
+        RelationshipUpdate(character_id="hero", target_id="merchant", relation="grateful — she healed me"),
+        RelationshipUpdate(character_id="hero", target_id="bandit", relation=""),  # empty — dropped
+        RelationshipUpdate(character_id="hero", target_id="hero", relation="self-reflective"),  # self — dropped
+    ]
+    result = dm_output(None, [], [], updates, [])  # type: ignore[arg-type]
+    assert len(result.modifies) == 1
+    modify = result.modifies[0]
+    assert isinstance(modify, Modify)
+    assert modify.action == "update_relationship"
+    assert modify.target_id == "hero"
+    assert modify.other_id == "merchant"
+    assert modify.reason == "grateful — she healed me"
+
+
 def test_dm_output_minutes_clamped():
-    result = dm_output(None, [], [], [0, 1, 30, 9999, -5])  # type: ignore[arg-type]
+    result = dm_output(None, [], [], [], [0, 1, 30, 9999, -5])  # type: ignore[arg-type]
     assert result.minutes == [0, 1, 30, 1440, 0]
 
 
 def test_dm_output_all_empty():
-    result = dm_output(None, [], [], [])  # type: ignore[arg-type]
+    result = dm_output(None, [], [], [], [])  # type: ignore[arg-type]
     assert result == DMResult(creates=[], modifies=[], minutes=[])

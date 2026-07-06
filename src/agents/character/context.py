@@ -44,6 +44,8 @@ def character_context(char: Character, state: WorldState) -> str:
     for c in present_characters:
         status = get_health_status(c)
         tags = [t for t in (c.role, status if status != "healthy" else "") if t]
+        if disposition := c.relationships.get(char.id):
+            tags.append(f"thinks of me: {disposition}")
         others.append(f"{c.id} ({', '.join(tags)})" if tags else c.id)
     speak_targets = [c.id for c in present_characters if c.stats.hp > 0]
     # Warnings

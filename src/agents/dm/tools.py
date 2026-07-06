@@ -19,9 +19,10 @@ class Create(BaseModel):
 
 class Modify(BaseModel):
     kind: Literal["modify"] = "modify"
-    action: Literal["update_quest", "remove_npc", "update_location"]
+    action: Literal["update_quest", "remove_npc", "update_location", "update_relationship"]
     target_id: str
     status: str | None = None
     step: str | None = None
     advance: bool = False
     reason: str | None = None
+    other_id: str | None = None  # update_relationship: the character target_id's opinion is about

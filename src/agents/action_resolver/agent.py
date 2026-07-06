@@ -136,6 +136,10 @@ def _resolve_modify(tool: Modify, state: WorldState) -> str:
         return ops.delete_npc(tool.target_id, reason=tool.reason or "")
     if tool.action == "update_location":
         return ops.modify_location(tool.target_id, description=tool.reason)
+    if tool.action == "update_relationship":
+        if not tool.other_id or not tool.reason:
+            return "Cannot update relationship — other_id and reason are required."
+        return ops.update_relationship(tool.target_id, tool.other_id, tool.reason)
     return f"Unknown modify action: {tool.action!r}."
 
 

@@ -37,6 +37,12 @@ class QuestUpdate(BaseModel):
     advance: bool = False  # the quest's CURRENT objective was clearly accomplished this turn
 
 
+class RelationshipUpdate(BaseModel):
+    character_id: str  # whose opinion this is
+    target_id: str  # who the opinion is about
+    relation: str  # free-form disposition, e.g. "hostile — saw me steal from the shrine"
+
+
 @dataclass
 class DMResult:
     creates: list[Create]
@@ -48,9 +54,10 @@ def dm_output(
     _: RunContext[DMDeps],
     entities: list[NewEntity],
     quest_updates: list[QuestUpdate],
+    relationship_updates: list[RelationshipUpdate],
     minutes: list[int],
 ) -> DMResult:
-    """register new entities, report quest progress, and estimate minutes elapsed per new event."""
+    """register new entities, report quest and relationship changes, and estimate minutes elapsed per new event."""
     creates = [
         Create(
             type=e.type,
@@ -65,20 +72,25 @@ def dm_output(
         for e in entities
         if e.name.strip()
     ]
-    modifies = [
+    quest_modifies = [
         Modify(action="update_quest", target_id=u.quest_id, status=u.new_status, step=u.step, advance=u.advance)
         for u in quest_updates
         if u.new_status or u.step or u.advance
     ]
+    relationship_modifies = [
+        Modify(action="update_relationship", target_id=u.character_id, other_id=u.target_id, reason=u.relation)
+        for u in relationship_updates
+        if u.relation.strip() and u.character_id != u.target_id
+    ]
     clamped_minutes = [max(0, min(int(m), 1440)) for m in minutes]
-    return DMResult(creates=creates, modifies=modifies, minutes=clamped_minutes)
+    return DMResult(creates=creates, modifies=quest_modifies + relationship_modifies, minutes=clamped_minutes)
 
 
 agent: Agent[DMDeps, DMResult] = Agent(
     model=create_model(),
     deps_type=DMDeps,
     output_type=ToolOutput(dm_output, name="report"),
-    instructions="You maintain the world after each turn: register new entities, advance quests, and estimate time elapsed.",
+    instructions="You maintain the world after each turn: register new entities, advance quests, adjust relationships, and estimate time elapsed.",
 )
 
 
