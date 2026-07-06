@@ -358,8 +358,9 @@ def run_game(
     new_character: dict | None = None,
     *,
     replay: ReplayTape | None = None,
+    pc_controller: Callable[[str, WorldState], Awaitable[CharacterTool]] | None = None,
 ) -> None:
     # Narrative text (arrows, em-dashes) doesn't fit Windows' default console codepage.
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    asyncio.run(_run_game(scenario, character_id, max_turns, new_character, replay=replay))
+    asyncio.run(_run_game(scenario, character_id, max_turns, new_character, replay=replay, pc_controller=pc_controller))

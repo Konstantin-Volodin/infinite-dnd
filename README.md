@@ -22,6 +22,7 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 ### ⚡ Running stuff
 - `infinite-dnd` - runs the game
 - `infinite-dnd --new-character` - runs the game with an interactively-created PC
+- `infinite-dnd --interactive` - play the PC's turns yourself from the console; everything else stays autonomous
 - `infinite-dnd --record-replay run.jsonl` - records structured agent decisions for deterministic playback
 - `infinite-dnd --replay run.jsonl` - replays a recorded run without an LLM provider
 - `infinite-dnd-state` - runs the app (World + Logs tabs)
