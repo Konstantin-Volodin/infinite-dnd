@@ -6,12 +6,15 @@ recording) doesn't need to know a human is behind the wheel.
 """
 
 import asyncio
+from typing import cast
 
-from src.agents.character.tools import Action, Attack, CharacterTool, Speak, Travel, Wait
+from src.agents.character.tools import Ability, Action, Attack, CharacterTool, Check, Speak, Travel, Wait
 from src.engine.rules import get_health_status
 from src.engine.state import WorldState, characters_in_location, connected_location_ids, resolve_character, resolve_location_id
 
-_HELP = "Type a plain sentence to act, or a command: /speak [target] <message> | /travel <place> | /attack <target> | /wait"
+_HELP = "Type a plain sentence to act, or: /check <ability> <DC> <action> [vs <character>] | /speak ... | /travel ... | /attack ... | /wait"
+
+_ABILITIES: set[str] = {"strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"}
 
 
 class _InputError(ValueError):
@@ -78,6 +81,29 @@ def _parse_intent(actor_id: str, state: WorldState, line: str) -> CharacterTool:
         if target is None:
             raise _InputError(f"Unknown target '{rest}'.")
         return Attack(actor=actor_id, target=target.id)
+    if command == "check":
+        parts = rest.split(maxsplit=2)
+        if len(parts) < 3 or parts[0].lower() not in _ABILITIES:
+            raise _InputError("Usage: /check <ability> <DC> <action> [vs <character>]")
+        try:
+            difficulty = int(parts[1])
+        except ValueError as exc:
+            raise _InputError("Check DC must be a number from 1 to 30.") from exc
+        description = parts[2]
+        opponent_id = None
+        if " vs " in description:
+            description, _, opponent_text = description.rpartition(" vs ")
+            opponent = resolve_character(state, opponent_text)
+            if opponent is None:
+                raise _InputError(f"Unknown opponent '{opponent_text}'.")
+            opponent_id = opponent.id
+        try:
+            return Check(
+                actor=actor_id, ability=cast(Ability, parts[0].lower()), difficulty=difficulty,
+                description=description.strip(), opponent=opponent_id,
+            )
+        except ValueError as exc:
+            raise _InputError("Check DC must be a number from 1 to 30.") from exc
     if command == "speak":
         if not rest:
             raise _InputError("Usage: /speak [target] <message>")

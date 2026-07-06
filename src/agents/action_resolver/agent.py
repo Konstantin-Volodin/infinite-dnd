@@ -18,7 +18,8 @@ from src.engine.state import (
     WorldState,
     slugify,
 )
-from src.agents.character.tools import Action, Attack, CharacterTool, Speak, Travel, Wait
+from src.agents.character.tools import Action, Attack, CharacterTool, Check, Speak, Travel, Wait
+from src.engine.rules import DieRoller, resolve_check
 from src.agents.dm.tools import Create, Modify
 from src.agents.utils import create_model
 from src.interface.session_log import Logger
@@ -32,9 +33,15 @@ AnyTool = CharacterTool | Create | Modify
 # Public entry
 # ============================================================
 
-async def resolve(tool: AnyTool, state: WorldState, usage: RunUsage | None = None, logger: Logger | None = None) -> str:
+async def resolve(
+    tool: AnyTool,
+    state: WorldState,
+    usage: RunUsage | None = None,
+    logger: Logger | None = None,
+    rng: DieRoller | None = None,
+) -> str:
     """Execute a tool call against world state. Single writer surface."""
-    result = await _dispatch(tool, state, usage, logger)
+    result = await _dispatch(tool, state, usage, logger, rng)
     _apply_self_updates(tool, state)
     if logger:
         subject = getattr(tool, "actor", None) or getattr(tool, "target_id", None) or getattr(tool, "name", None)
@@ -54,7 +61,9 @@ def _apply_self_updates(tool: AnyTool, state: WorldState) -> None:
         ops.set_goal(actor, new_goal)
 
 
-async def _dispatch(tool: AnyTool, state: WorldState, usage: RunUsage | None, logger: Logger | None) -> str:
+async def _dispatch(
+    tool: AnyTool, state: WorldState, usage: RunUsage | None, logger: Logger | None, rng: DieRoller | None
+) -> str:
     if isinstance(tool, Speak):
         return _resolve_speak(tool, state)
     if isinstance(tool, Travel):
@@ -63,6 +72,8 @@ async def _dispatch(tool: AnyTool, state: WorldState, usage: RunUsage | None, lo
         return _resolve_wait(tool, state)
     if isinstance(tool, Attack):
         return _resolve_attack(tool, state)
+    if isinstance(tool, Check):
+        return _resolve_check(tool, state, rng)
     if isinstance(tool, Create):
         return _resolve_create(tool, state)
     if isinstance(tool, Modify):
@@ -94,6 +105,34 @@ def _resolve_wait(tool: Wait, state: WorldState) -> str:
 
 def _resolve_attack(tool: Attack, state: WorldState) -> str:
     return WorldOperations(state).attack(tool.actor, tool.target)
+
+
+def _resolve_check(tool: Check, state: WorldState, rng: DieRoller | None) -> str:
+    actor = state.characters.get(tool.actor)
+    if actor is None:
+        return f"Cannot resolve check — character {tool.actor!r} not found."
+    opponent = state.characters.get(tool.opponent) if tool.opponent else None
+    if tool.opponent and opponent is None:
+        return f"Cannot resolve check — opponent {tool.opponent!r} not found."
+
+    result = resolve_check(
+        tool.difficulty,
+        tool.modifier,
+        opposing_modifier=tool.opposing_modifier if opponent else None,
+        rng=rng,
+    )
+    outcome = "succeeds" if result.success else "fails"
+    detail = f"{result.roll}{result.modifier:+d}={result.total} vs DC {tool.difficulty}"
+    characters = [tool.actor]
+    if opponent:
+        detail = (
+            f"{result.roll}{result.modifier:+d}={result.total} vs "
+            f"{opponent.id} {result.opposing_roll}{result.opposing_modifier:+d}={result.opposing_total}"
+        )
+        characters.append(opponent.id)
+    text = f"{tool.actor} {outcome}: {tool.description} [{tool.ability}; {detail}]."
+    state.history.append(HistoryEvent(text=text, location=actor.location, characters=characters))
+    return text
 
 
 def _resolve_create(tool: Create, state: WorldState) -> str:

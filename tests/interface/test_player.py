@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from src.agents.character.tools import Action, Attack, Speak, Travel, Wait
+from src.agents.character.tools import Action, Attack, Check, Speak, Travel, Wait
 from src.engine.state.models import Character, Location, WorldState
 from src.interface.player import _describe_situation, _parse_intent, _InputError, console_pc_controller
 
@@ -61,6 +61,19 @@ def test_attack_command_resolves_target():
 def test_attack_command_rejects_unknown_target():
     with pytest.raises(_InputError, match="Unknown target"):
         _parse_intent("hero", _state(), "/attack ghost")
+
+
+def test_check_command_with_dc():
+    assert _parse_intent("hero", _state(), "/check dexterity 14 pick the lock") == Check(
+        actor="hero", ability="dexterity", difficulty=14, description="pick the lock"
+    )
+
+
+def test_contested_check_command_resolves_opponent():
+    assert _parse_intent("hero", _state(), "/check charisma 10 bluff convincingly vs bob") == Check(
+        actor="hero", ability="charisma", difficulty=10,
+        description="bluff convincingly", opponent="bob",
+    )
 
 
 def test_speak_command_with_resolved_target():

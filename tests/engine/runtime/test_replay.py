@@ -4,7 +4,7 @@ from typing import Any, Iterator
 
 import pytest
 
-from src.agents.character.tools import Action, Speak, Wait
+from src.agents.character.tools import Action, Check, Speak, Wait
 from src.agents.dm.agent import DMResult
 from src.agents.dm.director import DirectorResult
 from src.agents.dm.tools import Create, Modify
@@ -162,4 +162,25 @@ def test_empty_event_dm_flow_does_not_consume_tape(tmp_path):
 
     assert asyncio.run(flow_dm(_state(), [], _Logger(), playback)) == DMResult([], [], [])
     assert asyncio.run(flow_agent_turn("hero", _state(), _Logger(), replay=playback)) == Wait(actor="hero")
+    playback.assert_consumed()
+
+
+def test_check_round_trips_and_playback_restores_recorded_roll(tmp_path):
+    path = tmp_path / "check.jsonl"
+    check = Check(actor="hero", ability="wisdom", description="notices the tripwire", difficulty=16)
+    recorded_state = _state()
+    recorded_state.history.append(HistoryEvent(
+        text="hero succeeds: notices the tripwire [wisdom; 18+0=18 vs DC 16].",
+        location="tavern", characters=["hero"],
+    ))
+    tape = ReplayTape.recording(path)
+    tape.character("hero", check)
+    tape.action_resolution("hero", recorded_state, recorded_state.history[-1].text)
+    tape.dm(DMResult(creates=[], modifies=[], minutes=[1]))
+
+    state = _state()
+    playback = ReplayTape.playback(path)
+    asyncio.run(tick("hero", state, 0, _Logger(), replay=playback))
+    assert state.history[-1].text == recorded_state.history[-1].text
+    assert state.history[-1].minutes_elapsed == 1
     playback.assert_consumed()

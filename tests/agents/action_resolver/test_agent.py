@@ -2,7 +2,7 @@ import asyncio
 
 from src.engine.state.models import Character, Location, WorldState
 from src.agents.action_resolver.agent import resolve
-from src.agents.character.tools import Speak, Wait
+from src.agents.character.tools import Check, Speak, Wait
 from src.agents.dm.tools import Modify
 
 
@@ -74,3 +74,33 @@ def test_modify_update_relationship_missing_fields():
     result = asyncio.run(resolve(tool, state))
     assert "Cannot update relationship" in result
     assert state.characters["hero"].relationships == {}
+
+
+class _Rolls:
+    def __init__(self, *values: int):
+        self.values = iter(values)
+
+    def randint(self, _low: int, _high: int) -> int:
+        return next(self.values)
+
+
+def test_check_resolution_records_concise_roll_history():
+    state = _state()
+    result = asyncio.run(resolve(
+        Check(actor="hero", ability="dexterity", description="picks the cellar lock", difficulty=14, modifier=2),
+        state,
+        rng=_Rolls(12),
+    ))
+    assert result == "hero succeeds: picks the cellar lock [dexterity; 12+2=14 vs DC 14]."
+    assert state.history[-1].text == result
+    assert state.history[-1].characters == ["hero"]
+
+
+def test_contested_check_records_both_characters():
+    state = _state()
+    result = asyncio.run(resolve(Check(
+        actor="hero", ability="charisma", description="bluffs the merchant",
+        opponent="merchant", modifier=1, opposing_modifier=2,
+    ), state, rng=_Rolls(16, 10)))
+    assert "16+1=17 vs merchant 10+2=12" in result
+    assert state.history[-1].characters == ["hero", "merchant"]

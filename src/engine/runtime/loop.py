@@ -12,7 +12,7 @@ from pydantic_ai.usage import UsageLimits
 from src.engine.state import StateManager, WorldOperations, WorldState
 from src.engine.state.models import HistoryEvent
 from src.agents.character.agent import CharacterDeps, agent as character_agent
-from src.agents.character.tools import Action, Attack, CharacterTool, Speak, Travel, Wait
+from src.agents.character.tools import Action, Attack, CharacterTool, Check, Speak, Travel, Wait
 from src.agents.dm.agent import DMDeps, DMResult, agent as dm_agent
 from src.agents.dm.director import DirectorDeps, agent as director_agent
 from src.agents.action_resolver.agent import resolve
@@ -65,6 +65,9 @@ def _describe_tool(tool: CharacterTool) -> str:
         return "wait"
     if isinstance(tool, Attack):
         return f"attack → {tool.target}"
+    if isinstance(tool, Check):
+        target = f" vs {tool.opponent}" if tool.opponent else f" vs DC {tool.difficulty}"
+        return f"check ({tool.ability}{target}): {tool.description}"
     if isinstance(tool, Action):
         suffix = f" ({tool.target})" if tool.target else ""
         return f"action{suffix}: {tool.description}"
@@ -116,7 +119,7 @@ async def flow_agent_turn(
     try:
         with logger.run(label):
             result = await character_agent.run(
-                "Choose exactly ONE next step by calling action, speak, travel, attack, or wait.",
+                "Choose exactly ONE next step by calling action, check, speak, travel, attack, or wait.",
                 deps=CharacterDeps(char=char, state=state),
                 usage_limits=_AGENT_USAGE,
             )
@@ -220,11 +223,11 @@ async def tick(
 
     # 1. Resolve the turn.
     pre = len(state.history)
-    if replay and replay.is_playback and isinstance(intent, Action):
+    if replay and replay.is_playback and isinstance(intent, (Action, Check)):
         replay.action_resolution(actor_id, state)
     else:
         resolution = await resolve(intent, state, logger=logger)
-        if replay and isinstance(intent, Action):
+        if replay and isinstance(intent, (Action, Check)):
             replay.action_resolution(actor_id, state, resolution)
     new_events = state.history[pre:]
 

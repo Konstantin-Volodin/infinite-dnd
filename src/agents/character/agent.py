@@ -8,7 +8,7 @@ from pydantic_ai.tools import ToolDefinition
 from src.engine.state import Character, WorldState, characters_in_location, connected_location_ids
 from src.agents.utils import create_model
 from .context import character_context, character_system
-from .tools import Action, Attack, CharacterTool, Speak, Travel, Wait
+from .tools import Ability, Action, Attack, CharacterTool, Check, Speak, Travel, Wait
 
 
 @dataclass
@@ -111,6 +111,27 @@ def attack_output(
     return Attack(actor=ctx.deps.char.id, target=target, remember=remember, new_goal=new_goal)
 
 
+def check_output(
+    ctx: RunContext[CharacterDeps],
+    ability: Ability,
+    description: str,
+    difficulty: int = 10,
+    modifier: int = 0,
+    opponent: str | None = None,
+    opposing_modifier: int = 0,
+    remember: str | None = None,
+    new_goal: str | None = None,
+) -> Check:
+    """attempt a risky action with a d20 check; use opponent only for a direct contest."""
+    if opponent and opponent not in _living_targets(ctx):
+        raise ModelRetry(f"Cannot contest {opponent!r}; they are not a living character here.")
+    return Check(
+        actor=ctx.deps.char.id, ability=ability, description=description, difficulty=difficulty,
+        modifier=modifier, opponent=opponent, opposing_modifier=opposing_modifier,
+        remember=remember, new_goal=new_goal,
+    )
+
+
 CHARACTER_RESPONSE_OUTPUTS = [
     ToolOutput(speak_output, name="speak"),
     ToolOutput(wait_output, name="wait"),
@@ -121,6 +142,7 @@ agent: Agent[CharacterDeps, CharacterTool] = Agent(
     deps_type=CharacterDeps,
     output_type=[
         ToolOutput(action_output, name="action"),
+        ToolOutput(check_output, name="check"),
         ToolOutput(speak_output, name="speak"),
         ToolOutput(travel_output, name="travel"),
         ToolOutput(attack_output, name="attack"),

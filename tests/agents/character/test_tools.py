@@ -1,4 +1,4 @@
-from src.agents.character.tools import Action, Attack, Speak, Travel, Wait
+from src.agents.character.tools import Action, Attack, Check, Speak, Travel, Wait
 
 
 def test_speak():
@@ -26,13 +26,19 @@ def test_attack():
     assert k.kind == "attack" and k.target == "bob"
 
 
+def test_check():
+    check = Check(actor="alice", ability="dexterity", description="pick the lock", difficulty=14)
+    assert check.kind == "check" and check.difficulty == 14
+
+
 def test_roundtrip_serialization():
     s = Speak(actor="alice", message="hi", target="bob")
     t = Travel(actor="alice", destination="forest")
     w = Wait(actor="alice")
     a = Action(actor="alice", description="pick the lock")
     k = Attack(actor="alice", target="bob")
-    for tool in (s, t, w, a, k):
+    check = Check(actor="alice", ability="wisdom", description="spot the ambush", difficulty=12)
+    for tool in (s, t, w, a, k, check):
         clone = type(tool).model_validate_json(tool.model_dump_json())
         assert clone == tool
 

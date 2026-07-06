@@ -6,7 +6,10 @@ The agent emits one per turn; the resolver consumes them and is the only writer.
 
 from typing import Literal, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+Ability = Literal["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]
 
 
 class CharacterToolBase(BaseModel):
@@ -46,4 +49,16 @@ class Attack(CharacterToolBase):
     target: str
 
 
-CharacterTool = Union[Speak, Travel, Wait, Action, Attack]
+class Check(CharacterToolBase):
+    """A risky action resolved with a d20 against a DC or another character."""
+    kind: Literal["check"] = "check"
+    actor: str
+    ability: Ability
+    description: str
+    difficulty: int = Field(default=10, ge=1, le=30)
+    modifier: int = Field(default=0, ge=-20, le=20)
+    opponent: str | None = None
+    opposing_modifier: int = Field(default=0, ge=-20, le=20)
+
+
+CharacterTool = Union[Speak, Travel, Wait, Action, Attack, Check]

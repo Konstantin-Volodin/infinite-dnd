@@ -3,8 +3,60 @@ Game Rules - Mechanics derived from character stats.
 """
 
 import random
+from dataclasses import dataclass
+from typing import Protocol
 
 from src.engine.state.models import Character, CharacterStats
+
+
+class DieRoller(Protocol):
+    """Small injectable random surface used by deterministic rules tests."""
+
+    def randint(self, a: int, b: int, /) -> int: ...
+
+
+@dataclass(frozen=True)
+class CheckResult:
+    roll: int
+    modifier: int
+    total: int
+    success: bool
+    difficulty: int
+    opposing_roll: int | None = None
+    opposing_modifier: int = 0
+    opposing_total: int | None = None
+
+
+def d20(rng: DieRoller | None = None) -> int:
+    """Roll a d20 through an injectable RNG."""
+    return (rng or random).randint(1, 20)
+
+
+def resolve_check(
+    difficulty: int,
+    modifier: int = 0,
+    *,
+    opposing_modifier: int | None = None,
+    rng: DieRoller | None = None,
+) -> CheckResult:
+    """Resolve a DC or contested d20 check; contested ties favor the defender."""
+    roll = d20(rng)
+    total = roll + modifier
+    if opposing_modifier is None:
+        return CheckResult(roll, modifier, total, total >= difficulty, difficulty)
+
+    opposing_roll = d20(rng)
+    opposing_total = opposing_roll + opposing_modifier
+    return CheckResult(
+        roll,
+        modifier,
+        total,
+        total > opposing_total,
+        opposing_total,
+        opposing_roll,
+        opposing_modifier,
+        opposing_total,
+    )
 
 
 def get_health_status(character: object) -> str:
