@@ -17,4 +17,6 @@ jobs:
 
       - run: uv sync --locked --extra dev
 
+      - run: uv run pyright
+
       - run: uv run pytest
