@@ -12,9 +12,7 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 
 ### 📋 Prerequisites
 **python environment**
-- `uv venv .venv`
-- `source .venv/Scripts/activate`
-- `uv pip install -e .`
+- `uv sync --extra dev`
 
 **LLM (CUDA):**
 - download the LLAMA CUDA binary from the [llama.cpp releases page](https://github.com/ggerganov/llama.cpp/releases/latest)
@@ -24,6 +22,8 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 ### ⚡ Running stuff
 - `infinite-dnd` - runs the game
 - `infinite-dnd --new-character` - runs the game with an interactively-created PC
+- `infinite-dnd --record-replay run.jsonl` - records structured agent decisions for deterministic playback
+- `infinite-dnd --replay run.jsonl` - replays a recorded run without an LLM provider
 - `infinite-dnd-state` - runs the app (World + Logs tabs)
 - `infinite-dnd-scorecard` - compares campaign runs
 - `infinite-dnd-dump-context` - dumps each agent's exact prompt/tools/context for inspection
@@ -55,6 +55,8 @@ src/                        - source code
 │   ├── runtime/                - game loop orchestration
 │   └── world/                  - world-state queries, interactions, and mutations
 ├── interface/              - user interface
+│   ├── templates/              - World and Logs page structure
+│   └── static/                 - page scripts and shared/view-specific styles
 ├── tests/                  - dumps each agent's exact prompt/tools/context for inspection
 └── world/                  - scenario data (one subdir per scenario)
 tests/                      - pytest suite, mirrors src/ layout
