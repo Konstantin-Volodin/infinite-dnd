@@ -32,9 +32,12 @@ def test_slugify():
 
 
 def test_resolve_character(state):
-    assert resolve_character(state, "elara-swift").id == "elara-swift"
-    assert resolve_character(state, "Elara Swift").id == "elara-swift"
-    assert resolve_character(state, "bram").id == "bram-the-bold"
+    exact = resolve_character(state, "elara-swift")
+    normalized = resolve_character(state, "Elara Swift")
+    partial = resolve_character(state, "bram")
+    assert exact is not None and exact.id == "elara-swift"
+    assert normalized is not None and normalized.id == "elara-swift"
+    assert partial is not None and partial.id == "bram-the-bold"
     assert resolve_character(state, None) is None
     assert resolve_character(state, "ghost") is None
 

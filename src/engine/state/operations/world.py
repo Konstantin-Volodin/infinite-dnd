@@ -2,8 +2,14 @@
 World-scoped operations: quests, characters (spawn/delete), items (world-level), locations, time.
 """
 
+from typing import Protocol, cast
+
 from src.engine.state.models import Character, Location, Quest
 from src.engine.state.operations._base import _OpsBase
+
+
+class _XpAwarder(Protocol):
+    def award_xp(self, character_id: str, amount: int, reason: str = "") -> str: ...
 
 
 class WorldOps(_OpsBase):
@@ -32,11 +38,12 @@ class WorldOps(_OpsBase):
         # XP award to owner — step/advance=10, completion=50. Silent if owner isn't a known character.
         award_suffix = ""
         if quest.owner and quest.owner in self.state.characters:
+            award_xp = cast(_XpAwarder, self).award_xp
             if awarded_step:
-                self.award_xp(quest.owner, 10, reason=f"quest '{quest_id}' progress")
+                award_xp(quest.owner, 10, reason=f"quest '{quest_id}' progress")
                 award_suffix = f" (+10 XP to {quest.owner})"
             if new_status == "completed":
-                self.award_xp(quest.owner, 50, reason=f"quest '{quest_id}' completed")
+                award_xp(quest.owner, 50, reason=f"quest '{quest_id}' completed")
                 award_suffix = f" (+50 XP to {quest.owner})"
         return f"Quest '{quest_id}' updated.{award_suffix}"
 

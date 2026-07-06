@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from src.engine.state.models import (
     Character,
     CharacterStats,
@@ -69,3 +72,46 @@ def test_world_state():
     assert world.characters == {"hero-1": char}
     assert world.quests == {"q1": quest}
     assert world.history == [HistoryEvent(text="Hero enters the forest", location="forest-1", characters=["hero-1"])]
+
+
+def test_collection_defaults_are_not_shared():
+    first = WorldState()
+    second = WorldState()
+
+    first.locations["forest"] = Location(id="forest")
+    first.history.append(HistoryEvent(text="arrived", location="forest"))
+
+    assert second.locations == {}
+    assert second.history == []
+
+    first_character = Character(id="first")
+    second_character = Character(id="second")
+    first_character.inventory.append("torch")
+    assert second_character.inventory == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("hp", -1), ("max_hp", -1), ("level", 0), ("xp", -1), ("gold", -1)],
+)
+def test_character_stats_reject_invalid_values(field, value):
+    with pytest.raises(ValidationError):
+        CharacterStats.model_validate({field: value})
+
+
+def test_character_stats_reject_hp_above_maximum():
+    with pytest.raises(ValidationError, match="hp cannot exceed max_hp"):
+        CharacterStats(hp=6, max_hp=5)
+
+
+@pytest.mark.parametrize("field", ["time", "minutes_elapsed", "last_quest_advance_time"])
+def test_world_state_rejects_negative_clocks(field):
+    with pytest.raises(ValidationError):
+        WorldState.model_validate({field: -1})
+
+
+def test_events_and_quests_reject_negative_progress():
+    with pytest.raises(ValidationError):
+        HistoryEvent(text="impossible", location="void", minutes_elapsed=-1)
+    with pytest.raises(ValidationError):
+        Quest(id="q", title="Quest", description="", current_step=-1)

@@ -137,7 +137,12 @@ def test_character_contextual_tools(state):
 
     deps = CharacterDeps(char=char, state=state)
     ctx = RunContext(deps=deps, model=create_model(), usage=RunUsage(), agent=character_agent)
-    prepared = character_agent._output_toolset.prepared(character_agent._prepare_output_tools)
+    output_toolset = character_agent._output_toolset
+    prepare_output_tools = character_agent._prepare_output_tools
+    assert output_toolset is not None
+    assert prepare_output_tools is not None
+    prepared = output_toolset.prepared(prepare_output_tools)
+    assert prepared is not None
     tools = {n: t.tool_def for n, t in asyncio.run(prepared.get_tools(ctx)).items()}
 
     expected_targets = [c.id for c in state.characters.values() if c.location == char.location and c.id != char.id]
