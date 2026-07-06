@@ -27,6 +27,7 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 - `infinite-dnd --replay run.jsonl` - replays a recorded run without an LLM provider
 - `infinite-dnd-state` - runs the app (World + Logs tabs)
 - `infinite-dnd-scorecard` - compares campaign runs
+- `infinite-dnd-recap` - exports a run's saved state as a markdown story recap
 - `infinite-dnd-dump-context` - dumps each agent's exact prompt/tools/context for inspection
 
 ### 🤖 Code style                                                   

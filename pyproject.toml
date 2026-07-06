@@ -23,6 +23,7 @@ dev = [
 infinite-dnd = "run_game:main"
 infinite-dnd-state = "src.interface.app:main"
 infinite-dnd-scorecard = "src.interface.scorecard:main"
+infinite-dnd-recap = "src.interface.recap:main"
 infinite-dnd-dump-context = "src.tests:main"
 
 [build-system]
