@@ -1,6 +1,7 @@
 import json
 
 from src.interface.app import _with_nav
+from src.interface.assets import static_asset
 from src.interface.world_state import load_series
 
 
@@ -15,6 +16,19 @@ def test_nav_marks_active_tab():
     html = _with_nav('<div class="topbar-main"></div>', "logs")
     assert '<a href="/logs" class="active">Logs</a>' in html
     assert '<a href="/" class="">World</a>' in html
+
+
+def test_shell_links_shared_studio_stylesheet():
+    html = _with_nav('<head></head><body><div class="topbar-main"></div></body>', "world")
+    assert 'href="/static/studio.css"' in html
+    assert 'class="view-world"' in html
+
+
+def test_static_assets_are_whitelisted():
+    body, content_type = static_asset("world.css") or (b"", "")
+    assert body
+    assert content_type == "text/css; charset=utf-8"
+    assert static_asset("../world.css") is None
 
 
 def test_series_math(tmp_path):

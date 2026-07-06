@@ -10,10 +10,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from src.interface.assets import static_asset
 from src.interface.dashboard import _HTML as WORLD_HTML
 from src.interface.session_log import DEFAULT_LOG_DIR, list_logs, load_session
 from src.interface.viewer import _HTML as LOGS_HTML, _pick_port
 from src.interface.world_state import DEFAULT_STATE_DIR, list_state_runs, load_series, load_view
+
+
 
 
 def _with_nav(html: str, active: str) -> str:
@@ -23,7 +26,15 @@ def _with_nav(html: str, active: str) -> str:
         f'<a href="/logs" class="{"active" if active == "logs" else ""}">Logs</a>'
         "</div>"
     )
-    return html.replace('<div class="topbar-main">', f'<div class="topbar-main">{tabs}', 1)
+    html = html.replace('<div class="topbar-main">', f'<div class="topbar-main">{tabs}', 1)
+    html = html.replace("</head>", '  <link rel="stylesheet" href="/static/studio.css">\n</head>', 1)
+    html = html.replace("<body>", f'<body class="view-{active}">', 1)
+    html = html.replace(
+        '<div class="brand"><span class="brand-mark"></span>infinite-dnd</div>',
+        '<div class="brand"><span class="brand-mark"></span>Infinite D&amp;D <span class="brand-sub">Observer</span></div>',
+        1,
+    )
+    return html
 
 
 def _build_handler(
@@ -37,6 +48,8 @@ def _build_handler(
                 self._send_html(_with_nav(WORLD_HTML, "world"))
             elif parsed.path == "/logs":
                 self._send_html(_with_nav(LOGS_HTML, "logs"))
+            elif parsed.path.startswith("/static/"):
+                self._send_static(parsed.path.removeprefix("/static/"))
             elif parsed.path == "/api/runs":
                 self._send_json(list_state_runs(state_dir))
             elif parsed.path == "/api/files":
@@ -99,6 +112,19 @@ def _build_handler(
             body = html.encode("utf-8")
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _send_static(self, name: str) -> None:
+            asset = static_asset(name)
+            if asset is None:
+                self._send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                return
+            body, content_type = asset
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()

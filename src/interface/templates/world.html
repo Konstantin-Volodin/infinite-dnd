@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infinite DnD World Dashboard</title>
+  <link rel="stylesheet" href="/static/world.css">
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand"><span class="brand-mark"></span>infinite-dnd</div>
+      <div class="topbar-main">
+        <select id="run"></select>
+        <div class="tick-controls">
+          <button id="tick-prev" title="Previous tick">‹</button>
+          <input type="range" id="tick-slider" min="0" max="0" value="0">
+          <button id="tick-next" title="Next tick">›</button>
+          <span class="tick-label" id="tick-label">tick –</span>
+        </div>
+        <button class="live-btn" id="live-btn"><span class="dot"></span>LIVE</button>
+        <div class="session-meta">
+          <div class="title" id="meta-title">Waiting for snapshots</div>
+          <div id="meta-sub"><span class="clock" id="meta-clock"></span> <span id="meta-quests"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bodygrid">
+      <div class="rail">
+        <h3 class="section">Map</h3>
+        <div class="map-wrap"><svg id="map-svg" viewBox="0 0 100 100"></svg></div>
+        <div class="loc-detail" id="loc-detail"></div>
+      </div>
+
+      <div class="story">
+        <h3 class="section">Story <span class="count" id="story-count">0</span></h3>
+        <div class="story-body" id="story-body"><div class="feed" id="feed"></div></div>
+      </div>
+
+      <div class="context">
+        <div class="char-panel">
+          <h3 class="section">Characters <span class="count" id="char-count"></span></h3>
+          <div class="char-grid" id="char-grid"></div>
+        </div>
+
+        <div class="side">
+          <h3 class="section">Quests <span class="count" id="quest-count">0</span></h3>
+          <div class="side-panel" id="panel-quests"><div id="quest-list"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer" id="char-drawer"><div class="dialog" id="char-detail"></div></div>
+
+  <script src="/static/world.js"></script>
+</body>
+</html>

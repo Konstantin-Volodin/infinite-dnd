@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infinite DnD Log Viewer</title>
+  <link rel="stylesheet" href="/static/logs.css">
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand"><span class="brand-mark"></span>infinite-dnd</div>
+      <div class="topbar-main">
+        <div class="search">🔍 <input id="search" placeholder="Search logs..."></div>
+        <div class="seg" id="detail-seg">
+          <button data-detail="story" class="active">Story</button>
+          <button data-detail="runs">Runs</button>
+          <button data-detail="all">All</button>
+        </div>
+        <div class="session-meta">
+          <div class="title" id="session-title">Waiting for logs</div>
+          <div id="session-sub"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bodygrid">
+      <div class="rail">
+        <h3>Sessions</h3>
+        <div id="file-list"></div>
+        <div class="rail-divider"></div>
+        <h3>Events</h3>
+        <div id="event-list"></div>
+        <div class="rail-divider"></div>
+        <h3>Agents</h3>
+        <div id="label-list"></div>
+      </div>
+
+      <div class="log-panel" id="log-panel"></div>
+      <div class="inspector" id="inspector"></div>
+    </div>
+  </div>
+
+  <script src="/static/logs.js"></script>
+</body>
+</html>
