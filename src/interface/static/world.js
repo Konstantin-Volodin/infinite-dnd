@@ -33,6 +33,14 @@
       feed: document.getElementById("feed"),
       storyBody: document.getElementById("story-body"),
       storyCount: document.getElementById("story-count"),
+      playPanel: document.getElementById("play-panel"),
+      playTitle: document.getElementById("play-title"),
+      playSituation: document.getElementById("play-situation"),
+      playForm: document.getElementById("play-form"),
+      playInput: document.getElementById("play-input"),
+      playSubmit: document.getElementById("play-submit"),
+      playError: document.getElementById("play-error"),
+      playToggle: document.getElementById("play-toggle"),
     };
 
     function escapeHtml(value) {
@@ -56,6 +64,31 @@
       const response = await fetch(path, { cache: "no-store" });
       if (!response.ok) throw new Error(`Request failed: ${response.status}`);
       return response.json();
+    }
+
+    async function postJson(path, payload) {
+      const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `Request failed: ${response.status}`);
+      return result;
+    }
+
+    async function pollPlayer() {
+      const turn = await fetchJson("/api/play/status");
+      const waiting = turn.status === "waiting";
+      dom.playPanel.classList.toggle("ready", waiting);
+      dom.playInput.disabled = !waiting;
+      dom.playSubmit.disabled = !waiting;
+      dom.playPanel.dataset.requestId = waiting ? turn.request_id : "";
+      if (waiting) {
+        dom.playTitle.textContent = `${turn.actor_name}'s turn`;
+        dom.playSituation.textContent = turn.situation;
+      } else if (turn.status === "submitted") {
+        dom.playTitle.textContent = "Resolving action…";
+      } else {
+        dom.playTitle.textContent = "Waiting for your turn";
+        dom.playSituation.textContent = "Start a game with --web to play here.";
+      }
     }
 
     function runKey(scenario, runId) {
@@ -475,6 +508,30 @@
       if (state.live) loadView(null).catch(() => {});
     });
 
+    dom.playForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const line = dom.playInput.value.trim();
+      const requestId = dom.playPanel.dataset.requestId;
+      if (!line || !requestId) return;
+      dom.playError.textContent = "";
+      dom.playInput.disabled = true;
+      dom.playSubmit.disabled = true;
+      try {
+        await postJson("/api/play/action", { request_id: requestId, line });
+        dom.playInput.value = "";
+        await pollPlayer();
+      } catch (error) {
+        dom.playError.textContent = error.message;
+        dom.playInput.disabled = false;
+        dom.playSubmit.disabled = false;
+        dom.playInput.focus();
+      }
+    });
+    dom.playToggle.addEventListener("click", () => {
+      dom.playPanel.classList.toggle("collapsed");
+      dom.playToggle.textContent = dom.playPanel.classList.contains("collapsed") ? "+" : "−";
+    });
+
     dom.charGrid.addEventListener("click", (event) => { const card=event.target.closest("[data-char]"); if(card) showCharacter(card.dataset.char); });
     document.body.addEventListener("click", (event) => {
       const close = event.target.closest("[data-close]");
@@ -489,3 +546,5 @@
       dom.locDetail.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
     });
     setLive(true);
+    pollPlayer().catch(() => {});
+    setInterval(() => pollPlayer().catch(() => {}), POLL_MS);

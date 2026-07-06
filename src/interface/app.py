@@ -12,8 +12,10 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from src.interface.assets import static_asset
 from src.interface.dashboard import _HTML as WORLD_HTML
+from src.engine.state import WorldState
 from src.interface.session_log import DEFAULT_LOG_DIR, list_logs, load_session
 from src.interface.viewer import _HTML as LOGS_HTML, _pick_port
+from src.interface.web_player import PlayBroker
 from src.interface.world_state import DEFAULT_STATE_DIR, list_state_runs, load_series, load_view
 
 
@@ -40,7 +42,10 @@ def _with_nav(html: str, active: str) -> str:
 def _build_handler(
     state_dir: Path = DEFAULT_STATE_DIR,
     log_dir: Path = DEFAULT_LOG_DIR,
+    play_broker: PlayBroker | None = None,
 ) -> type[BaseHTTPRequestHandler]:
+    broker = play_broker or PlayBroker()
+
     class StudioHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
             parsed = urlparse(self.path)
@@ -54,6 +59,11 @@ def _build_handler(
                 self._send_json(list_state_runs(state_dir))
             elif parsed.path == "/api/files":
                 self._send_json(list_logs(log_dir))
+            elif parsed.path == "/api/play/status":
+                self._send_json(broker.status())
+            elif parsed.path.startswith("/api/play/request/"):
+                request_id = unquote(parsed.path.removeprefix("/api/play/request/"))
+                self._send_json(broker.status(request_id))
             elif parsed.path.startswith("/api/state/"):
                 parts = self._parse_run_path(parsed.path, "/api/state/")
                 if parts is None:
@@ -89,6 +99,48 @@ def _build_handler(
                     self._send_json({"error": f"Log not found: {name}"}, HTTPStatus.NOT_FOUND)
             else:
                 self._send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+
+        def do_POST(self) -> None:  # noqa: N802
+            parsed = urlparse(self.path)
+            try:
+                payload = self._read_json()
+                if parsed.path == "/api/play/request":
+                    actor_id = payload.get("actor_id")
+                    if not isinstance(actor_id, str) or not actor_id:
+                        raise ValueError("actor_id is required.")
+                    request_id = broker.begin(actor_id, WorldState.model_validate(payload.get("state")))
+                    self._send_json({"status": "waiting", "request_id": request_id}, HTTPStatus.CREATED)
+                elif parsed.path == "/api/play/action":
+                    request_id, line = payload.get("request_id"), payload.get("line")
+                    if not isinstance(request_id, str) or not isinstance(line, str):
+                        raise ValueError("request_id and line are required.")
+                    self._send_json(broker.submit(request_id, line))
+                elif parsed.path == "/api/play/finish":
+                    request_id = payload.get("request_id")
+                    if not isinstance(request_id, str):
+                        raise ValueError("request_id is required.")
+                    broker.finish(request_id)
+                    self._send_json({"status": "idle"})
+                else:
+                    self._send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+            except (json.JSONDecodeError, ValueError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            except LookupError as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+            except RuntimeError as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.CONFLICT)
+
+        def _read_json(self) -> dict:
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError as exc:
+                raise ValueError("Invalid Content-Length.") from exc
+            if length <= 0 or length > 5_000_000:
+                raise ValueError("A JSON body is required (maximum 5 MB).")
+            payload = json.loads(self.rfile.read(length))
+            if not isinstance(payload, dict):
+                raise ValueError("JSON body must be an object.")
+            return payload
 
         def _parse_run_path(self, path: str, prefix: str) -> tuple[str, str] | None:
             remainder = unquote(path.removeprefix(prefix))

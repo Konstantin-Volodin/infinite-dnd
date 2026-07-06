@@ -54,6 +54,20 @@
 
   <div class="drawer" id="char-drawer"><div class="dialog" id="char-detail"></div></div>
 
+  <aside class="play-panel" id="play-panel" aria-live="polite">
+    <div class="play-head">
+      <div><span class="turn-dot"></span><strong id="play-title">Waiting for your turn</strong></div>
+      <button id="play-toggle" type="button" aria-label="Collapse play panel">−</button>
+    </div>
+    <pre class="play-situation" id="play-situation">Start a game with --web to play here.</pre>
+    <form id="play-form">
+      <input id="play-input" autocomplete="off" placeholder="What do you do?" disabled>
+      <button id="play-submit" type="submit" disabled>Act</button>
+    </form>
+    <div class="play-help">Plain action · /check ability DC action · /speak [target] message · /travel place · /attack target · /wait</div>
+    <div class="play-error" id="play-error"></div>
+  </aside>
+
   <script src="/static/world.js"></script>
 </body>
 </html>

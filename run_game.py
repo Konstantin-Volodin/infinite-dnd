@@ -6,6 +6,7 @@ from src.agents.server import LlamaServer
 from src.engine.runtime import ReplayTape, run_game
 from src.engine.state import StateManager, slugify
 from src.interface.player import console_pc_controller
+from src.interface.web_player import make_web_pc_controller
 
 
 def _prompt_new_character(locations: list[str], existing_ids: set[str]) -> dict:
@@ -43,10 +44,14 @@ def main() -> None:
     parser.add_argument("--turns", type=int, default=50, help="Max turns to run.")
     parser.add_argument("--new-character", action="store_true", help="Create a new PC interactively instead of playing a scenario's preset character.")
     parser.add_argument("--interactive", action="store_true", help="Play the PC's turns yourself from the console instead of the character agent.")
+    parser.add_argument("--web", action="store_true", help="Play PC turns in the World dashboard (start infinite-dnd-state first).")
+    parser.add_argument("--web-url", default="http://127.0.0.1:8765", help="World dashboard URL used with --web.")
     replay_group = parser.add_mutually_exclusive_group()
     replay_group.add_argument("--record-replay", metavar="PATH", help="Record structured agent outputs to a JSONL replay tape.")
     replay_group.add_argument("--replay", metavar="PATH", help="Replay structured agent outputs from a JSONL tape without character, DM, or director calls.")
     args = parser.parse_args()
+    if args.interactive and args.web:
+        parser.error("--interactive and --web cannot be used together")
 
     scenario = args.scenario
     new_character = None
@@ -71,7 +76,9 @@ def main() -> None:
             scenario=scenario,
             new_character=new_character,
             replay=tape,
-            pc_controller=console_pc_controller if args.interactive else None,
+            pc_controller=(
+                console_pc_controller if args.interactive else make_web_pc_controller(args.web_url) if args.web else None
+            ),
         )
 
 
