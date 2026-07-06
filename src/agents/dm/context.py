@@ -31,6 +31,7 @@ def dm_context(deps) -> str:
         item_ids=item_ids,
         quest_ids=quest_ids,
         quests=quests,
+        factions=[state.factions[fid] for fid in sorted(state.factions)],
     )
 
 
@@ -54,4 +55,5 @@ def director_context(deps) -> str:
         interventions=state.director_interventions,
         location_id=deps.location_id,
         present=present,
+        factions=[state.factions[fid] for fid in sorted(state.factions)],
     )

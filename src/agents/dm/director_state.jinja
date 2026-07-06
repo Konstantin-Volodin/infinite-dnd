@@ -32,6 +32,16 @@ _no prior events._
 - untargeted interventions so far: {{ interventions['world'] }} — prefer tying this one to a quest above.
 {% endif %}
 
+{% if factions %}
+## 🕰️ faction agendas (off-screen — good sources of pressure)
+{% for f in factions %}
+- **{{ f.name }}**: {{ f.goal }}
+{% for clock in f.clocks %}
+  - {{ clock.name }}: {{ 'already happened — ' ~ clock.consequence if clock.consequence_triggered else clock.progress ~ '/' ~ clock.segments ~ ' toward: ' ~ clock.consequence }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
 ## 🎬 scene
 - location: {{ location_id }}
 - present: {{ present | join(', ') if present else 'no one' }}

@@ -151,8 +151,9 @@ def test_init_state_loads_optional_factions(tmp_path):
 
     faction = state.factions["black-hull-crew"]
     assert faction.goal
-    assert faction.clocks[0].id == "retaliation"
-    assert faction.clocks[0].progress == 0
+    clocks = {clock.id: clock for clock in faction.clocks}
+    assert "retaliation" in clocks
+    assert clocks["retaliation"].progress == 0
 
 
 def test_load_state_backcompat_without_director_fields(tmp_path):

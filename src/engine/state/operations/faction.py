@@ -36,3 +36,8 @@ class FactionOps(_OpsBase):
                 if not clock.consequence_triggered:
                     results.append(self.advance_faction_clock(faction_id, clock.id, amount))
         return results
+
+    def advance_faction_clocks_hourly(self, pre_minutes: int, post_minutes: int) -> list[str]:
+        """Advance every clock once per full in-world hour crossed between the two timestamps."""
+        hours = post_minutes // 60 - pre_minutes // 60
+        return self.advance_faction_clocks(hours) if hours > 0 else []

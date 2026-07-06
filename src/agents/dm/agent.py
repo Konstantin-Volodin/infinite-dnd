@@ -43,6 +43,11 @@ class RelationshipUpdate(BaseModel):
     relation: str  # free-form disposition, e.g. "hostile — saw me steal from the shrine"
 
 
+class ClockAdvance(BaseModel):
+    faction_id: str
+    clock_id: str
+
+
 @dataclass
 class DMResult:
     creates: list[Create]
@@ -55,9 +60,10 @@ def dm_output(
     entities: list[NewEntity],
     quest_updates: list[QuestUpdate],
     relationship_updates: list[RelationshipUpdate],
+    clock_advances: list[ClockAdvance],
     minutes: list[int],
 ) -> DMResult:
-    """register new entities, report quest and relationship changes, and estimate minutes elapsed per new event."""
+    """register new entities, report quest, relationship, and faction-clock changes, and estimate minutes elapsed per new event."""
     creates = [
         Create(
             type=e.type,
@@ -82,8 +88,13 @@ def dm_output(
         for u in relationship_updates
         if u.relation.strip() and u.character_id != u.target_id
     ]
+    clock_modifies = [
+        Modify(action="advance_faction_clock", target_id=c.faction_id, other_id=c.clock_id)
+        for c in clock_advances
+        if c.faction_id.strip() and c.clock_id.strip()
+    ]
     clamped_minutes = [max(0, min(int(m), 1440)) for m in minutes]
-    return DMResult(creates=creates, modifies=quest_modifies + relationship_modifies, minutes=clamped_minutes)
+    return DMResult(creates=creates, modifies=quest_modifies + relationship_modifies + clock_modifies, minutes=clamped_minutes)
 
 
 agent: Agent[DMDeps, DMResult] = Agent(

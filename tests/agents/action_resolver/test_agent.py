@@ -1,6 +1,6 @@
 import asyncio
 
-from src.engine.state.models import Character, Location, WorldState
+from src.engine.state.models import Character, Faction, Location, ProgressClock, WorldState
 from src.agents.action_resolver.agent import resolve
 from src.agents.character.tools import Check, Speak, Wait
 from src.agents.dm.tools import Modify
@@ -74,6 +74,27 @@ def test_modify_update_relationship_missing_fields():
     result = asyncio.run(resolve(tool, state))
     assert "Cannot update relationship" in result
     assert state.characters["hero"].relationships == {}
+
+
+def test_modify_advance_faction_clock_applied():
+    state = _state()
+    state.factions["crew"] = Faction(
+        id="crew",
+        name="The Crew",
+        goal="move the goods",
+        clocks=[ProgressClock(id="haul", name="Haul the goods", segments=2, consequence="The goods are gone.")],
+    )
+    tool = Modify(action="advance_faction_clock", target_id="crew", other_id="haul")
+    result = asyncio.run(resolve(tool, state))
+    assert state.factions["crew"].clocks[0].progress == 1
+    assert "1/2" in result
+
+
+def test_modify_advance_faction_clock_missing_clock_id():
+    state = _state()
+    tool = Modify(action="advance_faction_clock", target_id="crew", other_id=None)
+    result = asyncio.run(resolve(tool, state))
+    assert "Cannot advance faction clock" in result
 
 
 class _Rolls:

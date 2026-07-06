@@ -60,6 +60,16 @@ _no prior events._
 {% endif %}
 {% endfor %}
 
+{% if factions %}
+## 🕰️ faction agendas (off-screen)
+{% for f in factions %}
+- **{{ f.id }}** — {{ f.name }}: {{ f.goal }}
+{% for clock in f.clocks %}
+  - clock `{{ clock.id }}` ({{ clock.name }}): {{ 'consequence already fired' if clock.consequence_triggered else clock.progress ~ '/' ~ clock.segments }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
 ---
 
 Call `report` with new entities, quest progress, and exactly {{ new_events|length }} minute estimates (one per new event above, in order).

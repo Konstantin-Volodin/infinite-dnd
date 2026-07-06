@@ -343,9 +343,10 @@ async def _run_game(
                 break
             print(f"\n--- Tick {state.time + 1} ---")
             logger.log_turn(t + 1)
+            pre_minutes = state.minutes_elapsed
             await tick(pc_id, state, state.time, logger, pc_controller, replay)
-            # Off-screen agendas move once per campaign tick, without another LLM call.
-            WorldOperations(state).advance_faction_clocks()
+            # Off-screen agendas march with in-world time, not turn count.
+            WorldOperations(state).advance_faction_clocks_hourly(pre_minutes, state.minutes_elapsed)
             await compact_history(state, logger, replay)  # between ticks only — never mid-tick
             logger.log_event("world_snapshot", **_snapshot(state))
             state.time += 1

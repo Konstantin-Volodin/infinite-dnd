@@ -63,6 +63,20 @@ def test_advance_all_clocks_is_stable_and_skips_triggered_clocks():
     ]
 
 
+def test_hourly_advance_moves_one_segment_per_hour_crossed():
+    state = _state(segments=5)
+    operations = WorldOperations(state)
+
+    assert operations.advance_faction_clocks_hourly(0, 59) == []
+    assert state.factions["guild"].clocks[0].progress == 0
+
+    operations.advance_faction_clocks_hourly(59, 61)
+    assert state.factions["guild"].clocks[0].progress == 1
+
+    operations.advance_faction_clocks_hourly(61, 240)  # a long rest crosses several hours at once
+    assert state.factions["guild"].clocks[0].progress == 4
+
+
 def test_missing_clock_does_not_mutate_state():
     state = _state()
 

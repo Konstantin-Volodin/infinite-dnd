@@ -179,6 +179,10 @@ def _resolve_modify(tool: Modify, state: WorldState) -> str:
         if not tool.other_id or not tool.reason:
             return "Cannot update relationship — other_id and reason are required."
         return ops.update_relationship(tool.target_id, tool.other_id, tool.reason)
+    if tool.action == "advance_faction_clock":
+        if not tool.other_id:
+            return "Cannot advance faction clock — other_id (the clock id) is required."
+        return ops.advance_faction_clock(tool.target_id, tool.other_id)
     return f"Unknown modify action: {tool.action!r}."
 
 
