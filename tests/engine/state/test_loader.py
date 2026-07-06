@@ -144,6 +144,17 @@ def test_init_state_backcompat_quest_without_plan(tmp_path, monkeypatch):
     assert quest.steps == []
 
 
+def test_init_state_loads_optional_factions(tmp_path):
+    manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))
+
+    state = manager.init_state()
+
+    faction = state.factions["black-hull-crew"]
+    assert faction.goal
+    assert faction.clocks[0].id == "retaliation"
+    assert faction.clocks[0].progress == 0
+
+
 def test_load_state_backcompat_without_director_fields(tmp_path):
     """Old snapshots (pre-director) must still load — pydantic defaults fill the tracking fields."""
     manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))

@@ -68,6 +68,41 @@ class Quest(BaseModel):
     steps: List[str] = Field(default_factory=list)  # progress log — accomplished objectives + notes
 
 
+class ProgressClock(BaseModel):
+    """A finite, deterministic countdown toward a faction consequence."""
+
+    id: str
+    name: str
+    consequence: str = Field(min_length=1)
+    progress: int = Field(default=0, ge=0)
+    segments: int = Field(ge=1)
+    consequence_triggered: bool = False
+
+    @model_validator(mode="after")
+    def progress_does_not_exceed_segments(self) -> "ProgressClock":
+        if self.progress > self.segments:
+            raise ValueError("progress cannot exceed segments")
+        if self.consequence_triggered and self.progress < self.segments:
+            raise ValueError("consequence cannot be triggered before clock completion")
+        return self
+
+
+class Faction(BaseModel):
+    """An off-screen actor pursuing a goal through one or more progress clocks."""
+
+    id: str
+    name: str
+    goal: str
+    clocks: List[ProgressClock] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def clock_ids_are_unique(self) -> "Faction":
+        clock_ids = [clock.id for clock in self.clocks]
+        if len(clock_ids) != len(set(clock_ids)):
+            raise ValueError("clock ids must be unique within a faction")
+        return self
+
+
 class WorldState(BaseModel):
     time: int = Field(default=0, ge=0)
     minutes_elapsed: int = Field(default=0, ge=0)
@@ -76,5 +111,6 @@ class WorldState(BaseModel):
     locations: Dict[str, Location] = Field(default_factory=dict)
     characters: Dict[str, Character] = Field(default_factory=dict)
     quests: Dict[str, Quest] = Field(default_factory=dict)
+    factions: Dict[str, Faction] = Field(default_factory=dict)
     history: List[HistoryEvent] = Field(default_factory=list)
     chronicle: List[str] = Field(default_factory=list)  # compact era summaries of history archived by compaction

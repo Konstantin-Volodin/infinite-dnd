@@ -12,6 +12,8 @@ from src.engine.state.models import (
     Character,
     Location,
     CharacterStats,
+    Faction,
+    ProgressClock,
     Quest,
 )
 from src.world import pick_scenario, read_manifest, scenario_dir
@@ -103,10 +105,23 @@ class StateManager:
                 steps=quest.get("steps", []),
             )
 
+        factions = {}
+        factions_path = self.setup_dir / "factions.json"
+        if factions_path.exists():
+            for faction in self.read_json(factions_path):
+                clocks = [ProgressClock(**clock) for clock in faction.get("clocks", [])]
+                factions[faction["id"]] = Faction(
+                    id=faction["id"],
+                    name=faction["name"],
+                    goal=faction["goal"],
+                    clocks=clocks,
+                )
+
         word_state = WorldState(
             locations=locations,
             characters=characters,
-            quests=quests
+            quests=quests,
+            factions=factions,
         )
         return word_state
 

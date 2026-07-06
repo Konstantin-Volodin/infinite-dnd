@@ -1,7 +1,7 @@
 """World state models, persistence, queries, and mutation surface."""
 
 from .loader import StateManager
-from .models import Character, CharacterStats, HistoryEvent, Location, Quest, WorldState
+from .models import Character, CharacterStats, Faction, HistoryEvent, Location, ProgressClock, Quest, WorldState
 from .operations import WorldOperations
 from .queries import (
     characters_in_location,
@@ -17,8 +17,10 @@ __all__ = [
     "WorldState",
     "Character",
     "CharacterStats",
+    "Faction",
     "HistoryEvent",
     "Location",
+    "ProgressClock",
     "Quest",
     "characters_in_location",
     "connected_location_ids",

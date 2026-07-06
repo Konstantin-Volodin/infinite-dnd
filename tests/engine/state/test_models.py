@@ -4,8 +4,10 @@ from pydantic import ValidationError
 from src.engine.state.models import (
     Character,
     CharacterStats,
+    Faction,
     HistoryEvent,
     Location,
+    ProgressClock,
     Quest,
     WorldState,
 )
@@ -82,6 +84,24 @@ def test_world_state_chronicle_defaults_empty_and_round_trips():
     assert WorldState.model_validate(world.model_dump()).chronicle == ["Long ago, the hero entered the forest."]
 
 
+def test_faction_clock_round_trips_with_world_state():
+    clock = ProgressClock(id="raid", name="Prepare raid", consequence="The village is attacked.", segments=4)
+    faction = Faction(id="wolves", name="The Wolves", goal="Take the valley", clocks=[clock])
+    world = WorldState(factions={faction.id: faction})
+
+    loaded = WorldState.model_validate(world.model_dump())
+
+    assert loaded.factions["wolves"].clocks[0].segments == 4
+    assert loaded.factions["wolves"].clocks[0].progress == 0
+
+
+def test_world_state_without_factions_is_backward_compatible():
+    data = WorldState().model_dump()
+    del data["factions"]
+
+    assert WorldState.model_validate(data).factions == {}
+
+
 def test_collection_defaults_are_not_shared():
     first = WorldState()
     second = WorldState()
@@ -125,3 +145,22 @@ def test_events_and_quests_reject_negative_progress():
         HistoryEvent(text="impossible", location="void", minutes_elapsed=-1)
     with pytest.raises(ValidationError):
         Quest(id="q", title="Quest", description="", current_step=-1)
+
+
+def test_faction_requires_clock_and_clock_rejects_invalid_progress():
+    with pytest.raises(ValidationError):
+        Faction(id="empty", name="Empty", goal="Nothing", clocks=[])
+    with pytest.raises(ValidationError, match="progress cannot exceed segments"):
+        ProgressClock(id="clock", name="Clock", consequence="Trouble.", progress=3, segments=2)
+    with pytest.raises(ValidationError):
+        ProgressClock(id="clock", name="Clock", consequence="", segments=2)
+    with pytest.raises(ValidationError, match="clock ids must be unique"):
+        Faction(
+            id="duplicates",
+            name="Duplicates",
+            goal="Confuse everyone",
+            clocks=[
+                ProgressClock(id="same", name="First", consequence="One.", segments=2),
+                ProgressClock(id="same", name="Second", consequence="Two.", segments=2),
+            ],
+        )

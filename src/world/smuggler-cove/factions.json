@@ -1,0 +1,16 @@
+[
+  {
+    "id": "black-hull-crew",
+    "name": "The Black-Hull Crew",
+    "goal": "Silence anyone who can expose their operation in the cove",
+    "clocks": [
+      {
+        "id": "retaliation",
+        "name": "Prepare retaliation",
+        "progress": 0,
+        "segments": 6,
+        "consequence": "The black-hulled sloop lands a raiding party outside the village."
+      }
+    ]
+  }
+]
