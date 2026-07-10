@@ -53,18 +53,16 @@ src/                        - source code
 ├── agents/                 - LLM agent implementations
 │   ├── action_resolver/        - sole writer; resolves intents against state
 │   ├── character/              - PC/NPC turn: emits a CharacterTool
-│   └── dm/                     - post-tick entity enrichment, quest progress, and timing in one call
+│   └── dm/                     - directing, narration, quest progress, and chronicle compaction
 ├── engine/                 - game engine components
 │   ├── rules.py                - game rules and derived stats
-│   ├── utils.py                - shared engine helpers
 │   ├── state/                  - world models and state persistence
-│   ├── runtime/                - game loop orchestration
-│   └── world/                  - world-state queries, interactions, and mutations
+│   └── runtime/                - game loop, messages, replay, and chronicle orchestration
 ├── interface/              - user interface
 │   ├── templates/              - World and Logs page structure
 │   └── static/                 - page scripts and shared/view-specific styles
-├── tests/                  - dumps each agent's exact prompt/tools/context for inspection
-└── world/                  - scenario data (one subdir per scenario)
-tests/                      - pytest suite, mirrors src/ layout
+├── tests/                  - agent prompt/tool/context inspection utilities
+└── world/                  - bundled scenario data (one subdirectory per scenario)
+tests/                      - pytest suite, mirroring src/ where practical
 └── integration/                - live-agent tests, needs a reachable LLM provider
 ```
