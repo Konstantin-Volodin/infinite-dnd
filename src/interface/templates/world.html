@@ -11,14 +11,15 @@
     <div class="topbar">
       <div class="brand"><span class="brand-mark"></span>infinite-dnd</div>
       <div class="topbar-main">
-        <select id="run"></select>
+        <label class="sr-only" for="run">Game run</label>
+        <select id="run" aria-label="Game run"></select>
         <div class="tick-controls">
-          <button id="tick-prev" title="Previous tick">‹</button>
-          <input type="range" id="tick-slider" min="0" max="0" value="0">
-          <button id="tick-next" title="Next tick">›</button>
+          <button id="tick-prev" type="button" title="Previous tick" aria-label="Previous tick">‹</button>
+          <input type="range" id="tick-slider" min="0" max="0" value="0" aria-label="Story tick" aria-describedby="tick-label">
+          <button id="tick-next" type="button" title="Next tick" aria-label="Next tick">›</button>
           <span class="tick-label" id="tick-label">tick –</span>
         </div>
-        <button class="live-btn" id="live-btn"><span class="dot"></span>LIVE</button>
+        <button class="live-btn" id="live-btn" type="button" aria-pressed="true"><span class="dot" aria-hidden="true"></span>LIVE</button>
         <div class="session-meta">
           <div class="title" id="meta-title">Waiting for snapshots</div>
           <div id="meta-sub"><span class="clock" id="meta-clock"></span> <span id="meta-quests"></span></div>
@@ -29,7 +30,7 @@
     <div class="bodygrid">
       <div class="rail">
         <h3 class="section">Map</h3>
-        <div class="map-wrap"><svg id="map-svg" viewBox="0 0 100 100"></svg></div>
+        <div class="map-wrap"><svg id="map-svg" viewBox="0 0 100 100" role="group" aria-label="World locations"></svg></div>
         <div class="loc-detail" id="loc-detail"></div>
       </div>
 
@@ -52,20 +53,40 @@
     </div>
   </div>
 
-  <div class="drawer" id="char-drawer"><div class="dialog" id="char-detail"></div></div>
+  <div class="drawer" id="char-drawer" role="dialog" aria-modal="true" aria-labelledby="char-detail-title" aria-hidden="true"><div class="dialog" id="char-detail"></div></div>
 
-  <aside class="play-panel" id="play-panel" aria-live="polite">
+  <aside class="play-panel" id="play-panel" aria-label="Player action">
     <div class="play-head">
-      <div><span class="turn-dot"></span><strong id="play-title">Waiting for your turn</strong></div>
-      <button id="play-toggle" type="button" aria-label="Collapse play panel">−</button>
+      <div><span class="turn-dot" aria-hidden="true"></span><strong id="play-title" role="status" aria-live="polite">Waiting for your turn</strong></div>
+      <button id="play-toggle" type="button" aria-label="Collapse play panel" aria-expanded="true">−</button>
     </div>
     <pre class="play-situation" id="play-situation">Start a game with --web to play here.</pre>
+    <section class="turn-compass" id="turn-compass" aria-labelledby="turn-compass-title" hidden>
+      <div class="compass-objective">
+        <span class="compass-kicker">Current objective <span id="turn-compass-progress"></span></span>
+        <strong id="turn-compass-title"></strong>
+        <span id="turn-compass-step"></span>
+      </div>
+      <div class="play-suggestions" id="play-suggestions" role="group" aria-label="Suggested actions"></div>
+    </section>
+    <div class="play-trail" id="play-trail" aria-live="polite" hidden>
+      <div class="trail-step action">
+        <span class="trail-label">Your move</span>
+        <span class="trail-text" id="play-last-action"></span>
+      </div>
+      <div class="trail-line" aria-hidden="true"></div>
+      <div class="trail-step pending" id="play-outcome-step">
+        <span class="trail-label">World response</span>
+        <span class="trail-text" id="play-last-outcome">Resolving…</span>
+      </div>
+    </div>
     <form id="play-form">
-      <input id="play-input" autocomplete="off" placeholder="What do you do?" disabled>
+      <label class="sr-only" for="play-input">Your action</label>
+      <input id="play-input" autocomplete="off" placeholder="What do you do?" aria-describedby="play-help play-error" disabled>
       <button id="play-submit" type="submit" disabled>Act</button>
     </form>
-    <div class="play-help">Plain action · /check ability DC action · /speak [target] message · /travel place · /attack target · /wait</div>
-    <div class="play-error" id="play-error"></div>
+    <div class="play-help" id="play-help">Plain action · /check ability DC action · /speak [target] message · /travel place · /attack target · /wait (recover 1 HP if injured)</div>
+    <div class="play-error" id="play-error" role="alert"></div>
   </aside>
 
   <script src="/static/world.js"></script>

@@ -22,11 +22,15 @@ from src.interface.world_state import DEFAULT_STATE_DIR, list_state_runs, load_s
 
 
 def _with_nav(html: str, active: str) -> str:
+    world_current = ' aria-current="page"' if active == "world" else ""
+    logs_current = ' aria-current="page"' if active == "logs" else ""
     tabs = (
-        '<div class="tabs">'
-        f'<a href="/" class="{"active" if active == "world" else ""}">World</a>'
-        f'<a href="/logs" class="{"active" if active == "logs" else ""}">Logs</a>'
-        "</div>"
+        '<nav class="tabs" aria-label="Primary">'
+        f'<a href="/" class="{"active" if active == "world" else ""}"'
+        f'{world_current}>World</a>'
+        f'<a href="/logs" class="{"active" if active == "logs" else ""}"'
+        f'{logs_current}>Logs</a>'
+        "</nav>"
     )
     html = html.replace('<div class="topbar-main">', f'<div class="topbar-main">{tabs}', 1)
     html = html.replace("</head>", '  <link rel="stylesheet" href="/static/studio.css">\n</head>', 1)

@@ -11,11 +11,11 @@
     <div class="topbar">
       <div class="brand"><span class="brand-mark"></span>infinite-dnd</div>
       <div class="topbar-main">
-        <div class="search">🔍 <input id="search" placeholder="Search logs..."></div>
-        <div class="seg" id="detail-seg">
-          <button data-detail="story" class="active">Story</button>
-          <button data-detail="runs">Runs</button>
-          <button data-detail="all">All</button>
+        <label class="search" for="search"><span aria-hidden="true">🔍</span><span class="sr-only">Search logs</span> <input id="search" type="search" placeholder="Search logs..."></label>
+        <div class="seg" id="detail-seg" role="group" aria-label="Log detail level">
+          <button type="button" data-detail="story" class="active" aria-pressed="true">Story</button>
+          <button type="button" data-detail="runs" aria-pressed="false">Runs</button>
+          <button type="button" data-detail="all" aria-pressed="false">All</button>
         </div>
         <div class="session-meta">
           <div class="title" id="session-title">Waiting for logs</div>
@@ -25,7 +25,7 @@
     </div>
 
     <div class="bodygrid">
-      <div class="rail">
+      <nav class="rail" aria-label="Log filters">
         <h3>Sessions</h3>
         <div id="file-list"></div>
         <div class="rail-divider"></div>
@@ -34,10 +34,10 @@
         <div class="rail-divider"></div>
         <h3>Agents</h3>
         <div id="label-list"></div>
-      </div>
+      </nav>
 
-      <div class="log-panel" id="log-panel"></div>
-      <div class="inspector" id="inspector"></div>
+      <main class="log-panel" id="log-panel" aria-label="Log events"></main>
+      <aside class="inspector" id="inspector" aria-label="Event details"></aside>
     </div>
   </div>
 

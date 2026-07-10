@@ -12,6 +12,10 @@
       mapLayout: null,
       selectedLoc: null,
       series: {},
+      lastDialogFocus: null,
+      recentAction: null,
+      playerWaiting: false,
+      playerActor: null,
     };
 
     const dom = {
@@ -41,6 +45,15 @@
       playSubmit: document.getElementById("play-submit"),
       playError: document.getElementById("play-error"),
       playToggle: document.getElementById("play-toggle"),
+      playTrail: document.getElementById("play-trail"),
+      playLastAction: document.getElementById("play-last-action"),
+      playLastOutcome: document.getElementById("play-last-outcome"),
+      playOutcomeStep: document.getElementById("play-outcome-step"),
+      turnCompass: document.getElementById("turn-compass"),
+      turnCompassTitle: document.getElementById("turn-compass-title"),
+      turnCompassStep: document.getElementById("turn-compass-step"),
+      turnCompassProgress: document.getElementById("turn-compass-progress"),
+      playSuggestions: document.getElementById("play-suggestions"),
     };
 
     function escapeHtml(value) {
@@ -73,9 +86,106 @@
       return result;
     }
 
+    function describeAction(action, fallback) {
+      if (!action) return fallback;
+      if (action.kind === "travel") return `Travel to ${action.destination}`;
+      if (action.kind === "speak") return action.target ? `Tell ${action.target}: “${action.message}”` : `Say: “${action.message}”`;
+      if (action.kind === "attack") return `Attack ${action.target}`;
+      if (action.kind === "check") return `${action.description} (${action.ability} check, DC ${action.difficulty})`;
+      if (action.kind === "wait") return "Wait and watch";
+      return action.description || fallback;
+    }
+
+    function renderPlayTrail() {
+      const recent = state.recentAction;
+      dom.playTrail.hidden = !recent;
+      if (!recent) return;
+      dom.playLastAction.textContent = recent.label;
+      dom.playLastOutcome.textContent = recent.outcome || "The world is resolving your move…";
+      dom.playOutcomeStep.classList.toggle("pending", !recent.outcome);
+      dom.playOutcomeStep.classList.toggle("answered", Boolean(recent.outcome));
+    }
+
+    function updateActionOutcome(view) {
+      const recent = state.recentAction;
+      if (!recent || recent.outcome) return;
+      if (recent.runKey && recent.runKey !== runKey(state.scenario, state.runId)) return;
+      const history = view?.state.history || [];
+      if (history.length <= recent.historyLength) return;
+      recent.outcome = history.at(recent.historyLength)?.text || "The world changed in response.";
+      renderPlayTrail();
+    }
+
+    function contextualChoices(view, actorId) {
+      const world = view?.state;
+      const actor = world?.characters?.[actorId];
+      const location = world?.locations?.[actor?.location];
+      if (!actor || !location) return [];
+
+      const choices = [];
+      const add = (label, action, ariaLabel = label) => {
+        if (choices.length < 4 && !choices.some((choice) => choice.action === action)) {
+          choices.push({ label, action, ariaLabel });
+        }
+      };
+
+      if ((actor.stats?.hp ?? 0) < (actor.stats?.max_hp ?? 0)) add("Catch breath", "/wait", "Wait and recover");
+      if (location.items?.length) add(`Inspect ${location.items[0]}`, `inspect ${location.items[0]}`);
+
+      const present = Object.values(world.characters)
+        .filter((character) => character.id !== actorId && character.location === actor.location && (character.stats?.hp ?? 1) > 0)
+        .sort((a, b) => a.id.localeCompare(b.id));
+      if (present.length) add(`Talk to ${present[0].id}`, `/speak ${present[0].id} `, `Start a message to ${present[0].id}`);
+
+      (location.connections || [])
+        .filter((destination) => destination !== actor.location && world.locations[destination])
+        .sort()
+        .forEach((destination) => add(`Travel to ${destination}`, `/travel ${destination}`));
+
+      add("Look around", "look around carefully");
+      return choices;
+    }
+
+    function campaignOutcome(view, actorId = view?.pc) {
+      const quests = Object.values(view?.state.quests || {}).filter((quest) => quest.owner === actorId);
+      if (!quests.length || quests.some((quest) => !["completed", "failed"].includes((quest.status || "active").toLowerCase()))) {
+        return null;
+      }
+      return quests.some((quest) => (quest.status || "").toLowerCase() === "failed") ? "failed" : "completed";
+    }
+
+    function renderTurnCompass() {
+      const view = state.view;
+      const actorId = state.playerActor || view?.pc;
+      const actor = view?.state.characters?.[actorId];
+      const visible = state.playerWaiting && state.live && view?.tick === view?.latest_tick && Boolean(actor);
+      dom.turnCompass.hidden = !visible;
+      if (!visible) return;
+
+      const activeQuests = Object.values(view.state.quests || {})
+        .filter((quest) => quest.owner === actorId && !["completed", "failed"].includes((quest.status || "active").toLowerCase()))
+        .sort((a, b) => (a.title || a.id).localeCompare(b.title || b.id));
+      const quest = activeQuests[0];
+      dom.turnCompassTitle.textContent = quest?.title || "Personal goal";
+      const planLength = quest?.plan?.length || 0;
+      dom.turnCompassProgress.textContent = planLength
+        ? `· step ${Math.min((quest.current_step || 0) + 1, planLength)} of ${planLength}`
+        : "";
+      dom.turnCompassStep.textContent = quest
+        ? quest.plan?.[quest.current_step || 0] || quest.description || "Choose the next step."
+        : actor.goal || "Decide what matters next.";
+
+      dom.playSuggestions.innerHTML = contextualChoices(view, actorId).map((choice) => `
+        <button type="button" data-action="${escapeHtml(choice.action)}" aria-label="${escapeHtml(choice.ariaLabel)}">${escapeHtml(choice.label)}</button>
+      `).join("");
+    }
+
     async function pollPlayer() {
       const turn = await fetchJson("/api/play/status");
       const waiting = turn.status === "waiting";
+      const waitingChanged = waiting !== state.playerWaiting || (waiting && turn.actor_id !== state.playerActor);
+      state.playerWaiting = waiting;
+      state.playerActor = waiting ? turn.actor_id : null;
       dom.playPanel.classList.toggle("ready", waiting);
       dom.playInput.disabled = !waiting;
       dom.playSubmit.disabled = !waiting;
@@ -86,9 +196,15 @@
       } else if (turn.status === "submitted") {
         dom.playTitle.textContent = "Resolving action…";
       } else {
-        dom.playTitle.textContent = "Waiting for your turn";
-        dom.playSituation.textContent = "Start a game with --web to play here.";
+        const outcome = campaignOutcome(state.view);
+        dom.playTitle.textContent = outcome === "completed" ? "Campaign complete" : outcome === "failed" ? "Campaign failed" : "Waiting for your turn";
+        dom.playSituation.textContent = outcome === "completed"
+          ? "Every quest you owned is complete. Victory is yours."
+          : outcome === "failed"
+            ? "Your remaining quest threads have ended in failure. This campaign is over."
+            : "Start a game with --web to play here.";
       }
+      if (waitingChanged) renderTurnCompass();
     }
 
     function runKey(scenario, runId) {
@@ -118,6 +234,7 @@
       const scenarioPart = encodeURIComponent(state.scenario);
       const runPart = encodeURIComponent(state.runId);
       state.view = await fetchJson(`/api/state/${scenarioPart}/${runPart}${query}`);
+      updateActionOutcome(state.view);
       state.series = await fetchJson(`/api/series/${scenarioPart}/${runPart}`);
       renderAll();
     }
@@ -137,6 +254,7 @@
       renderCharacters();
       renderQuests();
       renderFeed();
+      renderTurnCompass();
     }
 
     function renderTopbar() {
@@ -264,7 +382,7 @@
         ].join(" ");
         const itemCount = (locations[n.id].items || []).length;
         return `
-          <g class="${cls}" data-loc="${escapeHtml(n.id)}" transform="translate(${n.x},${n.y})">
+          <g class="${cls}" data-loc="${escapeHtml(n.id)}" transform="translate(${n.x},${n.y})" role="button" tabindex="0" aria-label="${escapeHtml(`Location ${n.id}, ${alive.length} characters, ${itemCount} items`)}" aria-pressed="${state.selectedLoc === n.id}">
             ${n.id === selected ? `<circle class="halo" r="${r + 5}"/>` : ""}
             <circle class="body" r="${r}"/>
             ${alive.length ? `<text class="count" dy="3">${alive.length}</text>` : ""}
@@ -336,7 +454,7 @@
         const delta = changes[c.id];
         const points = sparkline(state.series[c.id] || []);
         return `
-          <div class="char-card ${c.id === view.pc ? "pc" : ""} ${dead ? "dead" : ""} ${delta ? "changed" : ""}" data-char="${escapeHtml(c.id)}">
+          <div class="char-card ${c.id === view.pc ? "pc" : ""} ${dead ? "dead" : ""} ${delta ? "changed" : ""}" data-char="${escapeHtml(c.id)}" role="button" tabindex="0" aria-haspopup="dialog" aria-label="View details for ${escapeHtml(c.id)}">
             <div class="char-head">
               <span class="name">${dead ? "☠ " : ""}${escapeHtml(c.id)}</span>
               ${c.id === view.pc ? '<span class="chip violet">PC</span>' : ""}
@@ -369,14 +487,26 @@
     function showCharacter(id) {
       const c = state.view?.state.characters?.[id]; if (!c) return;
       const stats = c.stats || {};
-      document.getElementById("char-detail").innerHTML = `<div class="dialog-head"><h2>${escapeHtml(c.id)}</h2><button data-close="char-drawer">×</button></div><div class="detail-grid">
+      const drawer = document.getElementById("char-drawer");
+      state.lastDialogFocus = document.activeElement;
+      document.getElementById("char-detail").innerHTML = `<div class="dialog-head"><h2 id="char-detail-title">${escapeHtml(c.id)}</h2><button type="button" data-close="char-drawer" aria-label="Close character details">×</button></div><div class="detail-grid">
         <div class="detail-field"><span class="k">Role & location</span>${escapeHtml(c.role || "—")} · ${escapeHtml(c.location || "—")}</div>
         <div class="detail-field"><span class="k">Stats</span>${escapeHtml(stats.hp ?? 0)}/${escapeHtml(stats.max_hp ?? "?")} HP · level ${escapeHtml(stats.level ?? 1)} · ${escapeHtml(stats.xp ?? 0)} XP · ${escapeHtml(stats.gold ?? 0)} gold</div>
         <div class="detail-field"><span class="k">Backstory</span>${escapeHtml(c.backstory || "—")}</div><div class="detail-field"><span class="k">Personality</span>${escapeHtml(c.personality || "—")}</div>
         <div class="detail-field"><span class="k">Relationships</span>${Object.entries(c.relationships || {}).map(([k,v]) => `${escapeHtml(k)}: ${escapeHtml(v)}`).join("<br>") || "—"}</div>
         <div class="detail-field"><span class="k">Knowledge</span>${(c.knowledge || []).map(escapeHtml).join("<br>") || "—"}</div></div>
         <div class="dialog-hint">esc or click outside to close</div>`;
-      document.getElementById("char-drawer").classList.add("open");
+      drawer.classList.add("open");
+      drawer.setAttribute("aria-hidden", "false");
+      drawer.querySelector("[data-close]").focus();
+    }
+
+    function closeDrawer(drawer) {
+      if (!drawer?.classList.contains("open")) return;
+      drawer.classList.remove("open");
+      drawer.setAttribute("aria-hidden", "true");
+      if (state.lastDialogFocus?.isConnected) state.lastDialogFocus.focus();
+      state.lastDialogFocus = null;
     }
 
     function renderQuests() {
@@ -431,6 +561,8 @@
     function setLive(on) {
       state.live = on;
       dom.liveBtn.classList.toggle("on", on);
+      dom.liveBtn.setAttribute("aria-pressed", String(on));
+      renderTurnCompass();
       if (state.timer) clearInterval(state.timer);
       state.timer = null;
       if (on) state.timer = setInterval(pollLive, POLL_MS);
@@ -458,6 +590,7 @@
         const currentLen = current ? (current.state.history || []).length : -1;
         if (!current || fresh.tick !== current.tick || (fresh.state.history || []).length !== currentLen) {
           state.view = fresh;
+          updateActionOutcome(fresh);
           renderAll();
         }
       } catch (error) {
@@ -473,6 +606,8 @@
       state.runId = dom.run.value.slice(sep + 1);
       state.mapLayout = null;
       state.selectedLoc = null;
+      state.recentAction = null;
+      renderPlayTrail();
       loadView(null).catch(() => {});
     });
 
@@ -482,6 +617,13 @@
       state.selectedLoc = state.selectedLoc === node.dataset.loc ? null : node.dataset.loc;
       renderMap();
       renderLocDetail();
+    });
+    dom.mapSvg.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const node = event.target.closest("[data-loc]");
+      if (!node) return;
+      event.preventDefault();
+      node.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     dom.slider.addEventListener("input", () => {
@@ -516,8 +658,19 @@
       dom.playError.textContent = "";
       dom.playInput.disabled = true;
       dom.playSubmit.disabled = true;
+      const actionContext = {
+        historyLength: (state.view?.state.history || []).length,
+        runKey: state.scenario && state.runId ? runKey(state.scenario, state.runId) : null,
+      };
       try {
-        await postJson("/api/play/action", { request_id: requestId, line });
+        const result = await postJson("/api/play/action", { request_id: requestId, line });
+        state.recentAction = {
+          ...actionContext,
+          label: describeAction(result.action, line),
+          outcome: null,
+        };
+        renderPlayTrail();
+        updateActionOutcome(state.view);
         dom.playInput.value = "";
         await pollPlayer();
       } catch (error) {
@@ -527,19 +680,40 @@
         dom.playInput.focus();
       }
     });
+    dom.playSuggestions.addEventListener("click", (event) => {
+      const suggestion = event.target.closest("[data-action]");
+      if (!suggestion || !state.playerWaiting || dom.playInput.disabled) return;
+      dom.playInput.value = suggestion.dataset.action;
+      dom.playInput.focus();
+      dom.playInput.setSelectionRange(dom.playInput.value.length, dom.playInput.value.length);
+    });
     dom.playToggle.addEventListener("click", () => {
-      dom.playPanel.classList.toggle("collapsed");
-      dom.playToggle.textContent = dom.playPanel.classList.contains("collapsed") ? "+" : "−";
+      const collapsed = dom.playPanel.classList.toggle("collapsed");
+      dom.playToggle.textContent = collapsed ? "+" : "−";
+      dom.playToggle.setAttribute("aria-expanded", String(!collapsed));
+      dom.playToggle.setAttribute("aria-label", collapsed ? "Expand play panel" : "Collapse play panel");
     });
 
     dom.charGrid.addEventListener("click", (event) => { const card=event.target.closest("[data-char]"); if(card) showCharacter(card.dataset.char); });
+    dom.charGrid.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const card = event.target.closest("[data-char]");
+      if (!card) return;
+      event.preventDefault();
+      showCharacter(card.dataset.char);
+    });
     document.body.addEventListener("click", (event) => {
       const close = event.target.closest("[data-close]");
-      if (close) document.getElementById(close.dataset.close).classList.remove("open");
-      else if (event.target.classList.contains("drawer")) event.target.classList.remove("open");
+      if (close) closeDrawer(document.getElementById(close.dataset.close));
+      else if (event.target.classList.contains("drawer")) closeDrawer(event.target);
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") document.querySelectorAll(".drawer.open").forEach((d) => d.classList.remove("open"));
+      const openDrawer = document.querySelector(".drawer.open");
+      if (event.key === "Escape") closeDrawer(openDrawer);
+      if (event.key === "Tab" && openDrawer) {
+        event.preventDefault();
+        openDrawer.querySelector("[data-close]")?.focus();
+      }
     });
 
     loadRuns().catch((error) => {

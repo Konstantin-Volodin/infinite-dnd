@@ -1,6 +1,8 @@
     const EVENT_COLOR = {
       game_session_started: "violet",
       game_session_finished: "violet",
+      campaign_completed: "green",
+      campaign_failed: "ember",
       pc_death: "ember",
       resolved: "green",
       world_snapshot: "amber",
@@ -12,7 +14,7 @@
     };
 
     const STORY_EVENTS = new Set([
-      "game_session_started", "game_session_finished", "pc_death",
+      "game_session_started", "game_session_finished", "campaign_completed", "campaign_failed", "pc_death",
       "resolved", "world_snapshot", "player_action", "parse_error",
     ]);
 
@@ -100,7 +102,7 @@
         const title = file.scenario_title || "Unknown campaign";
         const sub = `${file.character_id || "?"} · ${file.turns_completed ?? "?"}/${file.max_turns ?? "?"} turns`;
         return `
-          <button class="session-row ${active ? "active" : ""}" data-file="${escapeHtml(file.name)}" title="${escapeHtml(file.name)}">
+          <button type="button" class="session-row ${active ? "active" : ""}" data-file="${escapeHtml(file.name)}" title="${escapeHtml(file.name)}" ${active ? 'aria-current="true"' : ""}>
             <span class="name">${escapeHtml(title)}</span>
             <span class="sub">${escapeHtml(sub)} · ${escapeHtml(formatDateTime(file.modified_time))}</span>
           </button>
@@ -125,7 +127,7 @@
 
       const events = session.event_types.filter((event) => event !== "turn_started");
       dom.eventList.innerHTML = events.map((event) => `
-        <button class="filter-row ${state.eventFilter === event ? "active" : ""}" data-event="${escapeHtml(event)}">
+        <button type="button" class="filter-row ${state.eventFilter === event ? "active" : ""}" data-event="${escapeHtml(event)}" aria-pressed="${state.eventFilter === event}">
           <span class="dot ${EVENT_COLOR[event] || ""}"></span>${escapeHtml(event.replaceAll("_", " "))}
           <span class="count">${escapeHtml(session.event_counts[event])}</span>
         </button>
@@ -138,7 +140,7 @@
       });
       dom.labelList.innerHTML = labels.length
         ? labels.map((label) => `
-            <button class="filter-row ${state.labelFilter === label ? "active" : ""}" data-label="${escapeHtml(label)}">
+            <button type="button" class="filter-row ${state.labelFilter === label ? "active" : ""}" data-label="${escapeHtml(label)}" aria-pressed="${state.labelFilter === label}">
               <span class="dot violet"></span>${escapeHtml(label)}
               <span class="count">${escapeHtml(labelCounts[label] || 0)}</span>
             </button>
@@ -198,7 +200,7 @@
         const suffix = entry.event === "agent_run_finished" ? " ✓" : " …";
         return `<span class="chip violet">${escapeHtml((entry.label || "run") + suffix)}</span>`;
       }
-      const label = { game_session_started: "session", game_session_finished: "session", world_snapshot: "world", player_action: "player", pc_death: "death", resolved: (entry.raw || {}).tool || "resolved", parse_error: "error" }[entry.event] || entry.event.replaceAll("_", " ");
+      const label = { game_session_started: "session", game_session_finished: "session", campaign_completed: "victory", campaign_failed: "defeat", world_snapshot: "world", player_action: "player", pc_death: "death", resolved: (entry.raw || {}).tool || "resolved", parse_error: "error" }[entry.event] || entry.event.replaceAll("_", " ");
       return `<span class="chip ${EVENT_COLOR[entry.event] || ""}">${escapeHtml(label.toLowerCase())}</span>`;
     }
 
@@ -224,11 +226,11 @@
           chunks.push(`<div class="turn-header">${escapeHtml(title)}<span class="clock">${escapeHtml(entry.display_time)}</span></div>`);
         }
         chunks.push(`
-          <div class="log-row ${rowClass(entry)} ${state.selectedLine === entry.line ? "selected" : ""}" data-line="${entry.line}">
+          <button type="button" class="log-row ${rowClass(entry)} ${state.selectedLine === entry.line ? "selected" : ""}" data-line="${entry.line}" aria-pressed="${state.selectedLine === entry.line}" aria-label="Inspect log event on line ${entry.line}">
             <span class="log-time">${escapeHtml(entry.display_time)}</span>
             ${rowChip(entry)}
             <span class="log-msg">${rowContent(entry)}</span>
-          </div>
+          </button>
         `);
       }
       dom.logPanel.innerHTML = chunks.join("");
@@ -315,7 +317,11 @@
       const button = event.target.closest("[data-detail]");
       if (!button) return;
       state.detail = button.dataset.detail;
-      dom.detailSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === button));
+      dom.detailSeg.querySelectorAll("button").forEach((b) => {
+        const active = b === button;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-pressed", String(active));
+      });
       renderRows();
     });
 
@@ -325,6 +331,7 @@
       state.selectedLine = state.selectedLine === Number(row.dataset.line) ? null : Number(row.dataset.line);
       renderRows();
       renderInspector();
+      dom.logPanel.querySelector(`[data-line="${row.dataset.line}"]`)?.focus();
     });
 
     dom.search.addEventListener("input", (event) => {
