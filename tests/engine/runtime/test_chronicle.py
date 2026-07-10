@@ -2,7 +2,6 @@ import asyncio
 from contextlib import contextmanager
 from typing import Any, Iterator
 
-import pytest
 from pydantic_ai.exceptions import UsageLimitExceeded
 
 from src.engine.runtime.chronicle import (

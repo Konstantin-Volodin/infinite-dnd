@@ -17,6 +17,7 @@ dev = [
     "pyright>=1.1.350",
     "pre-commit>=3.6.0",
     "pytest>=8.0",
+    "ruff>=0.8.0",
 ]
 
 [project.scripts]
@@ -32,6 +33,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[tool.ruff]
+target-version = "py313"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
