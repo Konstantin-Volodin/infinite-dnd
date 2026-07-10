@@ -51,6 +51,13 @@
 - none
 {% endif %}
 
+{% if deadlines %}
+## ⏳ deadlines
+{% for faction_name, clock in deadlines %}
+- **{{ clock.name }}:** {{ clock.progress }}/{{ clock.segments }} — {{ clock.consequence }}
+{% endfor %}
+{% endif %}
+
 *... recent information about the world ...*
 
 {% if chronicle %}
@@ -76,6 +83,7 @@ Everything is calm... for now.
 
 ## 🏠 about my location
 {% if loc %}
+- **{{ loc.id }}:** {{ loc.description or 'no description' }}
 {% if others %}
 - **other people here**:  {{ others | join(', ') }}
 {% endif %}

@@ -44,8 +44,21 @@ _no prior events._
 
 ## 🎬 scene
 - location: {{ location_id }}
-- present: {{ present | join(', ') if present else 'no one' }}
+{% if scene %}
+- description: {{ scene.description or 'no description' }}
+- features: {{ scene.features | join(', ') if scene.features else 'none' }}
+- items: {{ scene.items | join(', ') if scene.items else 'none' }}
+- exits: {{ scene.connections | join(', ') if scene.connections else 'none' }}
+{% endif %}
+{% if present %}
+- people here:
+{% for character in present %}
+  - **{{ character.id }}**{% if character.role %} ({{ character.role }}){% endif %}: {{ character.stats.hp }}/{{ character.stats.max_hp }} HP; wants {{ character.goal or 'nothing specific' }}
+{% endfor %}
+{% else %}
+- people here: no one
+{% endif %}
 
 ---
 
-Call `report` with exactly one complication grounded in the state above.
+Call `report` with exactly one complication grounded in the state above. Use a concrete scene detail or present character's motivation when possible, and leave the characters more than one plausible way to respond.

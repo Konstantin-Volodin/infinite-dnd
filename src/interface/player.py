@@ -33,6 +33,35 @@ def _describe_situation(actor_id: str, state: WorldState) -> str:
         f"HP: {char.stats.hp}/{char.stats.max_hp}  Gold: {char.stats.gold}  "
         f"Inventory: {', '.join(char.inventory) if char.inventory else 'none'}"
     )
+    if char.goal:
+        lines.append(f"Goal: {char.goal}")
+
+    active_quests = [
+        quest for quest in state.quests.values()
+        if quest.owner == actor_id and quest.status.lower() not in {"completed", "failed"}
+    ]
+    for quest in active_quests:
+        objective = (
+            quest.plan[quest.current_step]
+            if quest.current_step < len(quest.plan)
+            else quest.description
+        )
+        if objective:
+            lines.append(f"Current objective ({quest.title}): {objective}")
+
+    active_quest_ids = {quest.id for quest in active_quests}
+    for faction_id in sorted(state.factions):
+        faction = state.factions[faction_id]
+        for clock in sorted(faction.clocks, key=lambda candidate: candidate.id):
+            if clock.fail_quest_id in active_quest_ids and not clock.consequence_triggered:
+                lines.append(
+                    f"Deadline ({clock.name}): {clock.progress}/{clock.segments} — "
+                    f"{clock.consequence}"
+                )
+
+    witnessed = [event.text for event in state.history if actor_id in event.characters]
+    if witnessed:
+        lines.append(f"Just happened: {witnessed[-1]}")
 
     present = characters_in_location(state, char.location, exclude_character_id=actor_id)
     if present:

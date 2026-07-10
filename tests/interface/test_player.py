@@ -3,7 +3,15 @@ import asyncio
 import pytest
 
 from src.agents.character.tools import Action, Attack, Check, Speak, Travel, Wait
-from src.engine.state.models import Character, Location, WorldState
+from src.engine.state.models import (
+    Character,
+    Faction,
+    HistoryEvent,
+    Location,
+    ProgressClock,
+    Quest,
+    WorldState,
+)
 from src.interface.player import _describe_situation, _parse_intent, _InputError, console_pc_controller
 
 
@@ -104,6 +112,63 @@ def test_describe_situation_includes_key_facts():
     assert "sword" in text
     assert "bob" in text
     assert "square" in text
+
+
+def test_describe_situation_frames_the_players_next_choice():
+    state = _state()
+    state.characters["hero"].goal = "Find who stole the lantern"
+    state.quests["missing-light"] = Quest(
+        id="missing-light",
+        title="The Missing Light",
+        description="Recover the tavern's lantern.",
+        owner="hero",
+        plan=["question the bartender", "search the square"],
+    )
+    state.history.append(HistoryEvent(
+        text='bob whispers: "I saw someone run toward the square."',
+        location="tavern",
+        characters=["hero", "bob"],
+    ))
+    state.factions["night"] = Faction(
+        id="night",
+        name="The Coming Night",
+        goal="Let the trail go cold",
+        clocks=[ProgressClock(
+            id="sunset",
+            name="Sunset",
+            consequence="The thief escapes with the lantern.",
+            segments=4,
+            progress=1,
+            fail_quest_id="missing-light",
+        )],
+    )
+
+    text = _describe_situation("hero", state)
+
+    assert "Goal: Find who stole the lantern" in text
+    assert "Current objective (The Missing Light): question the bartender" in text
+    assert "Deadline (Sunset): 1/4 — The thief escapes with the lantern." in text
+    assert 'Just happened: bob whispers: "I saw someone run toward the square."' in text
+
+
+def test_describe_situation_hides_other_characters_quests_and_unwitnessed_events():
+    state = _state()
+    state.quests["bobs-business"] = Quest(
+        id="bobs-business",
+        title="Private Errand",
+        description="Do not show this to the hero.",
+        owner="bob",
+    )
+    state.history.append(HistoryEvent(
+        text="bob hides a key in the cellar.",
+        location="tavern",
+        characters=["bob"],
+    ))
+
+    text = _describe_situation("hero", state)
+
+    assert "Private Errand" not in text
+    assert "bob hides a key" not in text
 
 
 # ============ console controller loop ============

@@ -41,12 +41,16 @@ def director_system() -> str:
 
 def director_context(deps) -> str:
     state: WorldState = deps.state
+    scene = state.locations.get(deps.location_id)
     recent_events = [e.text for e in state.history[-10:]]
     quests = [
         q for q in state.quests.values()
         if str(getattr(q, "status", "active")).lower() not in ("completed", "failed")
     ]
-    present = sorted(cid for cid, c in state.characters.items() if c.location == deps.location_id)
+    present = sorted(
+        (c for c in state.characters.values() if c.location == deps.location_id),
+        key=lambda c: c.id,
+    )
     return render(
         "dm/director_state.jinja",
         chronicle=state.chronicle[-3:],
@@ -54,6 +58,7 @@ def director_context(deps) -> str:
         quests=quests,
         interventions=state.director_interventions,
         location_id=deps.location_id,
+        scene=scene,
         present=present,
         factions=[state.factions[fid] for fid in sorted(state.factions)],
     )

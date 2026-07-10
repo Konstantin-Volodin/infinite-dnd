@@ -23,6 +23,13 @@ def character_context(char: Character, state: WorldState) -> str:
     for q in state.quests.values():
         if str(getattr(q, "status", "active")).lower() in ("completed", "failed"): continue
         if q.owner == char.id: quests.append(q)
+    quest_ids = {quest.id for quest in quests}
+    deadlines = [
+        (faction.name, clock)
+        for faction in (state.factions[fid] for fid in sorted(state.factions))
+        for clock in sorted(faction.clocks, key=lambda candidate: candidate.id)
+        if clock.fail_quest_id in quest_ids and not clock.consequence_triggered
+    ]
 
     # Recent events (only ones this character witnessed)
     recent_events = [
@@ -65,5 +72,6 @@ def character_context(char: Character, state: WorldState) -> str:
         others=others,
         speak_targets=speak_targets,
         quests=quests,
+        deadlines=deadlines,
         warnings=warnings,
     )
