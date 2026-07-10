@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from pydantic_ai import Agent, RunContext, ToolOutput
-from pydantic_ai.usage import RunUsage
+from pydantic_ai.exceptions import UsageLimitExceeded
+from pydantic_ai.usage import RunUsage, UsageLimits
 
 from src.engine.state import (
     Character,
@@ -27,6 +28,7 @@ from .context import action_resolver_context, action_resolver_system
 
 
 AnyTool = CharacterTool | Create | Modify
+_ACTION_USAGE = UsageLimits(request_limit=8)
 
 
 # ============================================================
@@ -54,11 +56,24 @@ def _apply_self_updates(tool: AnyTool, state: WorldState) -> None:
     actor = getattr(tool, "actor", None)
     if not actor or actor not in state.characters:
         return
+    char = state.characters[actor]
     ops = WorldOperations(state)
     if remember := getattr(tool, "remember", None):
         ops.add_knowledge(actor, remember)
     if new_goal := getattr(tool, "new_goal", None):
-        ops.set_goal(actor, new_goal)
+        current_verb = char.goal.strip().casefold().split(maxsplit=1)[0] if char.goal.strip() else ""
+        proposed_verb = new_goal.strip().casefold().split(maxsplit=1)[0] if new_goal.strip() else ""
+        quest_words = {
+            word.strip(".,!?;:'\"")
+            for quest in state.quests.values()
+            if quest.owner == actor and quest.status.lower() not in {"completed", "failed"}
+            for word in quest.title.casefold().split()
+            if len(word.strip(".,!?;:'\"")) > 2
+        }
+        proposed_words = {word.strip(".,!?;:'\"") for word in new_goal.casefold().split()}
+        restates_active_quest = current_verb == proposed_verb and bool(quest_words & proposed_words)
+        if not restates_active_quest:
+            ops.set_goal(actor, new_goal)
 
 
 async def _dispatch(
@@ -96,10 +111,22 @@ def _resolve_travel(tool: Travel, state: WorldState) -> str:
 
 
 def _resolve_wait(tool: Wait, state: WorldState) -> str:
-    char = state.characters.get(tool.actor)
-    location = char.location if char else ""
-    text = f"{tool.actor} waits."
-    state.history.append(HistoryEvent(text=text, location=location, characters=[tool.actor]))
+    actor = state.characters.get(tool.actor)
+    if actor is None:
+        return f"Cannot wait — character {tool.actor!r} not found."
+    if actor.stats.hp <= 0:
+        return f"Cannot wait — {tool.actor!r} is dead."
+
+    recovered = max(0, min(1, actor.stats.max_hp - actor.stats.hp))
+    if recovered:
+        actor.stats.hp += recovered
+        text = (
+            f"{tool.actor} catches their breath and recovers {recovered} HP. "
+            f"HP: {actor.stats.hp}/{actor.stats.max_hp}."
+        )
+    else:
+        text = f"{tool.actor} waits."
+    state.history.append(HistoryEvent(text=text, location=actor.location, characters=[tool.actor]))
     return text
 
 
@@ -190,17 +217,32 @@ async def _resolve_action(tool: Action, state: WorldState, usage: RunUsage | Non
     char = state.characters.get(tool.actor)
     if not char:
         return f"Cannot resolve action — character {tool.actor!r} not found."
+    history_size = len(state.history)
     prompt = f"Resolve this action: {tool.description}"
     if tool.target:
         prompt += f" (target: {tool.target})"
     deps = _ActionResolverDeps(char=char, state=state, description=tool.description, target=tool.target)
-    if logger:
-        with logger.run("action_resolver"):
-            result = await _action_agent.run(prompt, deps=deps, usage=usage)
-            logger.log_messages("action_resolver", result.all_messages())
-    else:
-        result = await _action_agent.run(prompt, deps=deps, usage=usage)
-    return result.output
+    try:
+        if logger:
+            with logger.run("action_resolver"):
+                result = await _action_agent.run(prompt, deps=deps, usage=usage, usage_limits=_ACTION_USAGE)
+                logger.log_messages("action_resolver", result.all_messages())
+        else:
+            result = await _action_agent.run(prompt, deps=deps, usage=usage, usage_limits=_ACTION_USAGE)
+        output = result.output.strip()
+    except UsageLimitExceeded:
+        output = (
+            f"{char.id}'s action produced the recorded change."
+            if len(state.history) > history_size
+            else f"{char.id} makes no further progress on that action."
+        )
+    if output and len(state.history) == history_size:
+        state.history.append(HistoryEvent(
+            text=output,
+            location=char.location,
+            characters=[char.id],
+        ))
+    return output
 
 
 # ============================================================
@@ -213,6 +255,7 @@ class _ActionResolverDeps:
     state: WorldState
     description: str
     target: str | None = None
+    remembered_this_action: bool = False
 
 
 # Keep public alias for context.py / tests that still reference the old name.
@@ -256,6 +299,9 @@ def remember(
     character_id: str | None = None,
 ) -> str:
     """add a concrete piece of knowledge to the acting character or another known character."""
+    if ctx.deps.remembered_this_action:
+        return "A decisive fact is already recorded from this action. Call done now without another remember call."
+    ctx.deps.remembered_this_action = True
     return _ops(ctx).add_knowledge(character_id or ctx.deps.char.id, knowledge)
 
 

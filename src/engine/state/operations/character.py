@@ -203,6 +203,11 @@ class CharacterOps(_OpsBase):
         char = self.state.characters.get(character_id)
         if not char: return f"Cannot set goal — character '{character_id}' not found."
 
+        new_goal = " ".join(new_goal.split())
+        current_goal = " ".join(char.goal.split())
+        if new_goal.casefold() == current_goal.casefold():
+            return f"{character_id}'s goal is unchanged."
+
         char.goal = new_goal
         result = f"{character_id}'s goal is now: {new_goal}"
         self._log(result, char.location, [character_id])

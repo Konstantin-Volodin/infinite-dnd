@@ -44,6 +44,8 @@ def _prepare_output_tools(
         elif td.name == "travel":
             if options:
                 result.append(replace(td, description=f"travel to a connected location. Valid ids: {', '.join(options)}."))
+            else:
+                result.append(replace(td, description="no connected locations are available; use action to discover one."))
         elif td.name == "attack":
             if targets:
                 result.append(replace(td, description=f"attack someone here. Valid targets: {', '.join(targets)}."))
@@ -73,7 +75,15 @@ def travel_output(
     remember: str | None = None,
     new_goal: str | None = None,
 ) -> Travel:
-    """travel to a connected location, or propose a new one for the DM to introduce."""
+    """travel to a connected location using its exact id."""
+    options = _travel_options(ctx)
+    if location not in options:
+        hint = (
+            f"Valid location ids: {', '.join(options)}."
+            if options
+            else "No connected locations are available; use action to discover one."
+        )
+        raise ModelRetry(f"Cannot travel to {location!r}. {hint}")
     return Travel(actor=ctx.deps.char.id, destination=location, remember=remember, new_goal=new_goal)
 
 

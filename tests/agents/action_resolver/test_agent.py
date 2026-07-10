@@ -1,7 +1,11 @@
 import asyncio
+from types import SimpleNamespace
 
-from src.engine.state.models import Character, Faction, Location, ProgressClock, WorldState
-from src.agents.action_resolver.agent import resolve
+from pydantic_ai.exceptions import UsageLimitExceeded
+
+from src.agents.character.tools import Action
+from src.engine.state.models import Character, Faction, Location, ProgressClock, Quest, WorldState
+from src.agents.action_resolver.agent import ActionResolverDeps, remember, resolve
 from src.agents.character.tools import Check, Speak, Wait
 from src.agents.dm.tools import Modify
 
@@ -34,6 +38,33 @@ def test_new_goal_applied_deterministically():
     assert event.characters == ["hero"]
 
 
+def test_duplicate_new_goal_does_not_create_goal_churn():
+    state = _state()
+
+    asyncio.run(resolve(Wait(actor="hero", new_goal="  FIND   the ale  "), state))
+
+    assert state.characters["hero"].goal == "find the ale"
+    assert [event.text for event in state.history] == ["hero waits."]
+
+
+def test_agent_cannot_narrow_active_quest_into_repetitive_search_goal():
+    state = _state()
+    state.quests["ale"] = Quest(
+        id="ale",
+        title="The Missing Ale",
+        description="Find the missing ale.",
+        owner="hero",
+    )
+
+    asyncio.run(resolve(Wait(
+        actor="hero",
+        new_goal="Find clues about the missing ale in the cellar",
+    ), state))
+
+    assert state.characters["hero"].goal == "find the ale"
+    assert [event.text for event in state.history] == ["hero waits."]
+
+
 def test_remember_and_new_goal_together_on_any_tool():
     state = _state()
     tool = Speak(actor="hero", message="I've had enough of this place.", remember="the barkeep flinched at the question", new_goal="leave town")
@@ -50,6 +81,99 @@ def test_no_self_updates_when_fields_absent():
     asyncio.run(resolve(tool, state))
     assert state.characters["hero"].goal == "find the ale"  # unchanged
     assert len(state.history) == history_before + 1  # only the wait event itself
+
+
+def test_injured_character_can_wait_to_catch_their_breath():
+    state = _state()
+    state.characters["hero"].stats.hp = 3
+
+    result = asyncio.run(resolve(Wait(actor="hero"), state))
+
+    assert state.characters["hero"].stats.hp == 4
+    assert result == "hero catches their breath and recovers 1 HP. HP: 4/5."
+    assert state.history[-1].text == result
+
+
+def test_wait_recovery_is_capped_at_max_hp():
+    state = _state()
+    state.characters["hero"].stats.hp = 4
+
+    result = asyncio.run(resolve(Wait(actor="hero"), state))
+
+    assert state.characters["hero"].stats.hp == 5
+    assert "recovers 1 HP" in result
+
+
+def test_full_health_wait_remains_unchanged():
+    state = _state()
+
+    result = asyncio.run(resolve(Wait(actor="hero"), state))
+
+    assert result == "hero waits."
+    assert state.characters["hero"].stats.hp == 5
+    assert state.history[-1].text == result
+
+
+def test_wait_cannot_revive_a_dead_character():
+    state = _state()
+    state.characters["hero"].stats.hp = 0
+
+    result = asyncio.run(resolve(Wait(actor="hero"), state))
+
+    assert result == "Cannot wait — 'hero' is dead."
+    assert state.characters["hero"].stats.hp == 0
+    assert state.history == []
+
+
+def test_free_form_action_records_its_outcome_before_optional_self_updates(monkeypatch):
+    state = _state()
+
+    async def resolved_action(*_args, **_kwargs):
+        return SimpleNamespace(output="A misaligned portrait reveals a hidden compartment.")
+
+    monkeypatch.setattr("src.agents.action_resolver.agent._action_agent.run", resolved_action)
+
+    result = asyncio.run(resolve(Action(
+        actor="hero",
+        description="inspect the portraits",
+        new_goal="open the hidden compartment",
+    ), state))
+
+    assert result == "A misaligned portrait reveals a hidden compartment."
+    assert [event.text for event in state.history] == [
+        "A misaligned portrait reveals a hidden compartment.",
+        "hero's goal is now: open the hidden compartment",
+    ]
+
+
+def test_action_resolver_keeps_only_one_decisive_knowledge_fact_per_action():
+    state = _state()
+    ctx = SimpleNamespace(deps=ActionResolverDeps(
+        char=state.characters["hero"],
+        state=state,
+        description="read the genealogy",
+    ))
+
+    first = remember(ctx, "The circlet is hidden behind the chapel altar.")
+    second = remember(ctx, "The altar has a secret compartment containing the circlet.")
+
+    assert "learns" in first
+    assert "Call done now" in second
+    assert state.characters["hero"].knowledge == ["The circlet is hidden behind the chapel altar."]
+
+
+def test_free_form_action_usage_limit_becomes_visible_outcome_instead_of_crash(monkeypatch):
+    state = _state()
+
+    async def exhausted(*_args, **_kwargs):
+        raise UsageLimitExceeded("request limit reached")
+
+    monkeypatch.setattr("src.agents.action_resolver.agent._action_agent.run", exhausted)
+
+    result = asyncio.run(resolve(Action(actor="hero", description="search forever"), state))
+
+    assert result == "hero makes no further progress on that action."
+    assert state.history[-1].text == result
 
 
 def test_modify_update_relationship_applied():

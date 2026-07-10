@@ -22,6 +22,7 @@
 ## location
 {% if loc %}
 - place: {{ loc.id }}
+- description: {{ loc.description or 'no description' }}
 {% if loc.features %}
 - features: {{ loc.features | join(', ') }}
 {% endif %}
@@ -54,7 +55,10 @@
 {% if quests %}
 ## active quests
 {% for q in quests %}
-- {{ q.title }} ({{ q.status }})
+- {{ q.title }} ({{ q.status }}; owner: {{ q.owner or 'unassigned' }})
+{% if q.plan and q.current_step < q.plan|length %}
+  - current objective: {{ q.plan[q.current_step] }}
+{% endif %}
 {% endfor %}
 {% endif %}
 
