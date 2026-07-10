@@ -1,7 +1,8 @@
 """Live tests — verify proposer agents emit correct intents and Resolver mutates state.
 
-Requires a reachable LLM provider (local llama.cpp server, or ANTHROPIC_API_KEY when
-LLM_PROVIDER=anthropic). Skipped automatically otherwise. Run explicitly with:
+Requires a reachable LLM provider: local llama.cpp server, ANTHROPIC_API_KEY when
+LLM_PROVIDER=anthropic, or OPENAI_API_KEY when LLM_PROVIDER=openai. Skipped
+automatically otherwise. Run explicitly with:
     uv run pytest -m integration tests/integration
 """
 
@@ -47,8 +48,11 @@ _USAGE_LIMITS = UsageLimits(request_limit=4, output_tokens_limit=256)
 
 def _provider_reachable() -> bool:
     """Cheap reachability check — no LLM call, just a connectivity/config probe."""
-    if os.getenv("LLM_PROVIDER", "local") == "anthropic":
+    provider = os.getenv("LLM_PROVIDER", "local")
+    if provider == "anthropic":
         return bool(os.getenv("ANTHROPIC_API_KEY"))
+    if provider == "openai":
+        return bool(os.getenv("OPENAI_API_KEY"))
     url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1").removesuffix("/v1") + "/health"
     try:
         r = urllib.request.urlopen(url, timeout=5)
@@ -160,7 +164,7 @@ def test_character_action_intent(state):
     before = len(state.history)
     intent, _ = _run(
         character_agent, "character",
-        f'Call `action` once with description "carefully inspects the old fountain". No other tools.',
+        'Call `action` once with description "carefully inspects the old fountain". No other tools.',
         CharacterDeps(char=char, state=state), "action",
     )
     assert isinstance(intent, Action), f"expected Action, got {type(intent).__name__}"

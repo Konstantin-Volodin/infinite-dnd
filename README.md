@@ -34,6 +34,14 @@ AI-driven D&D engine where LLM agents run tabletop RPG sessions autonomously.
 - `infinite-dnd-recap` - exports a run's saved state as a markdown story recap
 - `infinite-dnd-dump-context` - dumps each agent's exact prompt/tools/context for inspection
 
+### 🌐 Deploy
+Runs on a home server via `docker-compose.yml` + `Caddyfile`, behind a `.env` with
+`LLM_PROVIDER=openai` (no GPU needed for that path — see `.env.example`).
+- `docker compose up -d app caddy` - starts the dashboard, reachable at `http://dnd.voxlab.home` (point that host at the server's LAN IP in your local DNS first)
+- `docker compose run --rm game` - starts one game session against the running dashboard; exits when the session ends or hits `--turns`
+- override scenario/turns with `docker compose run --rm game infinite-dnd --web --web-url http://app:8765 --turns 30`
+- only one game can be actively waiting on player input at a time (the dashboard's play broker is single-slot) - start a new one after the previous session ends
+
 ### 🤖 Code style                                                   
 - Every change must leave the code easier to read than before.
 - Prefer deletion over addition. If a refactor grows a file, question the approach.
