@@ -10,6 +10,41 @@ import urllib.request
 from dotenv import load_dotenv
 load_dotenv()
 
+
+def _reasoning_args(model: str) -> list[str]:
+    """Build llama.cpp reasoning flags, including its Gemma 4 tool-call workaround."""
+    reasoning = os.getenv("LLM_REASONING", "auto")
+    if reasoning == "off" and "gemma-4" in model.lower():
+        # With Gemma 4, --reasoning off makes llama.cpp emit an empty `start`
+        # production in its tool-call grammar. Keeping the parser enabled with
+        # a zero-token budget disables thinking without breaking that grammar.
+        return ["--reasoning", "auto", "--reasoning-budget", "0"]
+    return ["--reasoning", reasoning]
+
+
+def _performance_args() -> list[str]:
+    """Defaults measured for the local MoE model, while keeping every knob overridable."""
+    default_threads = str(min(os.cpu_count() or 1, 8))
+    return [
+        "--threads", os.getenv("LLM_THREADS", default_threads),
+        "--threads-batch", os.getenv("LLM_THREADS_BATCH", default_threads),
+        "--n-cpu-moe", os.getenv("LLM_N_CPU_MOE", "11"),
+    ]
+
+
+def _speculative_args() -> list[str]:
+    """Enable speculative decoding when a compatible embedded or separate drafter is configured."""
+    spec_type = os.getenv("LLM_SPEC_TYPE", "none")
+    if spec_type == "none":
+        return []
+    args = [
+        "--spec-type", spec_type,
+        "--spec-draft-n-max", os.getenv("LLM_SPEC_DRAFT_N_MAX", "3"),
+    ]
+    if draft_model := os.getenv("LLM_SPEC_DRAFT_MODEL"):
+        args.extend(["--spec-draft-model", draft_model])
+    return args
+
 class LlamaServer:
     """manages a local llama-server subprocess."""
 
@@ -31,11 +66,12 @@ class LlamaServer:
             "--n-predict", os.getenv("LLM_N_PREDICT", "-1"),
             "--parallel", os.getenv("LLM_PARALLEL", "1"),
             "-ngl", os.getenv("LLM_NGL", "99"),
-            "--n-cpu-moe", os.getenv("LLM_N_CPU_MOE", "10"),
+            *_performance_args(),
+            *_speculative_args(),
             "--batch-size", os.getenv("LLM_BATCH_SIZE", "1024"),
             "--ubatch-size", os.getenv("LLM_UBATCH_SIZE", "512"),
             "--flash-attn", os.getenv("LLM_FLASH_ATTN", "on"),
-            "--reasoning", os.getenv("LLM_REASONING", "auto"),
+            *_reasoning_args(model or model_path or ""),
             "--metrics",
             "--jinja",
             "--temp", os.getenv("LLM_TEMP", "1.0"),
