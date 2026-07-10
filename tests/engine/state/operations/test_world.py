@@ -44,6 +44,26 @@ def test_advance_ownerless_quest_no_xp(state, ops):
     assert msg == "Quest 'q2' updated."
 
 
+@pytest.mark.parametrize("terminal_status", ["completed", "failed", "Completed"])
+def test_terminal_quest_rejects_stale_updates_without_awarding_xp(state, ops, terminal_status):
+    quest = state.quests["q1"]
+    quest.status = terminal_status
+    quest.current_step = 1
+    quest.steps = ["found the entrance"]
+    state.characters["hero"].stats.xp = 50
+    state.last_quest_advance_time = 3
+    state.time = 8
+
+    msg = ops.advance_quest("q1", new_status="completed", step="duplicate update", advance=True)
+
+    assert "already" in msg
+    assert quest.status == terminal_status
+    assert quest.current_step == 1
+    assert quest.steps == ["found the entrance"]
+    assert state.characters["hero"].stats.xp == 50
+    assert state.last_quest_advance_time == 3
+
+
 def test_advance_quest_with_plan_increments_and_logs(state, ops):
     ops.add_quest("q5", title="Clear the Ruins", description="", owner="hero", plan=["scout the entrance", "clear the first hall", "defeat the guardian"])
     msg = ops.advance_quest("q5", advance=True)

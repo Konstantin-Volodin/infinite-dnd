@@ -12,11 +12,16 @@ class _XpAwarder(Protocol):
     def award_xp(self, character_id: str, amount: int, reason: str = "") -> str: ...
 
 
+_TERMINAL_QUEST_STATUSES = {"completed", "failed"}
+
+
 class WorldOps(_OpsBase):
     # ============ QUESTS ============
     def advance_quest(self, quest_id: str, new_status: str | None = None, step: str | None = None, advance: bool = False) -> str:
         quest = self.state.quests.get(quest_id)
         if not quest: return f"Cannot advance quest — '{quest_id}' not found."
+        if quest.status.lower() in _TERMINAL_QUEST_STATUSES:
+            return f"Cannot advance quest — '{quest_id}' is already {quest.status.lower()}."
 
         # `advance` accomplishes the CURRENT plan objective: log it, move the pointer, maybe auto-complete.
         # `step` alone (no advance) is a plain log note — used alongside explicit new_status.

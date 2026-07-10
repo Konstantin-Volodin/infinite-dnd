@@ -156,6 +156,16 @@ def test_init_state_loads_optional_factions(tmp_path):
     assert clocks["retaliation"].progress == 0
 
 
+def test_init_state_loads_quest_deadline_clock(tmp_path):
+    manager = StateManager(scenario="cursed-heirloom", state_dir=str(tmp_path))
+
+    state = manager.init_state()
+
+    clock = state.factions["encroaching-dawn"].clocks[0]
+    assert clock.segments == 6
+    assert clock.fail_quest_id == "find-the-circlet"
+
+
 def test_load_state_backcompat_without_director_fields(tmp_path):
     """Old snapshots (pre-director) must still load — pydantic defaults fill the tracking fields."""
     manager = StateManager(scenario="smuggler-cove", state_dir=str(tmp_path))

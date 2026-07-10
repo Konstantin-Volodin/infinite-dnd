@@ -95,6 +95,24 @@ def test_faction_clock_round_trips_with_world_state():
     assert loaded.factions["wolves"].clocks[0].progress == 0
 
 
+def test_faction_clock_quest_link_is_optional_and_must_resolve():
+    quest = Quest(id="defend", title="Defend the Village", description="")
+    clock = ProgressClock(
+        id="raid",
+        name="Prepare raid",
+        consequence="The village is attacked.",
+        segments=4,
+        fail_quest_id="defend",
+    )
+    faction = Faction(id="wolves", name="The Wolves", goal="Take the valley", clocks=[clock])
+
+    world = WorldState(quests={quest.id: quest}, factions={faction.id: faction})
+    assert world.factions["wolves"].clocks[0].fail_quest_id == "defend"
+
+    with pytest.raises(ValidationError, match="links unknown quest 'defend'"):
+        WorldState(factions={faction.id: faction})
+
+
 def test_world_state_without_factions_is_backward_compatible():
     data = WorldState().model_dump()
     del data["factions"]

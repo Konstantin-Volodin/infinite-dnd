@@ -1,4 +1,4 @@
-from src.engine.state.models import Faction, ProgressClock, WorldState
+from src.engine.state.models import Character, Faction, ProgressClock, Quest, WorldState
 from src.engine.state.operations import WorldOperations
 
 
@@ -84,4 +84,71 @@ def test_missing_clock_does_not_mutate_state():
 
     assert "not found" in result
     assert state.factions["guild"].clocks[0].progress == 0
+    assert state.history == []
+
+
+def test_completed_deadline_fails_linked_active_quest_once_and_warns_everyone():
+    state = _state(progress=2, segments=3)
+    state.time = 7
+    state.characters = {
+        "hero": Character(id="hero"),
+        "witness": Character(id="witness"),
+    }
+    state.quests["save-village"] = Quest(
+        id="save-village",
+        title="Save the Village",
+        description="Stop the raid before dawn.",
+    )
+    state.factions["guild"].clocks[0].fail_quest_id = "save-village"
+
+    result = WorldOperations(state).advance_faction_clock("guild", "seize-docks")
+
+    assert state.quests["save-village"].status == "failed"
+    assert state.last_quest_advance_time == 7
+    assert "Quest 'save-village' failed" in result
+    assert len(state.history) == 1
+    assert state.history[0].text == (
+        "The Ash Guild completes 'Seize the docks'. The guild closes the harbor gates. "
+        "Quest 'Save the Village' failed."
+    )
+    assert state.history[0].characters == ["hero", "witness"]
+
+    WorldOperations(state).advance_faction_clock("guild", "seize-docks")
+    assert len(state.history) == 1
+
+
+def test_hourly_deadline_triggers_at_exact_boundary():
+    state = _state(segments=6)
+    state.quests["save-village"] = Quest(
+        id="save-village",
+        title="Save the Village",
+        description="Stop the raid before dawn.",
+    )
+    state.factions["guild"].clocks[0].fail_quest_id = "save-village"
+    operations = WorldOperations(state)
+
+    operations.advance_faction_clocks_hourly(0, 359)
+    assert state.quests["save-village"].status == "active"
+    assert state.factions["guild"].clocks[0].progress == 5
+
+    operations.advance_faction_clocks_hourly(359, 360)
+    assert state.quests["save-village"].status == "failed"
+    assert state.factions["guild"].clocks[0].consequence_triggered is True
+    assert len(state.history) == 1
+
+
+def test_resolved_quest_stops_linked_deadline_without_overwriting_status():
+    state = _state(progress=2, segments=3)
+    state.quests["save-village"] = Quest(
+        id="save-village",
+        title="Save the Village",
+        description="",
+        status="completed",
+    )
+    clock = state.factions["guild"].clocks[0]
+    clock.fail_quest_id = "save-village"
+
+    assert WorldOperations(state).advance_faction_clocks() == []
+    assert state.quests["save-village"].status == "completed"
+    assert clock.progress == 2
     assert state.history == []

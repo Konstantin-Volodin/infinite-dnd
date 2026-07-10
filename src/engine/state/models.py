@@ -77,6 +77,7 @@ class ProgressClock(BaseModel):
     progress: int = Field(default=0, ge=0)
     segments: int = Field(ge=1)
     consequence_triggered: bool = False
+    fail_quest_id: str | None = None
 
     @model_validator(mode="after")
     def progress_does_not_exceed_segments(self) -> "ProgressClock":
@@ -114,3 +115,14 @@ class WorldState(BaseModel):
     factions: Dict[str, Faction] = Field(default_factory=dict)
     history: List[HistoryEvent] = Field(default_factory=list)
     chronicle: List[str] = Field(default_factory=list)  # compact era summaries of history archived by compaction
+
+    @model_validator(mode="after")
+    def faction_clock_quest_links_exist(self) -> "WorldState":
+        for faction in self.factions.values():
+            for clock in faction.clocks:
+                if clock.fail_quest_id and clock.fail_quest_id not in self.quests:
+                    raise ValueError(
+                        f"faction clock '{faction.id}/{clock.id}' links unknown quest "
+                        f"'{clock.fail_quest_id}'"
+                    )
+        return self
