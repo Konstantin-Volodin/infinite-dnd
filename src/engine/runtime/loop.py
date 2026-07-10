@@ -76,6 +76,91 @@ def _describe_tool(tool: CharacterTool) -> str:
 
 # ─── Stall detection ──────────────────────────────────────────
 
+def _minimum_action_minutes(tool: CharacterTool) -> int:
+    """Keep direct actions consequential when the DM underestimates their duration."""
+    if isinstance(tool, Travel):
+        return 10
+    if isinstance(tool, Wait):
+        return 5
+    if isinstance(tool, Action) and any(
+        verb in tool.description.lower() for verb in ("search", "examine", "inspect", "investigate")
+    ):
+        return 5
+    return 1
+
+
+def _advance_grounded_objective(
+    state: WorldState,
+    actor_id: str,
+    tool: CharacterTool,
+    events: list[HistoryEvent],
+    steps_before: dict[str, int],
+) -> list[str]:
+    """Advance an unchanged search objective when this turn produced concrete discovery evidence."""
+    if not isinstance(tool, (Action, Check)):
+        return []
+    actor = state.characters.get(actor_id)
+    if not actor:
+        return []
+    evidence_markers = (" learns:", " finds ", " found ", " discovers ", " reveals ", " picks up ")
+    has_evidence = any(
+        actor_id in event.characters
+        and not any(negative in event.text.lower() for negative in ("nothing", "no new", "cannot", "fails"))
+        and any(marker in f" {event.text.lower()} " for marker in evidence_markers)
+        for event in events
+    )
+    if not has_evidence:
+        return []
+
+    location_name = actor.location.replace("-", " ").lower()
+    results: list[str] = []
+    for quest in state.quests.values():
+        if quest.owner != actor_id or quest.status.lower() in {"completed", "failed"}:
+            continue
+        if quest.current_step != steps_before.get(quest.id) or quest.current_step >= len(quest.plan):
+            continue
+        objective = quest.plan[quest.current_step].replace("-", " ").lower()
+        search_objective = any(verb in objective for verb in ("search", "investigate", "examine", "find clues"))
+        if search_objective and location_name in objective:
+            results.append(WorldOperations(state).advance_quest(quest.id, advance=True))
+    return results
+
+
+def _record_resolution_if_needed(
+    state: WorldState,
+    actor_id: str,
+    history_size: int,
+    resolution: str,
+) -> list[HistoryEvent]:
+    """Keep a resolved turn visible when it produced no state-operation event."""
+    if len(state.history) == history_size and resolution.strip():
+        actor = state.characters.get(actor_id)
+        state.history.append(HistoryEvent(
+            text=resolution.strip(),
+            location=actor.location if actor else "",
+            characters=[actor_id],
+        ))
+    return state.history[history_size:]
+
+
+def _campaign_outcome(state: WorldState, pc_id: str) -> str | None:
+    """Return a terminal outcome once every quest owned by the PC is resolved."""
+    quests = [quest for quest in state.quests.values() if quest.owner == pc_id]
+    if not quests or any(quest.status.lower() not in {"completed", "failed"} for quest in quests):
+        return None
+    return "failed" if any(quest.status.lower() == "failed" for quest in quests) else "completed"
+
+
+def _announce_campaign_outcome(state: WorldState, pc_id: str, logger: Logger, outcome: str) -> None:
+    quests = [quest.id for quest in state.quests.values() if quest.owner == pc_id]
+    if outcome == "completed":
+        print(f"\n=== {pc_id}'s quests are complete. The campaign ends in victory. ===")
+        logger.log_event("campaign_completed", pc=pc_id, quests=quests)
+    else:
+        print(f"\n=== {pc_id}'s quests have failed. The campaign ends in defeat. ===")
+        logger.log_event("campaign_failed", pc=pc_id, quests=quests)
+
+
 def _is_idle_event(text: str) -> bool:
     """Speak/wait-style event — mirrors the dialogue heuristic in character/context.py."""
     lowered = text.lower()
@@ -214,6 +299,7 @@ async def tick(
     replay: ReplayTape | None = None,
 ) -> None:
     actor_id = _pick_next_actor(state, active_pc_id, tick_index)
+    quest_steps_before = {quest.id: quest.current_step for quest in state.quests.values()}
 
     controller = pc_controller if actor_id == active_pc_id else None
     intent = await flow_agent_turn(actor_id, state, logger, controller, replay)
@@ -224,15 +310,17 @@ async def tick(
     # 1. Resolve the turn.
     pre = len(state.history)
     if replay and replay.is_playback and isinstance(intent, (Action, Check)):
-        replay.action_resolution(actor_id, state)
+        resolution = replay.action_resolution(actor_id, state)
     else:
         resolution = await resolve(intent, state, logger=logger)
         if replay and isinstance(intent, (Action, Check)):
             replay.action_resolution(actor_id, state, resolution)
-    new_events = state.history[pre:]
+    new_events = _record_resolution_if_needed(state, actor_id, pre, resolution)
 
     # 2. One DM call: time estimates, new entities, and quest progress.
     dm = await flow_dm(state, new_events, logger, replay)
+    if new_events and dm.minutes:
+        dm.minutes[0] = max(dm.minutes[0], _minimum_action_minutes(intent))
 
     # 2a. Stamp elapsed time onto the resulting events and advance the clock.
     for event, mins in zip(new_events, dm.minutes):
@@ -255,6 +343,8 @@ async def tick(
     for update in dm.modifies:
         msg = await resolve(update, state, logger=logger)
         print(f"  [quest] {update.target_id}: {msg}")
+    for msg in _advance_grounded_objective(state, actor_id, intent, new_events, quest_steps_before):
+        print(f"  [quest] grounded fallback: {msg}")
     for event in state.history[pre_quest:]:
         print(f"  {event.text}")
 
@@ -334,6 +424,9 @@ async def _run_game(
             progress_callback(state)
         logger.log_event("world_snapshot", **_snapshot(state))
         for t in range(max_turns):
+            if outcome := _campaign_outcome(state, pc_id):
+                _announce_campaign_outcome(state, pc_id, logger, outcome)
+                break
             if stop_check and stop_check():
                 logger.log_event("run_stopped")
                 break
@@ -353,6 +446,9 @@ async def _run_game(
             manager.save_state(state)
             if progress_callback:
                 progress_callback(state)
+            if outcome := _campaign_outcome(state, pc_id):
+                _announce_campaign_outcome(state, pc_id, logger, outcome)
+                break
     finally:
         logger.close()
     if replay:

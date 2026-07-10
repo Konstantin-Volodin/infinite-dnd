@@ -4,7 +4,7 @@ from typing import Any, Iterator
 
 import pytest
 
-from src.agents.character.tools import Action, Check, Speak, Wait
+from src.agents.character.tools import Action, Check, Speak, Travel, Wait
 from src.agents.dm.agent import DMResult
 from src.agents.dm.director import DirectorResult
 from src.agents.dm.tools import Create, Modify
@@ -106,9 +106,9 @@ def test_tick_playback_never_calls_character_or_dm_agents(tmp_path, monkeypatch)
     asyncio.run(tick("hero", state, 0, _Logger(), replay=ReplayTape.playback(path)))
 
     assert state.history == [
-        HistoryEvent(text="hero waits.", location="tavern", characters=["hero"], minutes_elapsed=4)
+        HistoryEvent(text="hero waits.", location="tavern", characters=["hero"], minutes_elapsed=5)
     ]
-    assert state.minutes_elapsed == 4
+    assert state.minutes_elapsed == 5
 
 
 def test_flow_playback_never_calls_director_agent(tmp_path, monkeypatch):
@@ -150,7 +150,7 @@ def test_action_playback_restores_effects_without_resolver_agent(tmp_path, monke
 
     assert state.characters["hero"].knowledge == ["The loose brick hides a key."]
     assert state.history[-1].text == "hero finds a key behind the loose brick."
-    assert state.history[-1].minutes_elapsed == 2
+    assert state.history[-1].minutes_elapsed == 5
     playback.assert_consumed()
 
 
@@ -183,4 +183,22 @@ def test_check_round_trips_and_playback_restores_recorded_roll(tmp_path):
     asyncio.run(tick("hero", state, 0, _Logger(), replay=playback))
     assert state.history[-1].text == recorded_state.history[-1].text
     assert state.history[-1].minutes_elapsed == 1
+    playback.assert_consumed()
+
+
+def test_travel_time_floor_applies_when_recorded_dm_underestimates(tmp_path):
+    path = tmp_path / "travel.jsonl"
+    recording = ReplayTape.recording(path)
+    recording.character("hero", Travel(actor="hero", destination="road"))
+    recording.dm(DMResult(creates=[], modifies=[], minutes=[0]))
+
+    state = _state()
+    state.locations["tavern"].connections.append("road")
+    state.locations["road"] = Location(id="road", connections=["tavern"])
+    playback = ReplayTape.playback(path)
+
+    asyncio.run(tick("hero", state, 0, _Logger(), replay=playback))
+
+    assert state.history[-1].minutes_elapsed == 10
+    assert state.minutes_elapsed == 10
     playback.assert_consumed()
