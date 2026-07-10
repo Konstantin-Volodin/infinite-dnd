@@ -11,6 +11,40 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+# llama-server /metrics counters that split a request into its two phases:
+# prompt processing (prefill) and token generation (decode).
+_METRIC_KEYS = {
+    "llamacpp:prompt_tokens_total": "prompt_tokens",
+    "llamacpp:prompt_seconds_total": "prompt_seconds",
+    "llamacpp:tokens_predicted_total": "predicted_tokens",
+    "llamacpp:tokens_predicted_seconds_total": "predicted_seconds",
+}
+
+
+def _metrics_url() -> str:
+    base_url = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
+    port = urllib.parse.urlparse(base_url).port or 1234
+    return f"http://localhost:{port}/metrics"
+
+
+def read_metrics() -> dict[str, float] | None:
+    """Snapshot llama-server's cumulative prefill/decode counters, or None when unreachable."""
+    try:
+        with urllib.request.urlopen(_metrics_url(), timeout=2) as response:
+            text = response.read().decode("utf-8", errors="replace")
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError):
+        return None
+    values: dict[str, float] = {}
+    for line in text.splitlines():
+        name, _, value = line.rpartition(" ")
+        if name in _METRIC_KEYS:
+            try:
+                values[_METRIC_KEYS[name]] = float(value)
+            except ValueError:
+                continue
+    return values or None
+
+
 def _reasoning_args(model: str) -> list[str]:
     """Build llama.cpp reasoning flags, including its Gemma 4 tool-call workaround."""
     reasoning = os.getenv("LLM_REASONING", "auto")

@@ -17,10 +17,14 @@ def _score(session: dict) -> dict:
     final = snapshots[-1] if snapshots else {}
 
     tokens = {"input_tokens": 0, "output_tokens": 0}
+    timings = {"prefill_tokens": 0, "prefill_s": 0.0, "decode_tokens": 0, "decode_s": 0.0}
     for run in session["runs"]:
         for key in tokens:
             tokens[key] += run.get("tokens", {}).get(key, 0)
+        for key in timings:
+            timings[key] += (run.get("timings") or {}).get(key, 0)
     durations = [run["elapsed_s"] for run in session["runs"] if run.get("elapsed_s") is not None]
+    total_run_s = sum(durations)
 
     return {
         "file": session["file"],
@@ -40,6 +44,11 @@ def _score(session: dict) -> dict:
         "avg_run_s": (sum(durations) / len(durations)) if durations else None,
         "input_tokens": tokens["input_tokens"],
         "output_tokens": tokens["output_tokens"],
+        "output_tokens_per_s": (tokens["output_tokens"] / total_run_s) if total_run_s else None,
+        "prefill_tps": round(timings["prefill_tokens"] / timings["prefill_s"], 1) if timings["prefill_s"] else None,
+        "decode_tps": round(timings["decode_tokens"] / timings["decode_s"], 1) if timings["decode_s"] else None,
+        "prefill_s": round(timings["prefill_s"], 1),
+        "decode_s": round(timings["decode_s"], 1),
     }
 
 
@@ -51,13 +60,21 @@ def _print_report(score: dict) -> None:
     print(f"  world growth: +{score['locations_discovered']} locations, +{score['characters_added']} characters")
     print(f"  xp awarded: {score['xp_awarded']}   in-game minutes: {score['minutes_elapsed']}")
     print(f"  agent runs: {score['agent_runs']}   avg latency: {score['avg_run_s']}")
-    print(f"  tokens: {score['input_tokens']} in / {score['output_tokens']} out")
+    throughput = score["output_tokens_per_s"]
+    speed = f"   ~{throughput:.2f} output tok/s end-to-end" if throughput is not None else ""
+    print(f"  tokens: {score['input_tokens']} in / {score['output_tokens']} out{speed}")
+    if score["prefill_tps"] is not None or score["decode_tps"] is not None:
+        print(
+            f"  server: prefill {score['prefill_tps']} tok/s over {score['prefill_s']}s"
+            f"   decode {score['decode_tps']} tok/s over {score['decode_s']}s"
+        )
 
 
 def _print_comparison(scores: list[dict]) -> None:
     fields = [
         "turns_completed", "failure_rate", "quests_completed", "xp_awarded",
-        "locations_discovered", "avg_run_s", "input_tokens", "output_tokens",
+        "locations_discovered", "avg_run_s", "output_tokens_per_s", "prefill_tps", "decode_tps",
+        "input_tokens", "output_tokens",
     ]
     print(f"\n=== Comparison ({len(scores)} runs) ===")
     print("  {:<22}".format("metric") + "".join(f"{s['file'][:20]:>22}" for s in scores))

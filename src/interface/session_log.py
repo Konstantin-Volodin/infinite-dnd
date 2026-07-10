@@ -9,7 +9,7 @@ from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
@@ -22,6 +22,28 @@ DEFAULT_LOG_DIR = Path("logs")
 # Writer
 # ============================================================
 
+def _phase_timings(before: dict[str, float] | None, after: dict[str, float] | None) -> dict[str, Any]:
+    """Split a run's server-side work into prefill vs decode from cumulative counter deltas."""
+    if not before or not after:
+        return {}
+
+    def delta(key: str) -> float:
+        return after.get(key, 0.0) - before.get(key, 0.0)
+
+    prefill_tokens, prefill_s = delta("prompt_tokens"), delta("prompt_seconds")
+    decode_tokens, decode_s = delta("predicted_tokens"), delta("predicted_seconds")
+    if prefill_tokens <= 0 and decode_tokens <= 0:
+        return {}
+    return {
+        "prefill_tokens": int(prefill_tokens),
+        "prefill_s": round(prefill_s, 3),
+        "prefill_tps": round(prefill_tokens / prefill_s, 1) if prefill_s > 0 else None,
+        "decode_tokens": int(decode_tokens),
+        "decode_s": round(decode_s, 3),
+        "decode_tps": round(decode_tokens / decode_s, 1) if decode_s > 0 else None,
+    }
+
+
 class Logger:
     def __init__(
         self,
@@ -33,11 +55,17 @@ class Logger:
         log_dir: Path = DEFAULT_LOG_DIR,
         session_id: str | None = None,
         append: bool = False,
+        metrics_reader: Callable[[], dict[str, float] | None] | None = None,
     ):
+        # Optional snapshot of the LLM server's cumulative prefill/decode counters
+        # (see src.agents.server.read_metrics); deltas around a run split its wall
+        # time into prompt processing vs generation.
+        self._metrics_reader = metrics_reader
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(exist_ok=True)
         self.session_id = session_id or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.turn = 0
+        self._active_runs: dict[str, list[dict[str, int]]] = {}
         mode = "a" if append else "w"
         self._file = (self.log_dir / f"{self.session_id}.log").open(mode, encoding="utf-8")
         self._log(
@@ -59,12 +87,29 @@ class Logger:
     @contextmanager
     def run(self, label: str) -> Iterator[None]:
         start = time.perf_counter()
+        stats = {"input_tokens": 0, "output_tokens": 0}
+        self._active_runs.setdefault(label, []).append(stats)
+        metrics_before = self._metrics_reader() if self._metrics_reader else None
         self._log("agent_run_started", label=label, turn=self.turn or None)
         try:
             yield
         finally:
             elapsed = round(time.perf_counter() - start, 3)
-            self._log("agent_run_finished", label=label, turn=self.turn or None, elapsed_s=elapsed)
+            self._active_runs[label].pop()
+            if not self._active_runs[label]:
+                del self._active_runs[label]
+            output_tps = round(stats["output_tokens"] / elapsed, 2) if elapsed and stats["output_tokens"] else None
+            metrics_after = self._metrics_reader() if metrics_before is not None else None
+            self._log(
+                "agent_run_finished",
+                label=label,
+                turn=self.turn or None,
+                elapsed_s=elapsed,
+                input_tokens=stats["input_tokens"],
+                output_tokens=stats["output_tokens"],
+                output_tokens_per_s=output_tps,
+                **_phase_timings(metrics_before, metrics_after),
+            )
 
     def log_messages(self, label: str, messages: list[Any]) -> None:
         try:
@@ -72,6 +117,13 @@ class Logger:
         except Exception:
             dumped = [str(msg) for msg in messages]
         for msg in dumped:
+            if isinstance(msg, dict) and label in self._active_runs and self._active_runs[label]:
+                usage = msg.get("usage") or {}
+                stats = self._active_runs[label][-1]
+                for key in stats:
+                    value = usage.get(key)
+                    if isinstance(value, int):
+                        stats[key] += value
             self._log("llm_message", label=label, turn=self.turn or None, message=msg)
 
     def log_event(self, event: str, **kwargs: Any) -> None:
@@ -290,6 +342,9 @@ def _normalize_entry(entry: dict[str, Any], line_number: int) -> dict[str, Any]:
     }
 
 
+_TIMING_KEYS = ("prefill_tokens", "prefill_s", "prefill_tps", "decode_tokens", "decode_s", "decode_tps")
+
+
 def _build_runs(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
     open_runs: dict[str, list[dict[str, Any]]] = {}
@@ -309,6 +364,8 @@ def _build_runs(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "tool_calls": [],
                 "message_kinds": [],
                 "tokens": {},
+                "output_tokens_per_s": None,
+                "timings": None,
             }
             runs.append(run)
             open_runs.setdefault(label, []).append(run)
@@ -331,6 +388,9 @@ def _build_runs(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
             run = open_runs[label].pop()
             run["finished_at"] = entry.get("time")
             run["elapsed_s"] = entry["raw"].get("elapsed_s")
+            run["output_tokens_per_s"] = entry["raw"].get("output_tokens_per_s")
+            timings = {key: entry["raw"][key] for key in _TIMING_KEYS if entry["raw"].get(key) is not None}
+            run["timings"] = timings or None
 
     return runs
 
@@ -349,7 +409,13 @@ def _summarize_entry(entry: dict[str, Any], digest: dict[str, Any] | None) -> st
         elapsed = entry.get("elapsed_s")
         if elapsed is None:
             return f"{entry.get('label', 'agent')} finished."
-        return f"{entry.get('label', 'agent')} finished in {elapsed}s."
+        prefill_tps, decode_tps = entry.get("prefill_tps"), entry.get("decode_tps")
+        if prefill_tps is not None or decode_tps is not None:
+            suffix = f" · prefill {prefill_tps} tok/s · decode {decode_tps} tok/s"
+        else:
+            throughput = entry.get("output_tokens_per_s")
+            suffix = f" · ~{throughput} output tok/s" if throughput is not None else ""
+        return f"{entry.get('label', 'agent')} finished in {elapsed}s{suffix}."
     if event == "llm_message" and digest:
         prefix = (digest["kind"] or "llm").replace("_", " ")
         if digest["tool_calls"]:

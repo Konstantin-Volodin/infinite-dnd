@@ -1,6 +1,7 @@
 """Game loop. Each tick: one actor takes a turn → resolve → stamp elapsed time → enrich world → review quests."""
 
 import asyncio
+import os
 import sys
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -16,6 +17,7 @@ from src.agents.character.tools import Action, Attack, CharacterTool, Check, Spe
 from src.agents.dm.agent import DMDeps, DMResult, agent as dm_agent
 from src.agents.dm.director import DirectorDeps, agent as director_agent
 from src.agents.action_resolver.agent import resolve
+from src.agents.server import read_metrics
 from src.interface.session_log import Logger
 from .chronicle import compact_history
 from .replay import ReplayTape
@@ -417,6 +419,8 @@ async def _run_game(
         scenario_title=manager.manifest.get("title", manager.scenario),
         session_id=session_id,
         append=resume,
+        # Prefill/decode split only exists for the local llama-server.
+        metrics_reader=read_metrics if os.getenv("LLM_PROVIDER", "local") == "local" else None,
     )
     try:
         manager.save_state(state)
