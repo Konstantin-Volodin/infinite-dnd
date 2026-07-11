@@ -76,8 +76,11 @@ class Logger:
             scenario_title=scenario_title,
         )
 
-    def close(self) -> None:
-        self._log("game_session_finished", turns_completed=self.turn)
+    def close(self, *, turns_completed: int | None = None) -> None:
+        self._log(
+            "game_session_finished",
+            turns_completed=self.turn if turns_completed is None else turns_completed,
+        )
         self._file.close()
 
     def log_turn(self, turn: int) -> None:

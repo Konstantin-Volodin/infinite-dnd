@@ -123,6 +123,16 @@ def test_logger_uses_explicit_session_id(tmp_path):
     assert (tmp_path / "explicit-id.log").exists()
 
 
+def test_logger_can_record_only_completed_turns_after_a_failed_turn(tmp_path):
+    logger = Logger(character_id="hero", max_turns=3, log_dir=tmp_path)
+    logger.log_turn(1)
+    logger.close(turns_completed=0)
+
+    session = load_session(list_logs(tmp_path)[0]["path"])
+
+    assert session["summary"]["turns_completed"] == 0
+
+
 def test_logger_append_preserves_existing_session(tmp_path):
     path = tmp_path / "resumed.log"
     path.write_text('{"event": "earlier"}\n', encoding="utf-8")

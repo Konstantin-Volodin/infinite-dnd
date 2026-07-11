@@ -18,11 +18,17 @@ def _score(session: dict) -> dict:
 
     tokens = {"input_tokens": 0, "output_tokens": 0}
     timings = {"prefill_tokens": 0, "prefill_s": 0.0, "decode_tokens": 0, "decode_s": 0.0}
+    timed_runs = cache_reused_runs = 0
     for run in session["runs"]:
         for key in tokens:
             tokens[key] += run.get("tokens", {}).get(key, 0)
         for key in timings:
             timings[key] += (run.get("timings") or {}).get(key, 0)
+        if run.get("timings"):
+            timed_runs += 1
+            # Prefilling fewer tokens than the prompt held means the KV cache served the rest.
+            if run["timings"].get("prefill_tokens", 0) < run.get("tokens", {}).get("input_tokens", 0):
+                cache_reused_runs += 1
     durations = [run["elapsed_s"] for run in session["runs"] if run.get("elapsed_s") is not None]
     total_run_s = sum(durations)
 
@@ -49,6 +55,9 @@ def _score(session: dict) -> dict:
         "decode_tps": round(timings["decode_tokens"] / timings["decode_s"], 1) if timings["decode_s"] else None,
         "prefill_s": round(timings["prefill_s"], 1),
         "decode_s": round(timings["decode_s"], 1),
+        "server_busy_s": round(timings["prefill_s"] + timings["decode_s"], 1),
+        "timed_runs": timed_runs,
+        "cache_reused_runs": cache_reused_runs,
     }
 
 
@@ -67,14 +76,16 @@ def _print_report(score: dict) -> None:
         print(
             f"  server: prefill {score['prefill_tps']} tok/s over {score['prefill_s']}s"
             f"   decode {score['decode_tps']} tok/s over {score['decode_s']}s"
+            f"   busy {score['server_busy_s']}s"
         )
+        print(f"  kv-cache reuse: {score['cache_reused_runs']}/{score['timed_runs']} runs")
 
 
 def _print_comparison(scores: list[dict]) -> None:
     fields = [
         "turns_completed", "failure_rate", "quests_completed", "xp_awarded",
         "locations_discovered", "avg_run_s", "output_tokens_per_s", "prefill_tps", "decode_tps",
-        "input_tokens", "output_tokens",
+        "server_busy_s", "cache_reused_runs", "input_tokens", "output_tokens",
     ]
     print(f"\n=== Comparison ({len(scores)} runs) ===")
     print("  {:<22}".format("metric") + "".join(f"{s['file'][:20]:>22}" for s in scores))
