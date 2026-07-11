@@ -51,15 +51,6 @@
       playSuggestions: document.getElementById("play-suggestions"),
     };
 
-    function escapeHtml(value) {
-      return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-    }
-
     function renderPlayAlert(text) {
       return String(text ?? "")
         .split(/\r?\n/)
@@ -82,12 +73,6 @@
       const hh = String(Math.floor(rest / 60)).padStart(2, "0");
       const mm = String(rest % 60).padStart(2, "0");
       return `day ${day} · ${hh}:${mm}`;
-    }
-
-    async function fetchJson(path) {
-      const response = await fetch(path, { cache: "no-store" });
-      if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-      return response.json();
     }
 
     async function postJson(path, payload) {

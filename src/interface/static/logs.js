@@ -40,15 +40,6 @@
       sessionSub: document.getElementById("session-sub"),
     };
 
-    function escapeHtml(value) {
-      return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-    }
-
     function formatDateTime(value) {
       if (!value) return "unknown";
       const date = new Date(value);
@@ -58,12 +49,6 @@
     function formatDuration(value) {
       if (value === null || value === undefined) return "--";
       return `${Number(value).toFixed(1)}s`;
-    }
-
-    async function fetchJson(path) {
-      const response = await fetch(path, { cache: "no-store" });
-      if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-      return response.json();
     }
 
     async function loadFiles() {
