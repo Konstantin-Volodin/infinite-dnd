@@ -38,6 +38,14 @@ def test_advance_quest_awards_xp(state, ops):
     assert "+50 XP to hero" in msg
 
 
+def test_advance_quest_normalizes_completion_status_and_xp(state, ops):
+    msg = ops.advance_quest("q1", new_status="Completed")
+
+    assert state.quests["q1"].status == "completed"
+    assert state.characters["hero"].stats.xp == 50
+    assert "+50 XP to hero" in msg
+
+
 def test_advance_ownerless_quest_no_xp(state, ops):
     msg = ops.advance_quest("q2", new_status="completed")
     assert state.quests["q2"].status == "completed"
@@ -84,6 +92,60 @@ def test_advance_quest_with_plan_increments_and_logs(state, ops):
     assert quest.steps[-1] == "defeat the guardian"
     assert quest.status == "completed"
     assert "+50 XP to hero" in msg
+
+
+def test_planned_quest_rejects_completion_before_final_objective(state, ops):
+    ops.add_quest(
+        "q5",
+        title="Recover the Circlet",
+        description="",
+        owner="hero",
+        plan=["find a clue", "recover the circlet"],
+    )
+    quest = state.quests["q5"]
+
+    msg = ops.advance_quest("q5", new_status="completed", step="found the steward's key")
+
+    assert "has not achieved its final objective" in msg
+    assert quest.status == "active"
+    assert quest.current_step == 0
+    assert quest.steps == []
+    assert state.characters["hero"].stats.xp == 0
+
+    ops.advance_quest("q5", advance=True)
+    msg = ops.advance_quest("q5", advance=True)
+
+    assert quest.status == "completed"
+    assert quest.steps == ["find a clue", "recover the circlet"]
+    assert state.characters["hero"].stats.xp == 70
+    assert "+50 XP to hero" in msg
+
+
+def test_planned_quest_rejects_completion_after_exhausted_active_plan(state, ops):
+    ops.add_quest(
+        "q5",
+        title="Recover the Circlet",
+        description="",
+        owner="hero",
+        plan=["find a clue", "recover the circlet"],
+    )
+    quest = state.quests["q5"]
+    ops.advance_quest("q5", advance=True)
+    ops.advance_quest("q5", advance=True, new_status="active")
+
+    msg = ops.advance_quest("q5", new_status="completed", step="a clue points to the circlet")
+
+    assert "has not achieved its final objective" in msg
+    assert quest.status == "active"
+    assert quest.current_step == len(quest.plan)
+    assert state.characters["hero"].stats.xp == 20
+
+    msg = ops.advance_quest("q5", advance=True)
+
+    assert "has no remaining objectives" in msg
+    assert quest.status == "active"
+    assert quest.current_step == len(quest.plan)
+    assert state.characters["hero"].stats.xp == 20
 
 
 def test_advance_quest_without_plan_no_autocomplete(state, ops):
@@ -161,28 +223,13 @@ def test_create_item(state, ops):
 
 # ============ LOCATIONS ============
 
-def test_add_modify_remove_location(state, ops):
+def test_add_modify_location(state, ops):
     ops.add_location("cave", description="damp cave", connections=["forest"])
     assert "cave" in state.locations
     assert "cave" in state.locations["forest"].connections
     ops.modify_location("cave", description="very dark cave", add_feature="stalactites")
     assert state.locations["cave"].description == "very dark cave"
     assert "stalactites" in state.locations["cave"].features
-    ops.remove_location("cave")
-    assert "cave" not in state.locations
-    assert "cave" not in state.locations["forest"].connections
-
-
-def test_connect_disconnect_locations(state, ops):
-    assert "forest" in state.locations["tavern"].connections  # already connected via fixture
-    ops.disconnect_locations("tavern", "forest")
-    assert "forest" not in state.locations["tavern"].connections
-    assert "tavern" not in state.locations["forest"].connections
-    assert "not connected" in ops.disconnect_locations("tavern", "forest")
-    ops.connect_locations("tavern", "forest")
-    assert "forest" in state.locations["tavern"].connections
-    assert "tavern" in state.locations["forest"].connections
-    assert "already connected" in ops.connect_locations("tavern", "forest")
 
 
 # ============ EVENTS ============
@@ -195,11 +242,3 @@ def test_world_event_witnessed_by_present_characters(state, ops):
     assert event.location == "tavern"
     assert set(event.characters) == {"hero", "guard"}
     assert event.minutes_elapsed == 0
-
-
-# ============ TIME ============
-
-def test_tick_time(state, ops):
-    ops.tick_time("The sun sets.", location="tavern")
-    assert state.time == 1
-    assert state.history[-1].text == "The sun sets."

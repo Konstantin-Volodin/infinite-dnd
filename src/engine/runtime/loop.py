@@ -2,12 +2,13 @@
 
 import asyncio
 import os
+import re
 import sys
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from io import TextIOWrapper
 
-from pydantic_ai.exceptions import UsageLimitExceeded
+from pydantic_ai.exceptions import ModelAPIError, UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
 
 from src.engine.state import StateManager, WorldOperations, WorldState
@@ -33,6 +34,36 @@ _CREATE_ORDER = {"location": 0, "npc": 1, "item": 2, "quest": 3}
 # or the last few events are all talk/waiting.
 _STALL_QUIET_TICKS = 6
 _STALL_IDLE_EVENTS = 5
+
+_FINAL_OBJECTIVE_VERB_FORMS = {
+    "clear": {"clear", "clears", "cleared"},
+    "confront": {"confront", "confronts", "confronted"},
+    "defeat": {"defeat", "defeats", "defeated"},
+    "find": {"find", "finds", "found"},
+    "gather": {"gather", "gathers", "gathered"},
+    "recover": {"recover", "recovers", "recovered"},
+    "report": {"report", "reports", "reported"},
+    "track": {"track", "tracks", "tracked"},
+}
+_FINAL_OBJECTIVE_STOP_WORDS = {
+    "a", "an", "and", "at", "before", "by", "for", "from", "in", "of", "on", "or", "the", "to", "with",
+}
+_FINAL_OBJECTIVE_DISCOVERY_PATTERN = re.compile(
+    r"\b(?:clue|clues|lead|whereabouts|destination)\b"
+    r"|\blocation(?:\s+(?:of|for))?\b"
+    r"|\b(?:map|path|route|trail)\s+(?:about|for|of|to|toward|towards|leading|pointing)\b"
+    r"|\b[a-z]+['’]s\s+(?:map|path|route|trail)\b"
+    r"|\b[a-z]+['’]s\s+(?:house|home|hideout|camp|cabin|room|cave|cellar|quarters)\b"
+    r"|\b(?:house|home|hideout|camp|cabin|room|cave|cellar|quarters)\b[^.!?]{0,80}\b(?:of|where|containing|holding)\b"
+    r"|\b(?:hiding\s+place|hiding\s+spot)\b"
+    r"|\bwhere\b[^.!?]{0,80}\b(?:is|was|are|were)\s+(?:hiding|located|staying|living)\b"
+    r"|\b(?:where|place|spot|site)\b[^.!?]{0,80}\b(?:last\s+seen|last\s+known|was\s+seen|were\s+seen)\b"
+)
+_FINAL_OBJECTIVE_INDIRECT_FIND_PATTERN = re.compile(
+    r"\b(?:description|descriptions|evidence|information|portrait|portraits|proof|record|records|"
+    r"report|reports|poster|posters|rumor|rumors|rumour|rumours|sign|signs|testimony|trace|traces)\b"
+)
+_FINAL_OBJECTIVE_CONSTRAINT_PATTERN = re.compile(r"\b(?:after|at|before|by|during|until)\b")
 
 
 # ─── Scheduler ────────────────────────────────────────────────
@@ -91,6 +122,48 @@ def _minimum_action_minutes(tool: CharacterTool) -> int:
     return 1
 
 
+def _can_advance_final_objective(quest, tool: CharacterTool, events: list[HistoryEvent] | None = None) -> bool:
+    """Require owner-attributed evidence that the final planned objective happened."""
+    if not quest.plan or quest.current_step != len(quest.plan) - 1:
+        return True
+    if tool.actor != quest.owner or not isinstance(tool, (Action, Attack, Check, Speak)):
+        return False
+
+    objective_verb = quest.plan[quest.current_step].split(maxsplit=1)[0].casefold()
+    verb_forms = _FINAL_OBJECTIVE_VERB_FORMS.get(objective_verb, {objective_verb})
+    if objective_verb == "recover":
+        verb_forms |= {"pick", "picks", "picked", "take", "takes", "took", "receive", "receives", "received"}
+    objective_text = quest.plan[quest.current_step].casefold()
+    target_text = _FINAL_OBJECTIVE_CONSTRAINT_PATTERN.split(objective_text, maxsplit=1)[0]
+    objective_words = set(re.findall(r"[a-z]+", target_text))
+    objective_verbs = {verb for verb in _FINAL_OBJECTIVE_VERB_FORMS if verb in objective_words}
+    alternative_verbs = objective_verbs - {objective_verb} if re.search(r"\bor\b", target_text) else set()
+    target_words = objective_words - _FINAL_OBJECTIVE_STOP_WORDS - objective_verbs
+    alternative_forms = {
+        form for verb in alternative_verbs for form in _FINAL_OBJECTIVE_VERB_FORMS[verb]
+    }
+    resolution_forms = verb_forms | alternative_forms
+    resolution_pattern = re.compile(
+        rf"^{re.escape(quest.owner.casefold())}\s+(?:has\s+|have\s+)?(?:{'|'.join(resolution_forms)})\b"
+    )
+
+    for event in events or []:
+        text = event.text.casefold()
+        words = set(re.findall(r"[a-z]+", text))
+        if quest.owner not in event.characters or not resolution_pattern.match(text):
+            continue
+        if _FINAL_OBJECTIVE_DISCOVERY_PATTERN.search(text) or (
+            objective_verb in {"find", "recover"} and _FINAL_OBJECTIVE_INDIRECT_FIND_PATTERN.search(text)
+        ):
+            continue
+        if resolution_forms & words and target_words <= words and (
+            not alternative_verbs
+            or any(_FINAL_OBJECTIVE_VERB_FORMS[verb] & words for verb in alternative_verbs)
+        ):
+            return True
+    return False
+
+
 def _advance_grounded_objective(
     state: WorldState,
     actor_id: str,
@@ -124,6 +197,8 @@ def _advance_grounded_objective(
         objective = quest.plan[quest.current_step].replace("-", " ").lower()
         search_objective = any(verb in objective for verb in ("search", "investigate", "examine", "find clues"))
         if search_objective and location_name in objective:
+            if quest.current_step == len(quest.plan) - 1 and not _can_advance_final_objective(quest, tool, events):
+                continue
             results.append(WorldOperations(state).advance_quest(quest.id, advance=True))
     return results
 
@@ -343,6 +418,16 @@ async def tick(
     # 2c. Review quests. Step-level progress; may append XP events via advance_quest.
     pre_quest = len(state.history)
     for update in dm.modifies:
+        quest = state.quests.get(update.target_id)
+        is_final_status = update.status and update.status.casefold() == "completed"
+        if (
+            update.action == "update_quest"
+            and (update.advance or is_final_status)
+            and quest
+            and not _can_advance_final_objective(quest, intent, new_events)
+        ):
+            print(f"  [quest] {update.target_id}: final objective requires its owner's active resolution attempt.")
+            continue
         msg = await resolve(update, state, logger=logger)
         print(f"  [quest] {update.target_id}: {msg}")
     for msg in _advance_grounded_objective(state, actor_id, intent, new_events, quest_steps_before):
@@ -441,7 +526,12 @@ async def _run_game(
             print(f"\n--- Tick {state.time + 1} ---")
             logger.log_turn(t + 1)
             pre_minutes = state.minutes_elapsed
-            await tick(pc_id, state, state.time, logger, pc_controller, replay)
+            try:
+                await tick(pc_id, state, state.time, logger, pc_controller, replay)
+            except ModelAPIError as exc:
+                logger.log_event("run_error", error=type(exc).__name__, message=str(exc))
+                print(f"  [error] campaign stopped: {exc}", flush=True)
+                break
             # Off-screen agendas march with in-world time, not turn count.
             WorldOperations(state).advance_faction_clocks_hourly(pre_minutes, state.minutes_elapsed)
             await compact_history(state, logger, replay)  # between ticks only — never mid-tick
@@ -454,7 +544,7 @@ async def _run_game(
                 _announce_campaign_outcome(state, pc_id, logger, outcome)
                 break
     finally:
-        logger.close()
+        logger.close(turns_completed=state.time)
     if replay:
         replay.assert_consumed()
 

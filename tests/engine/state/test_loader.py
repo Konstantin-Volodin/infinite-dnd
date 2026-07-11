@@ -6,6 +6,7 @@ import pytest
 import src.engine.state.loader as loader_module
 from src.engine.state.loader import StateManager
 from src.engine.state.models import Character, Location, Quest, WorldState
+from src.engine.state.operations import WorldOperations
 from src.world import list_scenarios
 
 
@@ -142,6 +143,25 @@ def test_init_state_backcompat_quest_without_plan(tmp_path, monkeypatch):
     assert quest.plan == []
     assert quest.current_step == 0
     assert quest.steps == []
+
+
+def test_missing_brother_requires_finding_kaelen_after_following_clues(tmp_path):
+    state = StateManager(scenario="missing-brother", state_dir=str(tmp_path)).init_state()
+    quest = state.quests["find-brother"]
+    ops = WorldOperations(state)
+
+    assert quest.plan[-1] == "find Kaelen Swift"
+    for _ in quest.plan[:-1]:
+        ops.advance_quest(quest.id, advance=True)
+
+    assert quest.status == "active"
+    assert quest.current_step == len(quest.plan) - 1
+    assert state.characters[quest.owner].stats.xp == 40
+
+    ops.advance_quest(quest.id, advance=True)
+
+    assert quest.status == "completed"
+    assert state.characters[quest.owner].stats.xp == 100
 
 
 def test_init_state_loads_optional_factions(tmp_path):

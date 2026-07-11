@@ -22,6 +22,16 @@ class WorldOps(_OpsBase):
         if not quest: return f"Cannot advance quest — '{quest_id}' not found."
         if quest.status.lower() in _TERMINAL_QUEST_STATUSES:
             return f"Cannot advance quest — '{quest_id}' is already {quest.status.lower()}."
+        normalized_status = new_status.strip().casefold() if new_status is not None else None
+        if advance and quest.plan and quest.current_step >= len(quest.plan):
+            return f"Cannot advance quest — '{quest_id}' has no remaining objectives."
+
+        # A planned quest can only complete by advancing its final objective.
+        # DM status updates alone may reflect a lead or a discovered location,
+        # neither of which is evidence that the resolution objective was met.
+        completing_final_objective = advance and quest.current_step == len(quest.plan) - 1
+        if normalized_status == "completed" and quest.plan and not completing_final_objective:
+            return f"Cannot complete quest — '{quest_id}' has not achieved its final objective."
 
         # `advance` accomplishes the CURRENT plan objective: log it, move the pointer, maybe auto-complete.
         # `step` alone (no advance) is a plain log note — used alongside explicit new_status.
@@ -32,13 +42,13 @@ class WorldOps(_OpsBase):
             quest.steps.append(note)
             quest.current_step += 1
             awarded_step = True
-            if quest.plan and quest.current_step >= len(quest.plan) and not new_status:
-                new_status = "completed"
+            if quest.plan and quest.current_step >= len(quest.plan) and not normalized_status:
+                normalized_status = "completed"
         elif step:
             quest.steps.append(step)
 
-        if new_status: quest.status = new_status
-        if advance or new_status: self.state.last_quest_advance_time = self.state.time  # stall detection
+        if normalized_status: quest.status = normalized_status
+        if advance or normalized_status: self.state.last_quest_advance_time = self.state.time  # stall detection
 
         # XP award to owner — step/advance=10, completion=50. Silent if owner isn't a known character.
         award_suffix = ""
@@ -47,7 +57,7 @@ class WorldOps(_OpsBase):
             if awarded_step:
                 award_xp(quest.owner, 10, reason=f"quest '{quest_id}' progress")
                 award_suffix = f" (+10 XP to {quest.owner})"
-            if new_status == "completed":
+            if normalized_status == "completed":
                 award_xp(quest.owner, 50, reason=f"quest '{quest_id}' completed")
                 award_suffix = f" (+50 XP to {quest.owner})"
         return f"Quest '{quest_id}' updated.{award_suffix}"
