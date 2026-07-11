@@ -21,7 +21,7 @@ class _InputError(ValueError):
     """A malformed or unresolvable command — caller prints it and reprompts."""
 
 
-def _describe_situation(actor_id: str, state: WorldState) -> str:
+def _describe_situation(actor_id: str, state: WorldState, *, include_help: bool = True) -> str:
     char = state.characters[actor_id]
     loc = state.locations.get(char.location)
     lines = [f"\n=== Your turn: {actor_id} ==="]
@@ -71,7 +71,8 @@ def _describe_situation(actor_id: str, state: WorldState) -> str:
     if connections:
         lines.append("Connections: " + ", ".join(connections))
 
-    lines.append(f"\n{_HELP}")
+    if include_help:
+        lines.append(f"\n{_HELP}")
     return "\n".join(lines)
 
 

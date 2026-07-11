@@ -58,7 +58,7 @@ class PlayBroker:
                 "request_id": turn.id,
                 "actor_id": turn.actor_id,
                 "actor_name": turn.actor_id,
-                "situation": _describe_situation(turn.actor_id, turn.state).strip(),
+                "situation": _describe_situation(turn.actor_id, turn.state, include_help=False).strip(),
             }
 
     def submit(self, request_id: str, line: str) -> dict[str, Any]:

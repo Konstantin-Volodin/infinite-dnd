@@ -52,29 +52,39 @@ def test_dynamic_world_controls_support_keyboard_and_focus_restoration():
 def test_play_panel_connects_a_submitted_move_to_the_next_story_event():
     html = read_asset("templates/world.html")
     script = read_asset("static/world.js")
+    assert 'class="play-panel"' in html
+    assert 'class="play-panel collapsed"' not in html
+    assert 'id="play-toggle"' not in html
+    assert 'class="sr-only" id="play-title"' in html
+    assert 'class="play-alert" id="play-situation" role="status" aria-live="polite" hidden' in html
+    assert "Player controls are disabled" in html
+    css = read_asset("static/world.css")
+    assert "left:50%" in css and "transform:translateX(-50%)" in css and ".play-alert" in css and ".situation-row" in css
+    assert "min-height:48px" in css and "font-size:15px" in css
+    assert "prefers-reduced-motion" in css and "story-event-in" in css
     assert 'id="play-trail" aria-live="polite" hidden' in html
     assert 'id="play-last-action"' in html
     assert 'id="play-last-outcome"' in html
     assert "function describeAction(action, fallback)" in script
+    assert "function renderPlayAlert(text)" in script
     assert "history.length <= recent.historyLength" in script
     assert "recent.outcome = history.at(recent.historyLength)?.text" in script
     assert "label: describeAction(result.action, line)" in script
 
 
-def test_turn_compass_shows_progress_and_only_drafts_contextual_actions():
+def test_play_panel_surfaces_contextual_actions_in_the_action_row():
     html = read_asset("templates/world.html")
     script = read_asset("static/world.js")
-    assert 'id="turn-compass" aria-labelledby="turn-compass-title" hidden' in html
-    assert 'id="turn-compass-progress"' in html
     assert 'id="play-suggestions" role="group" aria-label="Suggested actions"' in html
+    assert '<div class="play-actions">' in html
+    assert 'id="play-submit" type="submit" disabled>Act</button>' in html
     assert "function contextualChoices(view, actorId)" in script
-    assert "quest.owner === actorId" in script
     assert "world.locations[destination]" in script
     assert "character.location === actor.location" in script
     assert 'dom.playInput.value = suggestion.dataset.action' in script
     assert 'dom.playSuggestions.addEventListener("click"' in script
     assert 'dom.playForm.dispatchEvent' not in script
-    assert "/wait (recover 1 HP if injured)" in html
+    assert "Player controls are disabled" in html
 
 
 def test_play_panel_and_log_story_surface_terminal_campaign_outcomes():

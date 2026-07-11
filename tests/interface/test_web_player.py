@@ -42,6 +42,8 @@ def test_broker_exposes_situation_and_parses_commands():
     assert waiting["status"] == "waiting"
     assert waiting["request_id"] == request_id
     assert "Your turn: hero" in waiting["situation"]
+    assert "Connections: road" in waiting["situation"]
+    assert "Type a plain sentence" not in waiting["situation"]
 
     submitted = broker.submit(request_id, "/travel road")
     assert submitted["action"] == Travel(actor="hero", destination="road").model_dump()

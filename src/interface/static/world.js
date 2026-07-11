@@ -44,15 +44,10 @@
       playInput: document.getElementById("play-input"),
       playSubmit: document.getElementById("play-submit"),
       playError: document.getElementById("play-error"),
-      playToggle: document.getElementById("play-toggle"),
       playTrail: document.getElementById("play-trail"),
       playLastAction: document.getElementById("play-last-action"),
       playLastOutcome: document.getElementById("play-last-outcome"),
       playOutcomeStep: document.getElementById("play-outcome-step"),
-      turnCompass: document.getElementById("turn-compass"),
-      turnCompassTitle: document.getElementById("turn-compass-title"),
-      turnCompassStep: document.getElementById("turn-compass-step"),
-      turnCompassProgress: document.getElementById("turn-compass-progress"),
       playSuggestions: document.getElementById("play-suggestions"),
     };
 
@@ -63,6 +58,22 @@
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+    }
+
+    function renderPlayAlert(text) {
+      return String(text ?? "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          if (line.startsWith("===") && line.endsWith("===")) {
+            return `<div class="situation-head">${escapeHtml(line.replaceAll("=", "").trim())}</div>`;
+          }
+          const separator = line.indexOf(": ");
+          if (separator < 0) return `<div class="situation-note">${escapeHtml(line)}</div>`;
+          return `<div class="situation-row"><span class="situation-label">${escapeHtml(line.slice(0, separator))}</span><span class="situation-value">${escapeHtml(line.slice(separator + 2))}</span></div>`;
+        })
+        .join("");
     }
 
     function formatClock(totalMinutes) {
@@ -154,28 +165,14 @@
       return quests.some((quest) => (quest.status || "").toLowerCase() === "failed") ? "failed" : "completed";
     }
 
-    function renderTurnCompass() {
+    function renderPlaySuggestions() {
       const view = state.view;
       const actorId = state.playerActor || view?.pc;
       const actor = view?.state.characters?.[actorId];
       const visible = state.playerWaiting && state.live && view?.tick === view?.latest_tick && Boolean(actor);
-      dom.turnCompass.hidden = !visible;
-      if (!visible) return;
-
-      const activeQuests = Object.values(view.state.quests || {})
-        .filter((quest) => quest.owner === actorId && !["completed", "failed"].includes((quest.status || "active").toLowerCase()))
-        .sort((a, b) => (a.title || a.id).localeCompare(b.title || b.id));
-      const quest = activeQuests[0];
-      dom.turnCompassTitle.textContent = quest?.title || "Personal goal";
-      const planLength = quest?.plan?.length || 0;
-      dom.turnCompassProgress.textContent = planLength
-        ? `· step ${Math.min((quest.current_step || 0) + 1, planLength)} of ${planLength}`
-        : "";
-      dom.turnCompassStep.textContent = quest
-        ? quest.plan?.[quest.current_step || 0] || quest.description || "Choose the next step."
-        : actor.goal || "Decide what matters next.";
-
-      dom.playSuggestions.innerHTML = contextualChoices(view, actorId).map((choice) => `
+      const choices = visible ? contextualChoices(view, actorId) : [];
+      dom.playSuggestions.hidden = !choices.length;
+      dom.playSuggestions.innerHTML = choices.map((choice) => `
         <button type="button" data-action="${escapeHtml(choice.action)}" aria-label="${escapeHtml(choice.ariaLabel)}">${escapeHtml(choice.label)}</button>
       `).join("");
     }
@@ -192,19 +189,29 @@
       dom.playPanel.dataset.requestId = waiting ? turn.request_id : "";
       if (waiting) {
         dom.playTitle.textContent = `${turn.actor_name}'s turn`;
-        dom.playSituation.textContent = turn.situation;
+        dom.playSituation.innerHTML = renderPlayAlert(turn.situation);
+        dom.playSituation.hidden = false;
+        dom.playHelp.textContent = "Plain action · /check ability DC action · /speak [target] message · /travel place · /attack target · /wait";
       } else if (turn.status === "submitted") {
         dom.playTitle.textContent = "Resolving action…";
+        dom.playSituation.innerHTML = renderPlayAlert("Resolving your action…");
+        dom.playSituation.hidden = false;
+        dom.playHelp.textContent = "Your action is being resolved by the world.";
       } else {
         const outcome = campaignOutcome(state.view);
         dom.playTitle.textContent = outcome === "completed" ? "Campaign complete" : outcome === "failed" ? "Campaign failed" : "Waiting for your turn";
-        dom.playSituation.textContent = outcome === "completed"
+        const message = outcome === "completed"
           ? "Every quest you owned is complete. Victory is yours."
           : outcome === "failed"
             ? "Your remaining quest threads have ended in failure. This campaign is over."
-            : "Start a game with --web to play here.";
+            : "";
+        dom.playSituation.innerHTML = renderPlayAlert(message);
+        dom.playSituation.hidden = !message;
+        dom.playHelp.textContent = outcome
+          ? "Player controls are disabled because this campaign is over."
+          : "Player controls are disabled. Start Infinite DnD with --web to enable them.";
       }
-      if (waitingChanged) renderTurnCompass();
+      if (waitingChanged) renderPlaySuggestions();
     }
 
     function runKey(scenario, runId) {
@@ -254,7 +261,7 @@
       renderCharacters();
       renderQuests();
       renderFeed();
-      renderTurnCompass();
+      renderPlaySuggestions();
     }
 
     function renderTopbar() {
@@ -492,6 +499,8 @@
       document.getElementById("char-detail").innerHTML = `<div class="dialog-head"><h2 id="char-detail-title">${escapeHtml(c.id)}</h2><button type="button" data-close="char-drawer" aria-label="Close character details">×</button></div><div class="detail-grid">
         <div class="detail-field"><span class="k">Role & location</span>${escapeHtml(c.role || "—")} · ${escapeHtml(c.location || "—")}</div>
         <div class="detail-field"><span class="k">Stats</span>${escapeHtml(stats.hp ?? 0)}/${escapeHtml(stats.max_hp ?? "?")} HP · level ${escapeHtml(stats.level ?? 1)} · ${escapeHtml(stats.xp ?? 0)} XP · ${escapeHtml(stats.gold ?? 0)} gold</div>
+        <div class="detail-field"><span class="k">Inventory</span>${c.inventory?.map(escapeHtml).join("<br>") || "—"}</div>
+        <div class="detail-field"><span class="k">Goal</span>${escapeHtml(c.goal || "—")}</div>
         <div class="detail-field"><span class="k">Backstory</span>${escapeHtml(c.backstory || "—")}</div><div class="detail-field"><span class="k">Personality</span>${escapeHtml(c.personality || "—")}</div>
         <div class="detail-field"><span class="k">Relationships</span>${Object.entries(c.relationships || {}).map(([k,v]) => `${escapeHtml(k)}: ${escapeHtml(v)}`).join("<br>") || "—"}</div>
         <div class="detail-field"><span class="k">Knowledge</span>${(c.knowledge || []).map(escapeHtml).join("<br>") || "—"}</div></div>
@@ -562,7 +571,7 @@
       state.live = on;
       dom.liveBtn.classList.toggle("on", on);
       dom.liveBtn.setAttribute("aria-pressed", String(on));
-      renderTurnCompass();
+      renderPlaySuggestions();
       if (state.timer) clearInterval(state.timer);
       state.timer = null;
       if (on) state.timer = setInterval(pollLive, POLL_MS);
@@ -687,13 +696,6 @@
       dom.playInput.focus();
       dom.playInput.setSelectionRange(dom.playInput.value.length, dom.playInput.value.length);
     });
-    dom.playToggle.addEventListener("click", () => {
-      const collapsed = dom.playPanel.classList.toggle("collapsed");
-      dom.playToggle.textContent = collapsed ? "+" : "−";
-      dom.playToggle.setAttribute("aria-expanded", String(!collapsed));
-      dom.playToggle.setAttribute("aria-label", collapsed ? "Expand play panel" : "Collapse play panel");
-    });
-
     dom.charGrid.addEventListener("click", (event) => { const card=event.target.closest("[data-char]"); if(card) showCharacter(card.dataset.char); });
     dom.charGrid.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
