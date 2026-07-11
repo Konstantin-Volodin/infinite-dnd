@@ -4,22 +4,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import socket
 import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from src.interface.assets import static_asset
-from src.interface.dashboard import _HTML as WORLD_HTML
+from src.interface.assets import read_asset, static_asset
 from src.engine.state import WorldState
 from src.interface.session_log import DEFAULT_LOG_DIR, list_logs, load_session
-from src.interface.viewer import _HTML as LOGS_HTML, _pick_port
 from src.interface.web_player import PlayBroker
 from src.interface.world_state import DEFAULT_STATE_DIR, list_state_runs, load_series, load_view
 
-
-
+WORLD_HTML = read_asset("templates/world.html")
+LOGS_HTML = read_asset("templates/logs.html")
 
 def _with_nav(html: str, active: str) -> str:
     world_current = ' aria-current="page"' if active == "world" else ""
@@ -199,6 +198,18 @@ def _build_handler(
             return
 
     return StudioHandler
+
+
+def _pick_port(host: str, preferred: int) -> int:
+    for candidate in [preferred, *range(preferred + 1, preferred + 10), 0]:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind((host, candidate))
+            except OSError:
+                continue
+            return sock.getsockname()[1]
+    raise RuntimeError("Could not find an available port.")
 
 
 def main(argv: list[str] | None = None) -> int:
