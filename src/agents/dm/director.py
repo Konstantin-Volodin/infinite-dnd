@@ -31,18 +31,7 @@ def director_output(
     quest_id: str | None = None,
 ) -> DirectorResult:
     """introduce exactly one complication: a narrative event, optionally one required new entity, tied to a quest when possible."""
-    create = None
-    if entity and entity.name.strip():
-        create = Create(
-            type=entity.type,
-            name=entity.name,
-            description=entity.description,
-            location=entity.location,
-            role=entity.role,
-            goal=entity.goal,
-            owner=entity.owner,
-            plan=entity.plan,
-        )
+    create = entity.to_create() if entity and entity.name.strip() else None
     return DirectorResult(event=event.strip(), create=create, quest_id=quest_id)
 
 

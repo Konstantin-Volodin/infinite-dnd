@@ -29,6 +29,9 @@ class NewEntity(BaseModel):
     owner: str | None = None
     plan: list[str] | None = None  # quests only: 3-5 concrete, ordered objectives
 
+    def to_create(self) -> Create:
+        return Create(**self.model_dump())
+
 
 class QuestUpdate(BaseModel):
     quest_id: str
@@ -64,20 +67,7 @@ def dm_output(
     minutes: list[int],
 ) -> DMResult:
     """register new entities, report quest, relationship, and faction-clock changes, and estimate minutes elapsed per new event."""
-    creates = [
-        Create(
-            type=e.type,
-            name=e.name,
-            description=e.description,
-            location=e.location,
-            role=e.role,
-            goal=e.goal,
-            owner=e.owner,
-            plan=e.plan,
-        )
-        for e in entities
-        if e.name.strip()
-    ]
+    creates = [e.to_create() for e in entities if e.name.strip()]
     quest_modifies = [
         Modify(action="update_quest", target_id=u.quest_id, status=u.new_status, step=u.step, advance=u.advance)
         for u in quest_updates

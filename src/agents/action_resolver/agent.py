@@ -2,7 +2,7 @@
 
 Public entry: `resolve(intent, state, usage=None) -> str`.
 Deterministic dispatch for structured intents; an internal LLM sub-agent
-(`_action_agent`) handles free-form Action tool.
+(`agent`) handles free-form Action tool.
 """
 
 from dataclasses import dataclass
@@ -80,13 +80,13 @@ async def _dispatch(
     tool: AnyTool, state: WorldState, usage: RunUsage | None, logger: Logger | None, rng: DieRoller | None
 ) -> str:
     if isinstance(tool, Speak):
-        return _resolve_speak(tool, state)
+        return WorldOperations(state).speak(tool.actor, tool.message, tool.target)
     if isinstance(tool, Travel):
-        return _resolve_travel(tool, state)
+        return WorldOperations(state).move_character(tool.actor, tool.destination)
     if isinstance(tool, Wait):
         return _resolve_wait(tool, state)
     if isinstance(tool, Attack):
-        return _resolve_attack(tool, state)
+        return WorldOperations(state).attack(tool.actor, tool.target)
     if isinstance(tool, Check):
         return _resolve_check(tool, state, rng)
     if isinstance(tool, Create):
@@ -101,14 +101,6 @@ async def _dispatch(
 # ============================================================
 # Deterministic dispatch
 # ============================================================
-
-def _resolve_speak(tool: Speak, state: WorldState) -> str:
-    return WorldOperations(state).speak(tool.actor, tool.message, tool.target)
-
-
-def _resolve_travel(tool: Travel, state: WorldState) -> str:
-    return WorldOperations(state).move_character(tool.actor, tool.destination)
-
 
 def _resolve_wait(tool: Wait, state: WorldState) -> str:
     actor = state.characters.get(tool.actor)
@@ -128,10 +120,6 @@ def _resolve_wait(tool: Wait, state: WorldState) -> str:
         text = f"{tool.actor} waits."
     state.history.append(HistoryEvent(text=text, location=actor.location, characters=[tool.actor]))
     return text
-
-
-def _resolve_attack(tool: Attack, state: WorldState) -> str:
-    return WorldOperations(state).attack(tool.actor, tool.target)
 
 
 def _resolve_check(tool: Check, state: WorldState, rng: DieRoller | None) -> str:
@@ -221,14 +209,14 @@ async def _resolve_action(tool: Action, state: WorldState, usage: RunUsage | Non
     prompt = f"Resolve this action: {tool.description}"
     if tool.target:
         prompt += f" (target: {tool.target})"
-    deps = _ActionResolverDeps(char=char, state=state, description=tool.description, target=tool.target)
+    deps = ActionResolverDeps(char=char, state=state, description=tool.description, target=tool.target)
     try:
         if logger:
             with logger.run("action_resolver"):
-                result = await _action_agent.run(prompt, deps=deps, usage=usage, usage_limits=_ACTION_USAGE)
+                result = await agent.run(prompt, deps=deps, usage=usage, usage_limits=_ACTION_USAGE)
                 logger.log_messages("action_resolver", result.all_messages())
         else:
-            result = await _action_agent.run(prompt, deps=deps, usage=usage, usage_limits=_ACTION_USAGE)
+            result = await agent.run(prompt, deps=deps, usage=usage, usage_limits=_ACTION_USAGE)
         output = result.output.strip()
     except UsageLimitExceeded:
         output = (
@@ -250,7 +238,7 @@ async def _resolve_action(tool: Action, state: WorldState, usage: RunUsage | Non
 # ============================================================
 
 @dataclass
-class _ActionResolverDeps:
+class ActionResolverDeps:
     char: Character
     state: WorldState
     description: str
@@ -258,28 +246,21 @@ class _ActionResolverDeps:
     remembered_this_action: bool = False
 
 
-# Keep public alias for context.py / tests that still reference the old name.
-ActionResolverDeps = _ActionResolverDeps
-
-
-_action_agent: Agent[_ActionResolverDeps, str] = Agent(
+agent: Agent[ActionResolverDeps, str] = Agent(
     model=create_model(),
-    deps_type=_ActionResolverDeps,
+    deps_type=ActionResolverDeps,
     output_type=ToolOutput(str, name="done"),
     instructions="Resolve exactly one character action into concrete state changes. Report the outcome in one short, plain sentence — no scene-setting or flourishes.",
 )
 
-# Public alias for tests / external imports.
-agent = _action_agent
 
-
-@_action_agent.system_prompt
-def _identity(_: RunContext[_ActionResolverDeps]) -> str:
+@agent.system_prompt
+def _identity(_: RunContext[ActionResolverDeps]) -> str:
     return action_resolver_system()
 
 
-@_action_agent.instructions
-def _context(ctx: RunContext[_ActionResolverDeps]) -> str:
+@agent.instructions
+def _context(ctx: RunContext[ActionResolverDeps]) -> str:
     return action_resolver_context(
         ctx.deps.char,
         ctx.deps.state,
@@ -288,13 +269,13 @@ def _context(ctx: RunContext[_ActionResolverDeps]) -> str:
     )
 
 
-def _ops(ctx: RunContext[_ActionResolverDeps]) -> WorldOperations:
+def _ops(ctx: RunContext[ActionResolverDeps]) -> WorldOperations:
     return WorldOperations(ctx.deps.state)
 
 
-@_action_agent.tool
+@agent.tool
 def remember(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     knowledge: str,
     character_id: str | None = None,
 ) -> str:
@@ -305,9 +286,9 @@ def remember(
     return _ops(ctx).add_knowledge(character_id or ctx.deps.char.id, knowledge)
 
 
-@_action_agent.tool
+@agent.tool
 def add_detail(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     detail: str,
     location: str | None = None,
 ) -> str:
@@ -315,9 +296,9 @@ def add_detail(
     return _ops(ctx).modify_location(location or ctx.deps.char.location, add_feature=detail)
 
 
-@_action_agent.tool
+@agent.tool
 def discover_exit(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     name: str,
     description: str,
     location_id: str | None = None,
@@ -328,9 +309,9 @@ def discover_exit(
     return _ops(ctx).add_location(location_id or slugify(name), description=description, connections=[anchor])
 
 
-@_action_agent.tool
+@agent.tool
 def adjust_hp(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     delta: int,
     character_id: str | None = None,
     reason: str | None = None,
@@ -341,9 +322,9 @@ def adjust_hp(
     return ops.heal(target, delta) if delta >= 0 else ops.damage(target, -delta)
 
 
-@_action_agent.tool
+@agent.tool
 def update_quest(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     quest_id: str,
     status: str,
 ) -> str:
@@ -351,9 +332,9 @@ def update_quest(
     return _ops(ctx).advance_quest(quest_id, new_status=status)
 
 
-@_action_agent.tool
+@agent.tool
 def take(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     item_name: str,
     character_id: str | None = None,
 ) -> str:
@@ -361,9 +342,9 @@ def take(
     return _ops(ctx).take_item(character_id or ctx.deps.char.id, item_name)
 
 
-@_action_agent.tool
+@agent.tool
 def drop(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     item_name: str,
     character_id: str | None = None,
 ) -> str:
@@ -371,9 +352,9 @@ def drop(
     return _ops(ctx).drop_item(character_id or ctx.deps.char.id, item_name)
 
 
-@_action_agent.tool
+@agent.tool
 def create_item(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     item_name: str,
     location: str | None = None,
 ) -> str:
@@ -381,15 +362,15 @@ def create_item(
     return _ops(ctx).create_item(item_name, location or ctx.deps.char.location)
 
 
-@_action_agent.tool
-def give_gold(ctx: RunContext[_ActionResolverDeps], amount: int, character_id: str) -> str:
+@agent.tool
+def give_gold(ctx: RunContext[ActionResolverDeps], amount: int, character_id: str) -> str:
     """give some of my gold to another character — payment, bribe, tip. no item involved."""
     return _ops(ctx).give_gold(ctx.deps.char.id, character_id, amount)
 
 
-@_action_agent.tool
+@agent.tool
 def trade_item(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     item_name: str,
     price: int,
     counterparty_id: str,
@@ -401,9 +382,9 @@ def trade_item(
     return _ops(ctx).trade_item(buyer, seller, item_name, price)
 
 
-@_action_agent.tool
+@agent.tool
 def create_npc(
-    ctx: RunContext[_ActionResolverDeps],
+    ctx: RunContext[ActionResolverDeps],
     name: str,
     role: str = "",
     goal: str = "",

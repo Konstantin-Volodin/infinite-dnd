@@ -131,7 +131,7 @@ def test_free_form_action_records_its_outcome_before_optional_self_updates(monke
     async def resolved_action(*_args, **_kwargs):
         return SimpleNamespace(output="A misaligned portrait reveals a hidden compartment.")
 
-    monkeypatch.setattr("src.agents.action_resolver.agent._action_agent.run", resolved_action)
+    monkeypatch.setattr("src.agents.action_resolver.agent.agent.run", resolved_action)
 
     result = asyncio.run(resolve(Action(
         actor="hero",
@@ -168,7 +168,7 @@ def test_free_form_action_usage_limit_becomes_visible_outcome_instead_of_crash(m
     async def exhausted(*_args, **_kwargs):
         raise UsageLimitExceeded("request limit reached")
 
-    monkeypatch.setattr("src.agents.action_resolver.agent._action_agent.run", exhausted)
+    monkeypatch.setattr("src.agents.action_resolver.agent.agent.run", exhausted)
 
     result = asyncio.run(resolve(Action(actor="hero", description="search forever"), state))
 

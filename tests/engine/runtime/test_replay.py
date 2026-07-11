@@ -143,7 +143,7 @@ def test_action_playback_restores_effects_without_resolver_agent(tmp_path, monke
     async def unexpected(*_args, **_kwargs):
         raise AssertionError("the action resolver agent was called during replay")
 
-    monkeypatch.setattr("src.agents.action_resolver.agent._action_agent.run", unexpected)
+    monkeypatch.setattr("src.agents.action_resolver.agent.agent.run", unexpected)
     state = _state()
     playback = ReplayTape.playback(path)
     asyncio.run(tick("hero", state, 0, _Logger(), replay=playback))
