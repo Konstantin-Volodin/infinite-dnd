@@ -124,47 +124,9 @@ class WorldOps(_OpsBase):
         if remove_feature and remove_feature in loc.features: loc.features.remove(remove_feature)
         return f"Location '{location_id}' updated."
 
-    def connect_locations(self, location_a: str, location_b: str) -> str:
-        if location_a not in self.state.locations: return f"Cannot connect — location '{location_a}' not found."
-        if location_b not in self.state.locations: return f"Cannot connect — location '{location_b}' not found."
-
-        loc_a, loc_b = self.state.locations[location_a], self.state.locations[location_b]
-        if location_b in loc_a.connections: return f"'{location_a}' and '{location_b}' are already connected."
-
-        loc_a.connections.append(location_b)
-        loc_b.connections.append(location_a)
-        return f"'{location_a}' and '{location_b}' connected."
-
-    def disconnect_locations(self, location_a: str, location_b: str) -> str:
-        if location_a not in self.state.locations: return f"Cannot disconnect — location '{location_a}' not found."
-        if location_b not in self.state.locations: return f"Cannot disconnect — location '{location_b}' not found."
-
-        loc_a, loc_b = self.state.locations[location_a], self.state.locations[location_b]
-        if location_b not in loc_a.connections: return f"'{location_a}' and '{location_b}' are not connected."
-
-        loc_a.connections.remove(location_b)
-        loc_b.connections.remove(location_a)
-        return f"'{location_a}' and '{location_b}' disconnected."
-
-    def remove_location(self, location_id: str) -> str:
-        if location_id not in self.state.locations: return f"Cannot remove — location '{location_id}' not found."
-
-        for loc in self.state.locations.values():
-            if location_id in loc.connections:
-                loc.connections.remove(location_id)
-
-        del self.state.locations[location_id]
-        return f"Location '{location_id}' removed."
-
     # ============ EVENTS ============
     def world_event(self, text: str, location_id: str) -> str:
         """log a narrative event witnessed by everyone present at the location."""
         witnesses = [cid for cid, c in self.state.characters.items() if c.location == location_id]
         self._log(text, location_id, witnesses)
         return text
-
-    # ============ TIME ============
-    def tick_time(self, event_text: str, location: str, characters: list[str] | None = None) -> str:
-        self.state.time += 1
-        self._log(event_text, location, characters)
-        return f"Time advanced to {self.state.time}. Event logged: {event_text}"

@@ -65,38 +65,6 @@ class CharacterOps(_OpsBase):
         self._log(result, char.location, [character_id])
         return result
 
-    def give_item(self, from_character_id: str, to_character_id: str, item: str) -> str:
-        giver = self.state.characters.get(from_character_id)
-        if not giver: return f"Cannot give item — character '{from_character_id}' not found."
-
-        receiver = self.state.characters.get(to_character_id)
-        if not receiver: return f"Cannot give item — character '{to_character_id}' not found."
-        if giver.location != receiver.location: return f"Cannot give item — '{from_character_id}' and '{to_character_id}' are not in the same location."
-        if receiver.stats.hp <= 0: return f"Cannot give item — '{to_character_id}' is dead."
-        if item not in giver.inventory: return f"Cannot give '{item}' — {from_character_id} doesn't have it."
-
-        giver.inventory.remove(item)
-        receiver.inventory.append(item)
-        result = f"{from_character_id} gives '{item}' to {to_character_id}."
-        self._log(result, giver.location, [from_character_id, to_character_id])
-        return result
-
-    def loot_item(self, character_id: str, target_id: str, item: str) -> str:
-        char = self.state.characters.get(character_id)
-        if not char: return f"Cannot loot — character '{character_id}' not found."
-
-        target = self.state.characters.get(target_id)
-        if not target: return f"Cannot loot — character '{target_id}' not found."
-        if char.location != target.location: return f"Cannot loot — '{character_id}' and '{target_id}' are not in the same location."
-        if target.stats.hp > 0: return f"Cannot loot '{target_id}' — they are still alive."
-        if item not in target.inventory: return f"Cannot loot '{item}' — {target_id} doesn't have it."
-
-        target.inventory.remove(item)
-        char.inventory.append(item)
-        result = f"{character_id} loots '{item}' from {target_id}."
-        self._log(result, char.location, [character_id, target_id])
-        return result
-
     def trade_item(self, buyer_id: str, seller_id: str, item: str, price: int) -> str:
         buyer = self.state.characters.get(buyer_id)
         if not buyer: return f"Cannot trade — character '{buyer_id}' not found."
@@ -143,6 +111,7 @@ class CharacterOps(_OpsBase):
         char = self.state.characters.get(character_id)
         if not char: return f"Cannot damage — character '{character_id}' not found."
 
+        amount = max(0, amount)
         char.stats.hp = max(0, char.stats.hp - amount)
         result = f"{character_id} takes {amount} damage. HP: {char.stats.hp}/{char.stats.max_hp}."
         self._log(result, char.location, [character_id])
@@ -152,6 +121,7 @@ class CharacterOps(_OpsBase):
         char = self.state.characters.get(character_id)
         if not char: return f"Cannot heal — character '{character_id}' not found."
 
+        amount = max(0, amount)
         char.stats.hp = min(char.stats.max_hp, char.stats.hp + amount)
         result = f"{character_id} heals {amount} HP. HP: {char.stats.hp}/{char.stats.max_hp}."
         self._log(result, char.location, [character_id])
@@ -213,16 +183,6 @@ class CharacterOps(_OpsBase):
         self._log(result, char.location, [character_id])
         return result
 
-    def update_character(self, character_id: str, backstory: str | None = None, personality: str | None = None, goal: str | None = None, role: str | None = None) -> str:
-        char = self.state.characters.get(character_id)
-        if not char: return f"Cannot update — character '{character_id}' not found."
-
-        if backstory is not None: char.backstory = backstory
-        if personality is not None: char.personality = personality
-        if goal is not None: char.goal = goal
-        if role is not None: char.role = role
-        return f"{character_id} updated."
-
     # ============ RELATIONSHIPS ============
     def update_relationship(self, character_id: str, target_id: str, relation: str) -> str:
         char = self.state.characters.get(character_id)
@@ -231,14 +191,6 @@ class CharacterOps(_OpsBase):
 
         char.relationships[target_id] = relation
         return f"{character_id}'s relationship with {target_id} is now '{relation}'."
-
-    def remove_relationship(self, character_id: str, target_id: str) -> str:
-        char = self.state.characters.get(character_id)
-        if not char: return f"Cannot remove relationship — character '{character_id}' not found."
-        if target_id not in char.relationships: return f"{character_id} has no relationship with '{target_id}'."
-
-        del char.relationships[target_id]
-        return f"{character_id}'s relationship with {target_id} removed."
 
     # ============ KNOWLEDGE ============
     def add_knowledge(self, character_id: str, fact: str) -> str:

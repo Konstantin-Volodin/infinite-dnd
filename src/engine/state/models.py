@@ -60,7 +60,7 @@ class HistoryEvent(BaseModel):
 class Quest(BaseModel):
     id: str
     title: str
-    description: str
+    description: str = ""
     status: str = "active"
     owner: str = ""
     plan: List[str] = Field(default_factory=list)  # ordered, concrete objectives set at creation

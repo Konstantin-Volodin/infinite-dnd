@@ -41,18 +41,6 @@ def test_take_drop_item(state, ops):
     assert "ale" in state.locations["tavern"].items
 
 
-def test_give_loot_item(state, ops):
-    ops.give_item("merchant", "hero", "potion")
-    assert "potion" in state.characters["hero"].inventory
-    ops.damage("merchant", 100)
-    assert state.characters["merchant"].stats.hp == 0
-    ops.loot_item("hero", "merchant", "shield")
-    assert "shield" in state.characters["hero"].inventory
-    assert "Cannot give" in ops.give_item("hero", "merchant", "potion")  # dead
-    ops.heal("merchant", 100)
-    assert "Cannot loot" in ops.loot_item("hero", "merchant", "shield")  # alive
-
-
 # ============ COMBAT ============
 
 class _FixedRng:
@@ -99,6 +87,13 @@ def test_damage_heal(state, ops):
     ops.damage("hero", 100)
     assert state.characters["hero"].stats.hp == 0
     ops.heal("hero", 100)
+    assert state.characters["hero"].stats.hp == 20
+
+
+def test_damage_and_heal_clamp_negative_amounts(state, ops):
+    assert "takes 0 damage" in ops.damage("hero", -5)
+    assert "heals 0 HP" in ops.heal("hero", -5)
+
     assert state.characters["hero"].stats.hp == 20
 
 
@@ -164,22 +159,11 @@ def test_trade_item(state, ops):
     assert "Cannot trade" in ops.trade_item("hero", "merchant", "shield", 1)  # different locations
 
 
-# ============ CHARACTER UPDATE ============
-
-def test_update_character(state, ops):
-    ops.update_character("hero", goal="find the artifact", personality="brooding")
-    assert state.characters["hero"].goal == "find the artifact"
-    assert state.characters["hero"].personality == "brooding"
-    assert "Cannot update" in ops.update_character("ghost", goal="haunt")
-
-
 # ============ RELATIONSHIPS ============
 
 def test_relationships(state, ops):
     ops.update_relationship("hero", "merchant", "friendly")
     assert state.characters["hero"].relationships["merchant"] == "friendly"
-    ops.remove_relationship("hero", "merchant")
-    assert "merchant" not in state.characters["hero"].relationships
 
 
 # ============ KNOWLEDGE ============

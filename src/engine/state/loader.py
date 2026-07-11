@@ -11,12 +11,21 @@ from src.engine.state.models import (
     WorldState,
     Character,
     Location,
-    CharacterStats,
     Faction,
-    ProgressClock,
     Quest,
 )
 from src.world import pick_scenario, read_manifest, scenario_dir
+
+_SNAPSHOT_PATTERN = re.compile(r"world_state_(\d+)\.json")
+
+
+def _snapshots(directory: Path):
+    """Yield (numeric id, mtime, filename) for valid snapshot files in a directory."""
+    for path in directory.glob("world_state_*.json"):
+        match = _SNAPSHOT_PATTERN.fullmatch(path.name)
+        if match:
+            yield int(match.group(1)), path.stat().st_mtime, path.name
+
 
 class StateManager:
     """Load, persist, and reset world state for a chosen scenario."""
@@ -46,13 +55,9 @@ class StateManager:
         for run_dir in self.scenario_dir.iterdir():
             if not run_dir.is_dir():
                 continue
-            snapshots = [
-                path
-                for path in run_dir.glob("world_state_*.json")
-                if re.fullmatch(r"world_state_(\d+)\.json", path.name)
-            ]
-            if snapshots:
-                candidate = (max(path.stat().st_mtime for path in snapshots), run_dir.name)
+            mtimes = [mtime for _, mtime, _ in _snapshots(run_dir)]
+            if mtimes:
+                candidate = (max(mtimes), run_dir.name)
                 if latest is None or candidate > latest:
                     latest = candidate
         return latest[1] if latest else None
@@ -64,66 +69,27 @@ class StateManager:
     def init_state(self) -> WorldState:
         """Load fresh world from setup files."""
 
-        locations = {}
-        locations_json = self.read_json(self.setup_dir / "locations.json")
-        for loc in locations_json:
-            locations[loc["id"]] = Location(
-                id=loc["id"],
-                description=loc.get("description", ""),
-                connections=loc.get("connections", []),
-                features=loc.get("features", []),
-                items=loc.get("items", []),
-            )
+        locations = {
+            loc["id"]: Location.model_validate(loc)
+            for loc in self.read_json(self.setup_dir / "locations.json")
+        }
+        characters = {
+            char["id"]: Character.model_validate(char)
+            for char in self.read_json(self.setup_dir / "characters.json")
+        }
+        quests = {
+            quest["id"]: Quest.model_validate(quest)
+            for quest in self.read_json(self.setup_dir / "quests.json")
+        }
 
-        characters = {}
-        characters_json = self.read_json(self.setup_dir / "characters.json")
-        for char in characters_json:
-            characters[char["id"]] = Character(
-                id=char["id"],
-                location=char["location"],
-                role=char.get("role", ""),
-                stats=CharacterStats(**char.get("stats", {})),
-                backstory=char.get("backstory", ""),
-                personality=char.get("personality", ""),
-                goal=char.get("goal", ""),
-                inventory=char.get("inventory", []),
-                knowledge=char.get("knowledge", []),
-                relationships=char.get("relationships", {}),
-            )
-
-        quests = {}
-        quests_json = self.read_json(self.setup_dir / "quests.json")
-        for quest in quests_json:
-            quests[quest["id"]] = Quest(
-                id=quest["id"],
-                title=quest.get("title", ""),
-                description=quest.get("description", ""),
-                status=quest.get("status", "active"),
-                owner=quest.get("owner", ""),
-                plan=quest.get("plan", []),
-                current_step=quest.get("current_step", 0),
-                steps=quest.get("steps", []),
-            )
-
-        factions = {}
         factions_path = self.setup_dir / "factions.json"
-        if factions_path.exists():
-            for faction in self.read_json(factions_path):
-                clocks = [ProgressClock(**clock) for clock in faction.get("clocks", [])]
-                factions[faction["id"]] = Faction(
-                    id=faction["id"],
-                    name=faction["name"],
-                    goal=faction["goal"],
-                    clocks=clocks,
-                )
-
-        word_state = WorldState(
-            locations=locations,
-            characters=characters,
-            quests=quests,
-            factions=factions,
+        factions = (
+            {faction["id"]: Faction.model_validate(faction) for faction in self.read_json(factions_path)}
+            if factions_path.exists()
+            else {}
         )
-        return word_state
+
+        return WorldState(locations=locations, characters=characters, quests=quests, factions=factions)
 
     def load_state(self, world_state_file: str | None = None) -> WorldState:
         """Load saved state, or create fresh from setup if none exists."""
@@ -142,12 +108,9 @@ class StateManager:
     def latest_snapshot_name(self) -> str | None:
         """Return the highest numbered snapshot in this scenario, if any."""
         latest: tuple[int, str] | None = None
-        for path in self.state_dir.glob("world_state_*.json"):
-            match = re.fullmatch(r"world_state_(\d+)\.json", path.name)
-            if match:
-                candidate = (int(match.group(1)), path.name)
-                if latest is None or candidate[0] > latest[0]:
-                    latest = candidate
+        for num, _, name in _snapshots(self.state_dir):
+            if latest is None or num > latest[0]:
+                latest = (num, name)
         return latest[1] if latest else None
 
     def save_state(self, state: WorldState):

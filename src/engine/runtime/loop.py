@@ -20,6 +20,7 @@ from src.agents.dm.director import DirectorDeps, agent as director_agent
 from src.agents.action_resolver.agent import resolve
 from src.agents.server import read_metrics
 from src.interface.session_log import Logger
+from src.interface.world_state import format_clock
 from .chronicle import compact_history
 from .replay import ReplayTape
 
@@ -79,12 +80,6 @@ def _scene_actors(state: WorldState, active_pc_id: str) -> list[str]:
 def _pick_next_actor(state: WorldState, active_pc_id: str, tick: int) -> str:
     actors = _scene_actors(state, active_pc_id)
     return actors[tick % len(actors)]
-
-
-def _format_clock(total_minutes: int) -> str:
-    day = total_minutes // 1440 + 1
-    remainder = total_minutes % 1440
-    return f"day {day}, {remainder // 60:02d}:{remainder % 60:02d}"
 
 
 def _describe_tool(tool: CharacterTool) -> str:
@@ -406,7 +401,7 @@ async def tick(
     for event in new_events:
         print(f"  {event.text}  (+{event.minutes_elapsed}m)")
     if new_events:
-        print(f"  [clock: {_format_clock(state.minutes_elapsed)}]")
+        print(f"  [clock: {format_clock(state.minutes_elapsed)}]")
 
     # 2b. Enrich the world. Revealed entities are retcons — logged but not time-stamped.
     pre_enrich = len(state.history)
