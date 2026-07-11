@@ -10,7 +10,14 @@ from typing import cast
 
 from src.agents.character.tools import Ability, Action, Attack, CharacterTool, Check, Speak, Travel, Wait
 from src.engine.rules import get_health_status
-from src.engine.state import WorldState, characters_in_location, connected_location_ids, resolve_character, resolve_location_id
+from src.engine.state import (
+    WorldState,
+    characters_in_location,
+    connected_location_ids,
+    quest_deadline_clocks,
+    resolve_character,
+    resolve_location_id,
+)
 
 _HELP = "Type a plain sentence to act, or: /check <ability> <DC> <action> [vs <character>] | /speak ... | /travel ... | /attack ... | /wait"
 
@@ -50,14 +57,11 @@ def _describe_situation(actor_id: str, state: WorldState, *, include_help: bool 
             lines.append(f"Current objective ({quest.title}): {objective}")
 
     active_quest_ids = {quest.id for quest in active_quests}
-    for faction_id in sorted(state.factions):
-        faction = state.factions[faction_id]
-        for clock in sorted(faction.clocks, key=lambda candidate: candidate.id):
-            if clock.fail_quest_id in active_quest_ids and not clock.consequence_triggered:
-                lines.append(
-                    f"Deadline ({clock.name}): {clock.progress}/{clock.segments} — "
-                    f"{clock.consequence}"
-                )
+    for _, clock in quest_deadline_clocks(state, active_quest_ids):
+        lines.append(
+            f"Deadline ({clock.name}): {clock.progress}/{clock.segments} — "
+            f"{clock.consequence}"
+        )
 
     witnessed = [event.text for event in state.history if actor_id in event.characters]
     if witnessed:

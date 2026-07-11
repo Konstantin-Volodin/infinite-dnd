@@ -163,36 +163,26 @@ def _build_handler(
             ):
                 raise FileNotFoundError(f"Run not found: {scenario}/{run_id}")
 
-        def _send_html(self, html: str) -> None:
-            body = html.encode("utf-8")
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
-
-        def _send_static(self, name: str) -> None:
-            asset = static_asset(name)
-            if asset is None:
-                self._send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
-                return
-            body, content_type = asset
-            self.send_response(HTTPStatus.OK)
+        def _send(self, body: bytes, content_type: str, status: HTTPStatus = HTTPStatus.OK) -> None:
+            self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
 
+        def _send_html(self, html: str) -> None:
+            self._send(html.encode("utf-8"), "text/html; charset=utf-8")
+
+        def _send_static(self, name: str) -> None:
+            asset = static_asset(name)
+            if asset is None:
+                self._send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send(*asset)
+
         def _send_json(self, payload: object, status: HTTPStatus = HTTPStatus.OK) -> None:
-            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+            self._send(json.dumps(payload, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8", status)
 
         def log_message(self, format: str, *args) -> None:  # noqa: A003
             return

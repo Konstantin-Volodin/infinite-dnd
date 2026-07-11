@@ -11,7 +11,7 @@ from io import TextIOWrapper
 from pydantic_ai.exceptions import ModelAPIError, UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
 
-from src.engine.state import StateManager, WorldOperations, WorldState
+from src.engine.state import StateManager, WorldOperations, WorldState, is_dialogue
 from src.engine.state.models import HistoryEvent
 from src.agents.character.agent import CharacterDeps, agent as character_agent
 from src.agents.character.tools import Action, Attack, CharacterTool, Check, Speak, Travel, Wait
@@ -234,9 +234,8 @@ def _announce_campaign_outcome(state: WorldState, pc_id: str, logger: Logger, ou
 
 
 def _is_idle_event(text: str) -> bool:
-    """Speak/wait-style event — mirrors the dialogue heuristic in character/context.py."""
-    lowered = text.lower()
-    return '"' in text or "says" in lowered or "waits" in lowered
+    """Speak/wait-style event."""
+    return is_dialogue(text) or "waits" in text.lower()
 
 
 def _is_stalled(state: WorldState) -> bool:
