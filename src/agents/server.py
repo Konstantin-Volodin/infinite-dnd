@@ -7,9 +7,14 @@ import logging
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
+
+import yaml
 from dotenv import load_dotenv
 load_dotenv()
 
+
+_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "llama.yaml"
 
 # llama-server /metrics counters that split a request into its two phases:
 # prompt processing (prefill) and token generation (decode).
@@ -45,9 +50,26 @@ def read_metrics() -> dict[str, float] | None:
     return values or None
 
 
-def _reasoning_args(model: str) -> list[str]:
+def load_profile(name: str | None = None) -> tuple[str, dict]:
+    """Resolve a tuning profile from config/llama.yaml, merged over `default`."""
+    name = name or os.getenv("LLM_PROFILE", "default")
+    profiles = yaml.safe_load(_CONFIG_PATH.read_text(encoding="utf-8"))
+    if name not in profiles:
+        raise RuntimeError(f"Unknown LLM_PROFILE {name!r}; available: {', '.join(profiles)}")
+    merged = dict(profiles["default"])
+    merged.update(profiles[name])
+    return name, merged
+
+
+def _flag_value(value: object) -> str:
+    # YAML may parse unquoted on/off-style values as booleans; llama-server wants on/off.
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    return str(value)
+
+
+def _reasoning_args(model: str, reasoning: str) -> list[str]:
     """Build llama.cpp reasoning flags, including its Gemma 4 tool-call workaround."""
-    reasoning = os.getenv("LLM_REASONING", "auto")
     if reasoning == "off" and "gemma-4" in model.lower():
         # With Gemma 4, --reasoning off makes llama.cpp emit an empty `start`
         # production in its tool-call grammar. Keeping the parser enabled with
@@ -56,33 +78,23 @@ def _reasoning_args(model: str) -> list[str]:
     return ["--reasoning", reasoning]
 
 
-def _performance_args() -> list[str]:
-    """Defaults measured for the local MoE model, while keeping every knob overridable."""
-    default_threads = str(min(os.cpu_count() or 1, 8))
-    return [
-        "--threads", os.getenv("LLM_THREADS", default_threads),
-        "--threads-batch", os.getenv("LLM_THREADS_BATCH", default_threads),
-        "--n-cpu-moe", os.getenv("LLM_N_CPU_MOE", "11"),
-    ]
-
-
-def _speculative_args() -> list[str]:
-    """Enable speculative decoding when a compatible embedded or separate drafter is configured."""
-    spec_type = os.getenv("LLM_SPEC_TYPE", "none")
-    if spec_type == "none":
-        return []
-    args = [
-        "--spec-type", spec_type,
-        "--spec-draft-n-max", os.getenv("LLM_SPEC_DRAFT_N_MAX", "3"),
-    ]
-    if draft_model := os.getenv("LLM_SPEC_DRAFT_MODEL"):
-        args.extend(["--spec-draft-model", draft_model])
+def _profile_args(profile: dict, model: str) -> list[str]:
+    """Render a profile's keys as llama-server command-line flags."""
+    args: list[str] = []
+    for key, value in profile.items():
+        if key == "reasoning":
+            args.extend(_reasoning_args(model, _flag_value(value)))
+        elif value is None:  # a bare `key:` renders as a valueless flag, e.g. --no-mmap
+            args.append(f"--{key}")
+        else:
+            args.extend([f"--{key}", _flag_value(value)])
     return args
+
 
 class LlamaServer:
     """manages a local llama-server subprocess."""
 
-    def __init__(self):
+    def __init__(self, profile: str | None = None):
         model = os.getenv("LLM_MODEL")
         model_path = os.getenv("LLM_MODEL_PATH")
         if not model and not model_path:
@@ -91,31 +103,18 @@ class LlamaServer:
         port = urllib.parse.urlparse(base_url).port or 1234
         self._health_url = f"http://localhost:{port}/health"
 
+        profile_name, config = load_profile(profile)
         server_bin = os.getenv("LLM_SERVER_BIN", "llama-server")
         # -m loads a local file directly (no network); -hf resolves/downloads by repo id.
         model_arg = ["-m", model_path] if model_path else ["-hf", model]
         cmd = [
             server_bin, *model_arg, "--port", str(port),
-            "--ctx-size", os.getenv("LLM_CTX_SIZE", "8192"),
-            "--n-predict", os.getenv("LLM_N_PREDICT", "-1"),
-            "--parallel", os.getenv("LLM_PARALLEL", "1"),
-            "-ngl", os.getenv("LLM_NGL", "99"),
-            *_performance_args(),
-            *_speculative_args(),
-            "--batch-size", os.getenv("LLM_BATCH_SIZE", "1024"),
-            "--ubatch-size", os.getenv("LLM_UBATCH_SIZE", "512"),
-            "--flash-attn", os.getenv("LLM_FLASH_ATTN", "on"),
-            *_reasoning_args(model or model_path or ""),
+            *_profile_args(config, model or model_path or ""),
             "--metrics",
             "--jinja",
-            "--temp", os.getenv("LLM_TEMP", "1.0"),
-            "--top-p", os.getenv("LLM_TOP_P", "0.95"),
-            "--top-k", os.getenv("LLM_TOP_K", "64"),
-            "--min-p", os.getenv("LLM_MIN_P", "0.01"),
             "--log-disable",
-            "--repeat-penalty", os.getenv("LLM_REPEAT_PENALTY", "1.0"),
         ]
-        logging.info(f"Starting LlamaServer with command: {' '.join(str(a) for a in cmd)}")
+        logging.info(f"Starting LlamaServer (profile {profile_name!r}): {' '.join(cmd)}")
         self._process = subprocess.Popen(cmd)
 
         # Loads of 26B models can take 60s+ from disk; first-time HF downloads take longer.
@@ -124,10 +123,15 @@ class LlamaServer:
             if self._process.poll() is not None:
                 raise RuntimeError(f"llama-server exited during startup with code {self._process.returncode}")
             try:
-                urllib.request.urlopen(self._health_url, timeout=1).close()
-                return
+                with urllib.request.urlopen(self._health_url, timeout=1) as response:
+                    body = response.read().decode("utf-8", errors="replace")
+                # Some builds answer 200 while the model is still loading and requests
+                # would still 503; the body carries the real status.
+                if '"ok"' in body:
+                    return
             except (urllib.error.URLError, urllib.error.HTTPError):
-                time.sleep(0.5)
+                pass
+            time.sleep(0.5)
         self._process.terminate()
         raise RuntimeError(f"llama-server did not become healthy in 300s: {self._health_url}")
 
